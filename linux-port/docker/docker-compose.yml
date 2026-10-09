@@ -547,6 +547,8 @@ services:
       # and changelog page read it (classic_changelog_entries) instead of
       # the Plus edition's file on GitHub.
       - ../../CHANGELOG.md:/opt/m2package/CHANGELOG.md:ro
+      # And the operator's own changes on top of the package ("Moje zmiany").
+      - ../../CHANGELOG-LEXIW.md:/opt/m2package/CHANGELOG-LEXIW.md:ro
     networks: [backend]
 
   # The ItemShop (OskarPWA): a PHP shop for Dragon Coins (account.cash) and

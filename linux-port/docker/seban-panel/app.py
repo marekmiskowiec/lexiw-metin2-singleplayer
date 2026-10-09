@@ -758,7 +758,10 @@ MT2009_PLUS_WEBSITE_URL = "https://metin2sp.pl/"
 _mt2009_changelog_cache = {"at": 0.0, "entries": None}
 # MT2009 Classic: the package's own CHANGELOG.md (compose mounts it here).
 CLASSIC_CHANGELOG_PATH = os.environ.get("M2_PACKAGE_CHANGELOG", "/opt/m2package/CHANGELOG.md")
-_classic_changelog_cache = {"mtime": None, "entries": None}
+# Lexiw: the operator's own changes on top of the package, a file of their
+# own beside it ("Moje zmiany" on /changelog).
+LEXIW_CHANGELOG_PATH = os.environ.get("M2_LEXIW_CHANGELOG", "/opt/m2package/CHANGELOG-LEXIW.md")
+_changelog_file_cache = {}
 
 
 def _clean_changelog_text(text):
@@ -781,7 +784,8 @@ def parse_mt2009_changelog(markdown):
 
     for raw in markdown.splitlines():
         line = raw.rstrip()
-        heading = re.match(r"^##\s+((?:Klient|Client)\s+)?(\d+\.\d+\.\d+)\b(.*)$", line, re.I)
+        # A version may carry a suffix: "## 2.21.1-lexiw.1 — ..." (CHANGELOG-LEXIW.md).
+        heading = re.match(r"^##\s+((?:Klient|Client)\s+)?(\d+\.\d+\.\d+(?:-[A-Za-z][A-Za-z0-9.]*)?)\b(.*)$", line, re.I)
         if heading:
             flush()
             parts = [part.strip() for part in re.split(r"\s+[—–-]\s+", heading.group(3).strip(" —–-")) if part.strip()]
@@ -816,21 +820,33 @@ def parse_mt2009_changelog(markdown):
     return [entry for entry in entries if entry["changes"]][:40]
 
 
-def classic_changelog_entries():
-    """A MT2009 Classic world's changelog: the installed package's own
-    CHANGELOG.md (mounted read-only by compose), read again when it changes.
-    The Plus repository's file on GitHub is another edition's - on a Classic
-    2.21.1 world the dashboard announced Plus 2.28.0 as the latest change."""
+def changelog_file_entries(path):
+    """A changelog file in the package's format, read again when it changes;
+    no entries when it is not there."""
     try:
-        mtime = os.path.getmtime(CLASSIC_CHANGELOG_PATH)
-        if _classic_changelog_cache["entries"] is not None and _classic_changelog_cache["mtime"] == mtime:
-            return _classic_changelog_cache["entries"]
-        with open(CLASSIC_CHANGELOG_PATH, encoding="utf-8", errors="replace") as handle:
+        mtime = os.path.getmtime(path)
+        cached = _changelog_file_cache.get(path)
+        if cached and cached[0] == mtime:
+            return cached[1]
+        with open(path, encoding="utf-8", errors="replace") as handle:
             entries = parse_mt2009_changelog(handle.read())
     except OSError:
         return []
-    _classic_changelog_cache.update(mtime=mtime, entries=entries)
+    _changelog_file_cache[path] = (mtime, entries)
     return entries
+
+
+def classic_changelog_entries():
+    """A MT2009 Classic world's changelog: the installed package's own
+    CHANGELOG.md (mounted read-only by compose). The Plus repository's file
+    on GitHub is another edition's - on a Classic 2.21.1 world the dashboard
+    announced Plus 2.28.0 as the latest change."""
+    return changelog_file_entries(CLASSIC_CHANGELOG_PATH)
+
+
+def lexiw_changelog_entries():
+    """The operator's own changes (CHANGELOG-LEXIW.md beside the package's)."""
+    return changelog_file_entries(LEXIW_CHANGELOG_PATH)
 
 
 def changelog_entries():
@@ -8247,10 +8263,12 @@ def maps():
 @app.route("/changelog")
 @login_required
 def changelog():
-    # One changelog here: the project's own (changelog.html has no second tab).
-    source = "seban"
+    # Two tabs: the package's changelog, and the operator's own changes on
+    # top of it (?source=lexiw, CHANGELOG-LEXIW.md).
+    source = "lexiw" if request.args.get("source") == "lexiw" else "seban"
     tieru_entries, tieru_error = ([], None) if source != "tieru" else tieru_changelog_entries()
-    return render_template("changelog.html", entries=changelog_entries(), panel_version=PANEL_VERSION,
+    entries = lexiw_changelog_entries() if source == "lexiw" else changelog_entries()
+    return render_template("changelog.html", entries=entries, panel_version=PANEL_VERSION,
                             source=source, tieru_entries=tieru_entries, tieru_error=tieru_error)
 
 
