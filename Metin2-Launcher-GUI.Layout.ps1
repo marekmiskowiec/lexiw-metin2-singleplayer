@@ -245,19 +245,24 @@ $header = [Windows.Forms.Panel]::new(); $header.Dock = 'Top'; $header.Height = 9
 $header.BackColor = UI-Color '#0D141A'; $header.Padding = [Windows.Forms.Padding]::new(26, 14, 26, 10)
 $script:form.Controls.Add($header)
 $brand = [Windows.Forms.Panel]::new(); $brand.Dock = 'Fill'; $header.Controls.Add($brand)
-$subtitle.Text = $(if ($script:M2LauncherClassic) { 'SINGLEPLAYER  /  MT2009 CLASSIC  /  BY ZAXEP' } else { 'SINGLEPLAYER  /  MT2009 PLUS  /  BY ZAXEP' })
+$subtitle.Text = Get-M2BrandValue -Name 'subtitle' -Default $(if ($script:M2LauncherClassic) { 'SINGLEPLAYER  /  MT2009 CLASSIC  /  BY ZAXEP' } else { 'SINGLEPLAYER  /  MT2009 PLUS  /  BY ZAXEP' })
 $subtitle.Dock = 'Top'; $subtitle.Height = 24
 $subtitle.Font = [Drawing.Font]::new('Segoe UI', 9); $subtitle.ForeColor = $script:ui.Muted
 $brand.Controls.Add($subtitle)
-$title.Text = $(if ($script:M2LauncherClassic) { 'MT2009 CLASSIC' } else { 'MT2009 PLUS' }); $title.Dock = 'Top'; $title.Height = 37; $title.Font = [Drawing.Font]::new('Georgia', 25, [Drawing.FontStyle]::Bold)
+$title.Text = Get-M2BrandValue -Name 'title' -Default $(if ($script:M2LauncherClassic) { 'MT2009 CLASSIC' } else { 'MT2009 PLUS' }); $title.Dock = 'Top'; $title.Height = 37; $title.Font = [Drawing.Font]::new('Georgia', 25, [Drawing.FontStyle]::Bold)
 $title.ForeColor = $script:ui.Gold; $brand.Controls.Add($title)
 $brand.Controls.SetChildIndex($title, 0)
-$website = New-Button 'metin2sp.pl  >' 0 0 240 44
+$website = New-Button (Get-M2BrandValue -Name 'websiteLabel' -Default 'metin2sp.pl  >') 0 0 240 44
 UI-ButtonStyle $website
 $website.Dock = 'Right'; $website.Width = 240; $website.BackColor = UI-Color '#19232C'
 $website.ForeColor = $script:ui.Gold
 $website.AccessibleName = UI-Text 'Oficjalna strona projektu' 'Official project website'
-$website.Add_Click({ Start-Process 'https://metin2sp.pl/' })
+$website.Add_Click({
+    # Lexiw: "panel" is this world's own web panel, at the port it publishes.
+    $target = [string](Get-M2BrandValue -Name 'websiteUrl' -Default 'https://metin2sp.pl/')
+    if ($target -eq 'panel') { $target = (Get-M2PanelAddresses -ServerRoot $root).SebanUrl }
+    Start-Process $target
+})
 $header.Controls.Add($website)
 UI-ButtonStyle $languageButton
 $languageButton.Text = if ($script:Lang -eq 'en') { 'EN / PL' } else { 'PL / EN' }
@@ -292,6 +297,11 @@ function Stop-UILiveResize {
 $script:form.Add_ResizeBegin({ Start-UILiveResize })
 $script:form.Add_ResizeEnd({ Stop-UILiveResize })
 $scenePath = Join-Path $PSScriptRoot 'Metin2-Launcher-GUI.Background.png'
+# Lexiw: the fork's own picture (launcher\branding.json, a path in the server folder).
+$brandScene = [string](Get-M2BrandValue -Name 'background' -Default '')
+if ($brandScene -and (Test-Path -LiteralPath (Join-Path $PSScriptRoot $brandScene) -PathType Leaf)) {
+    $scenePath = Join-Path $PSScriptRoot $brandScene
+}
 if (Test-Path -LiteralPath $scenePath -PathType Leaf) {
     try {
         # Clone the decoded bitmap to release the source file immediately:
@@ -322,13 +332,13 @@ $navStack = [Windows.Forms.FlowLayoutPanel]::new()
 $navStack.Dock = 'Top'; $navStack.Height = 300
 $navStack.FlowDirection = 'TopDown'; $navStack.WrapContents = $false
 $sidebar.Controls.Add($navStack)
-$coffeeButton = New-Button (UI-Text 'Dołącz na Discord  >' 'Join our Discord  >') 0 0 232 44
+$coffeeButton = New-Button (UI-Text (Get-M2BrandValue -Name 'communityLabel' -Default 'Dołącz na Discord  >') (Get-M2BrandValue -Name 'communityLabelEn' -Default 'Join our Discord  >')) 0 0 232 44
 UI-ButtonStyle $coffeeButton
 $coffeeButton.Dock = 'Bottom'; $coffeeButton.Height = 44
 $coffeeButton.Font = [Drawing.Font]::new('Segoe UI Semibold', 10)
 $coffeeButton.ForeColor = $script:ui.Gold
 $coffeeButton.AccessibleName = UI-Text 'Discord MT2009 PLUS' 'MT2009 PLUS Discord'
-$coffeeButton.Add_Click({ Start-Process 'https://discord.com/invite/vGE3T9gpm' })
+$coffeeButton.Add_Click({ Start-Process ([string](Get-M2BrandValue -Name 'communityUrl' -Default 'https://discord.com/invite/vGE3T9gpm')) })
 $sidebar.Controls.Add($coffeeButton)
 $versionPanel = [Windows.Forms.Panel]::new()
 $versionPanel.Dock = 'Bottom'; $versionPanel.Height = 232
@@ -362,7 +372,9 @@ if ($reportButton) {
         finally { $edge.Dispose() }
     })
     $sidebar.Controls.Add($reportPanel)
-    $sideReport = New-Button (UI-Text 'ZGŁOŚ BŁĄD / POMYSŁ' 'REPORT A BUG / IDEA') 0 0 212 36
+    # Lexiw: a local report is a logs ZIP on disk (Show-LauncherReport).
+    $reportLocal = (Get-M2BrandValue -Name 'reportMode' -Default '') -eq 'local'
+    $sideReport = New-Button $(if ($reportLocal) { UI-Text 'RAPORT BŁĘDU (ZIP)' 'BUG REPORT (ZIP)' } else { UI-Text 'ZGŁOŚ BŁĄD / POMYSŁ' 'REPORT A BUG / IDEA' }) 0 0 212 36
     UI-ButtonStyle $sideReport
     $sideReport.Dock = 'Bottom'; $sideReport.Height = 36
     $sideReport.BackColor = UI-Color '#6E3A44'
@@ -370,8 +382,8 @@ if ($reportButton) {
     $sideReport.AccessibleName = UI-Text 'Zgłoś błąd albo pomysł autorowi' 'Report a bug or an idea to the author'
     $sideReport.Add_Click({ Show-LauncherReport })
     $reportPanel.Controls.Add($sideReport)
-    $null = UI-Label $reportPanel (UI-Text 'Napisz - logi dołączą się same.' 'Tell us - the logs are included.') 8.5 $script:ui.Muted 18
-    $null = UI-Label $reportPanel (UI-Text 'Coś nie działa? Masz pomysł?' 'Something wrong? Got an idea?') 9.5 $script:ui.Gold 21
+    $null = UI-Label $reportPanel $(if ($reportLocal) { UI-Text 'Logi do ZIP na dysku, nic nie wysyłam.' 'Logs to a ZIP on disk, nothing is sent.' } else { UI-Text 'Napisz - logi dołączą się same.' 'Tell us - the logs are included.' }) 8.5 $script:ui.Muted 18
+    $null = UI-Label $reportPanel $(if ($reportLocal) { UI-Text 'Coś nie działa?' 'Something wrong?' } else { UI-Text 'Coś nie działa? Masz pomysł?' 'Something wrong? Got an idea?' }) 9.5 $script:ui.Gold 21
     $script:ui.SideReport = $sideReport
     $script:ui.SideReportPanel = $reportPanel
     $script:ui.SideReportGap = $reportGap
@@ -449,7 +461,11 @@ $script:ui.LogToggle.Add_Click({ Switch-UILog })
 $logHeader.Controls.Add($script:ui.LogToggle)
 $footer.Dock = 'Bottom'; $footer.Height = 34
 $footer.BackColor = [Drawing.Color]::FromArgb(240, 10, 16, 20)
-$footer.Text = UI-Text $(if ($script:M2LauncherClassic) { 'Twój świat. Twoje tempo.    •    MT2009 Classic by ZAXEP    •    metin2sp.pl' } else { 'Twój świat. Twoje tempo.    •    MT2009 PLUS by ZAXEP    •    metin2sp.pl' }) 'Your world. Your pace.    •    MT2009 PLUS by ZAXEP    •    metin2sp.pl'
+function Get-UIFooterText {
+    # Lexiw: the fork's line (launcher\branding.json), the author's without it.
+    UI-Text (Get-M2BrandValue -Name 'footer' -Default $(if ($script:M2LauncherClassic) { 'Twój świat. Twoje tempo.    •    MT2009 Classic by ZAXEP    •    metin2sp.pl' } else { 'Twój świat. Twoje tempo.    •    MT2009 PLUS by ZAXEP    •    metin2sp.pl' })) (Get-M2BrandValue -Name 'footerEn' -Default 'Your world. Your pace.    •    MT2009 PLUS by ZAXEP    •    metin2sp.pl')
+}
+$footer.Text = Get-UIFooterText
 $footer.ForeColor = $script:ui.Muted; $footer.Padding = [Windows.Forms.Padding]::new(28, 6, 0, 0)
 $main.Controls.Add($footer)
 
@@ -525,16 +541,27 @@ $coopInfo.Margin = [Windows.Forms.Padding]::new(0, 0, 12, 0)
 # COOP is open to everybody; the note links the project's support page
 # (operator, 2 October).
 $coopUrl = 'https://buycoffee.to/mt2009plus'
+# Lexiw: "supportUrl" in launcher\branding.json - empty leaves the line
+# without a support link.
+$coopUrl = [string](Get-M2BrandValue -Name 'supportUrl' -Default $(if ((Get-M2Branding).PSObject.Properties['supportUrl']) { '' } else { $coopUrl }))
+$script:coopSupportUrl = $coopUrl
 $coopText = [Windows.Forms.LinkLabel]::new()
-$coopText.Text = (UI-Text 'COOP jest teraz dostępny dla wszystkich. Jeśli chcesz, możesz wesprzeć rozwój paczki singleplayer: ' 'COOP is now available to everyone. If you like, you can support the singleplayer pack: ') + $coopUrl
-$coopText.LinkArea = [Windows.Forms.LinkArea]::new($coopText.Text.Length - $coopUrl.Length, $coopUrl.Length)
+if ($coopUrl) {
+    $coopText.Text = (UI-Text 'COOP jest teraz dostępny dla wszystkich. Jeśli chcesz, możesz wesprzeć rozwój paczki singleplayer: ' 'COOP is now available to everyone. If you like, you can support the singleplayer pack: ') + $coopUrl
+    $coopText.LinkArea = [Windows.Forms.LinkArea]::new($coopText.Text.Length - $coopUrl.Length, $coopUrl.Length)
+}
+else {
+    $coopText.Text = UI-Text 'Zaproś znajomych do wspólnej gry na Twoim świecie.' 'Invite friends to play together in your world.'
+    $coopText.LinkArea = [Windows.Forms.LinkArea]::new(0, 0)
+}
 $coopText.Font = [Drawing.Font]::new('Segoe UI', 10)
 $coopText.ForeColor = $script:ui.Text
 $coopText.LinkColor = $script:ui.Gold; $coopText.ActiveLinkColor = $script:ui.Gold; $coopText.VisitedLinkColor = $script:ui.Gold
 $coopText.BackColor = [Drawing.Color]::Transparent
 $coopText.Dock = 'Fill'
 $coopText.Add_LinkClicked({
-    try { Start-Process 'https://buycoffee.to/mt2009plus' } catch { Write-LocalLog "COOP: nie otwarto strony wsparcia: $($_.Exception.Message)" }
+    if (-not $script:coopSupportUrl) { return }
+    try { Start-Process $script:coopSupportUrl } catch { Write-LocalLog "COOP: nie otwarto strony wsparcia: $($_.Exception.Message)" }
 })
 $coopInfo.Controls.Add($coopText)
 $script:ui.Pages.coop.Grid.Controls.Add($coopInfo, 0, 1)
@@ -546,8 +573,15 @@ if (-not $coopButton) {
 
 UI-Card 'home' $installButton (UI-Text 'Przygotuj pliki i zależności serwera.' 'Prepare server files and dependencies.')
 UI-Card 'home' $clientButton (UI-Text 'Wskaż plik uruchamiający klienta gry.' 'Select the game client executable.')
-UI-Card 'home' $updateButton (UI-Text 'Sprawdź dostępność nowej wersji projektu.' 'Check for a new project version.')
-UI-Card 'home' $gmPanelButton (UI-Text 'Pobierz pakiet klienta dla tej wersji serwera.' 'Get the client package for this server version.')
+if (Test-M2AuthorUpdatesEnabled) {
+    UI-Card 'home' $updateButton (UI-Text 'Sprawdź dostępność nowej wersji projektu.' 'Check for a new project version.')
+    UI-Card 'home' $gmPanelButton (UI-Text 'Pobierz pakiet klienta dla tej wersji serwera.' 'Get the client package for this server version.')
+}
+else {
+    # Lexiw: launcher\branding.json "authorUpdates": false.
+    UI-Card 'home' $updateButton (UI-Text 'Wyłączone - wersje autora wgrywamy przez Gita.' 'Off - the author''s versions go in through Git.')
+    UI-Card 'home' $gmPanelButton (UI-Text 'Wyłączone - klient zostaje, jaki jest.' 'Off - the client stays as it is.')
+}
 
 UI-Card 'database' $dbAccessButton (UI-Text 'Dane połączenia dla Navicat i innych narzędzi.' 'Connection details for Navicat and other tools.')
 UI-Card 'database' $repairDbButton (UI-Text 'Przywróć dostęp narzędzi do bazy serwera.' 'Restore database access for external tools.')
@@ -559,7 +593,7 @@ UI-Card 'logs' $bundleButton (UI-Text 'Przygotuj paczkę logów do zgłoszenia.'
 UI-Card 'logs' $openLogButton (UI-Text 'Otwórz bieżący dziennik w edytorze.' 'Open the current log in an editor.')
 UI-Card 'logs' $folderButton (UI-Text 'Przejdź do wszystkich zapisanych logów.' 'Browse all saved log files.')
 # ZGLOS / REPORT, when its module is there (Metin2-Launcher-GUI.ps1 makes the button).
-UI-Card 'logs' $reportButton (UI-Text 'Błąd albo pomysł - prosto do autora, z logami.' 'A bug or an idea - straight to the author, with the logs.') '#6E3A44'
+UI-Card 'logs' $reportButton $(if ((Get-M2BrandValue -Name 'reportMode' -Default '') -eq 'local') { UI-Text 'Logi do pliku ZIP na dysku - nic nie jest wysyłane.' 'Logs to a ZIP file on disk - nothing is sent.' } else { UI-Text 'Błąd albo pomysł - prosto do autora, z logami.' 'A bug or an idea - straight to the author, with the logs.' }) '#6E3A44'
 
 Show-UIPage 'home'
 $script:ui.VersionTip = [Windows.Forms.ToolTip]::new()
@@ -569,7 +603,7 @@ $script:versionLabel.Add_ForeColorChanged({
         $footer.Text = UI-Text 'Dostępna aktualizacja — przejdź do pulpitu.' 'Update available — open Overview.'
         $footer.ForeColor = $script:ui.Gold
     } else {
-        $footer.Text = UI-Text $(if ($script:M2LauncherClassic) { 'Twój świat. Twoje tempo.    •    MT2009 Classic by ZAXEP    •    metin2sp.pl' } else { 'Twój świat. Twoje tempo.    •    MT2009 PLUS by ZAXEP    •    metin2sp.pl' }) 'Your world. Your pace.    •    MT2009 PLUS by ZAXEP    •    metin2sp.pl'
+        $footer.Text = Get-UIFooterText
         $footer.ForeColor = $script:ui.Muted
     }
     $script:ui.VersionTip.SetToolTip($script:ui.SideVersions, $script:versionLabel.Text)

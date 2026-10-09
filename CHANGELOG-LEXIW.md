@@ -8,9 +8,18 @@ Wersja to wersja paczki autora i numer moich zmian na niej:
 2.22.0 liczę od nowa: `2.22.0-lexiw.1`.
 
 Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
-`[panel]`, `[repo]`. Szczegóły zmian są w historii Gita.
+`[panel]`, `[launcher]`, `[repo]`. Szczegóły zmian są w historii Gita.
 
 ---
+
+## 2.21.1-lexiw.2 — 2026-10-09 — Launcher Lexiw Metin2
+
+- [launcher] Nowa nazwa: LEXIW METIN2 (okno „Lexiw Metin2 Singleplayer”, podtytuł „Singleplayer / na bazie MT2009 Classic / by Lexiw”), stopka z informacją o pochodzeniu (MT2009 Classic — ZAXEP, Metin2 Playerbots — Tieru).
+- [launcher] Tło bez wtopionego logo MT2009 Singleplayer Plus (launcher\lexiw-background.png); oryginalny plik autora zostaje nietknięty.
+- [launcher] Przycisk w nagłówku otwiera Twój panel WWW, a przycisk w pasku bocznym — repozytorium na GitHubie (zamiast metin2sp.pl i Discorda autora); w zakładce COOP nie ma już linku do wsparcia autora.
+- [launcher] „Raport błędu (ZIP)” zapisuje paczkę logów (bez haseł) w folderze support-bundles — nic nie jest wysyłane do autora.
+- [launcher] Aktualizacje od autora wyłączone: launcher nie łączy się z repozytorium autora ani z jego serwerem zapasowym (bez sprawdzania wersji, pobierania paczek serwera i klienta, adresu zgłoszeń). Nową wersję autora wgrywam przez Gita (upstream → main).
+- [launcher] Cała marka w jednym pliku launcher\branding.json — bez niego launcher działa jak u autora.
 
 ## 2.21.1-lexiw.1 — 2026-10-09 — Panel: dymki, rankingi, klasy, changelog
 

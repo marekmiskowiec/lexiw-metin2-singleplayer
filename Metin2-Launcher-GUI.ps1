@@ -1090,6 +1090,10 @@ function Confirm-DockerReady {
 }
 
 function Get-SupportSettings {
+    # Lexiw: reports stay on this computer - no upload address, no Discord.
+    if ((Get-M2BrandValue -Name 'reportMode' -Default '') -eq 'local') {
+        return [pscustomobject]@{ UploadUrl = ''; ContactUrl = ''; Source = 'local' }
+    }
     if ($null -eq $script:supportSettingsCache) {
         try { $script:supportSettingsCache = Get-M2SupportSettings -Config (Get-LauncherConfig) }
         catch {
@@ -2707,6 +2711,8 @@ $script:launcherFingerprint = Get-LauncherFingerprint
 $script:form = [Windows.Forms.Form]::new()
 # MT2009_CLASSIC_EDITION_V1: a MT2009 Classic package says so in its title.
 $script:form.Text = $(if ($script:M2LauncherClassic) { 'MT2009 Classic - ' + (T 'formTitle') } else { (T 'formTitle') })
+# Lexiw: the fork's own name (launcher\branding.json).
+$script:form.Text = Get-M2BrandValue -Name 'windowTitle' -Default $script:form.Text
 $script:form.Size = [Drawing.Size]::new(780, 806)
 $script:form.MinimumSize = [Drawing.Size]::new(780, 764)
 $script:form.StartPosition = 'CenterScreen'
@@ -2915,6 +2921,11 @@ function Update-VersionFooter {
     $latestClientText = if ($script:latestClientVersion) { $script:latestClientVersion }
         elseif ($script:latestVersionChecked) { 'nie udalo sie sprawdzic' }
         else { 'sprawdzanie...' }
+    if (-not (Test-M2AuthorUpdatesEnabled)) {
+        # Lexiw: no "newest" to compare with - the author's channel is off.
+        $latestText = 'wyłączone'
+        $latestClientText = 'wyłączone'
+    }
     # Three lines, asked for on the Discord: the server, the launcher itself
     # (its newest version is the server package's) and the client.
     $onDisk = Get-LauncherVersionOnDisk
@@ -2988,6 +2999,8 @@ function Read-LatestServerVersion {
     param([switch]$Force)
     if ($script:latestVersionChecked -and -not $Force) { return }
     $script:latestVersionChecked = $true
+    # Lexiw: the author's channel is off - nothing is asked, nothing offered.
+    if (-not (Test-M2AuthorUpdatesEnabled)) { Update-VersionFooter; return }
     try {
         $config = Get-M2LauncherConfig -ServerRoot $root -ConfigPath $configPath
         $manifest = Get-M2UpdateManifest -Source ([string]$config.manifestUrl) -TimeoutSec 8
@@ -3977,7 +3990,14 @@ $panelButton.Add_Click({
     }
 })
 $clientButton.Add_Click({ [void](Select-ClientExecutable) })
+function Show-AuthorUpdatesOff {
+    # Lexiw: what the update buttons say while the author's channel is off.
+    [Windows.Forms.MessageBox]::Show(
+        "Aktualizacje od autora paczki są w tej wersji wyłączone.`r`n`r`nPaczka autora nadpisałaby Twoje zmiany na działającym serwerze. Nową wersję autora wgrywamy przez Gita: najpierw na gałąź upstream, potem łączymy ją z main.`r`n`r`nWłącza je ""authorUpdates"": true w launcher\branding.json.",
+        'Aktualizacje wyłączone', 'OK', 'Information') | Out-Null
+}
 $updateButton.Add_Click({
+    if (-not (Test-M2AuthorUpdatesEnabled)) { Show-AuthorUpdatesOff; return }
     # One button for the whole flow: check in-process, and only offer to install
     # when there really is something newer.
     $installed = Get-InstalledServerVersion
@@ -4029,6 +4049,7 @@ $updateButton.Add_Click({
     Start-LauncherAction -Action 'UpdateServer' -Yes
 })
 $gmPanelButton.Add_Click({
+    if (-not (Test-M2AuthorUpdatesEnabled)) { Show-AuthorUpdatesOff; return }
     # A missing or moved client folder is asked for first, so the question
     # below names the folder the update will really go to.
     if (-not (Confirm-ClientForUpdate)) { return }
@@ -4070,6 +4091,12 @@ $bundleButton.Add_Click({
             Start-LauncherAction -Action 'SendLogs' -Yes
             return
         }
+    }
+    elseif ($support.Source -eq 'local') {
+        # Lexiw: the ZIP stays on this computer.
+        [Windows.Forms.MessageBox]::Show(
+            "Zapiszę paczkę ZIP z logami (hasła są z niej usunięte) i otworzę jej folder.`r`n`r`nNic nie jest nigdzie wysyłane.",
+            'Logi', 'OK', 'Information') | Out-Null
     }
     else {
         [Windows.Forms.MessageBox]::Show(
@@ -4404,7 +4431,7 @@ $reportButton = $null
 if (Test-Path -LiteralPath $reportModulePath -PathType Leaf) {
     Import-Module $reportModulePath -Force
     $title.Width = 500
-    $reportButton = New-Button 'ZGŁOŚ BŁĄD / POMYSŁ' 536 20 190 36 ([Drawing.Color]::FromArgb(150, 62, 72))
+    $reportButton = New-Button $(if ((Get-M2BrandValue -Name 'reportMode' -Default '') -eq 'local') { 'RAPORT BŁĘDU (ZIP)' } else { 'ZGŁOŚ BŁĄD / POMYSŁ' }) 536 20 190 36 ([Drawing.Color]::FromArgb(150, 62, 72))
     $script:form.Controls.Add($reportButton)
     $script:reportResultPath = ''
     $script:reportWatch = [Windows.Forms.Timer]::new()
@@ -4427,6 +4454,15 @@ if (Test-Path -LiteralPath $reportModulePath -PathType Leaf) {
     function Show-LauncherReport {
         if ($script:activeProcess -and -not $script:activeProcess.HasExited) {
             [Windows.Forms.MessageBox]::Show('Poczekaj na zakończenie bieżącej operacji.', 'Launcher pracuje', 'OK', 'Information') | Out-Null
+            return
+        }
+        if ((Get-M2BrandValue -Name 'reportMode' -Default '') -eq 'local') {
+            # Lexiw: a report is the logs ZIP on disk - the author's form
+            # would send it to the author's channel.
+            [Windows.Forms.MessageBox]::Show(
+                "Zapiszę paczkę ZIP z logami (hasła są z niej usunięte) w folderze support-bundles i otworzę go.`r`n`r`nNic nie jest nigdzie wysyłane - opis problemu i ZIP możesz przekazać dalej sam.",
+                'Raport błędu', 'OK', 'Information') | Out-Null
+            Start-LauncherAction -Action 'Logs' -OpenSupport
             return
         }
         $request = Show-M2ReportDialog -ServerRoot $root -Owner $script:form -Config (Get-LauncherConfig) -Manifest $script:latestManifest

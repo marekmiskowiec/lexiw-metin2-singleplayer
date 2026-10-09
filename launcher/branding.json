@@ -1,0 +1,17 @@
+{
+  "_comment": "Lexiw: wyglad i linki launchera oraz to, czy launcher laczy sie z kanalem aktualizacji autora paczki. Brak pliku = launcher jak u autora.",
+  "title": "LEXIW METIN2",
+  "subtitle": "SINGLEPLAYER  /  NA BAZIE MT2009 CLASSIC  /  BY LEXIW",
+  "windowTitle": "Lexiw Metin2 Singleplayer",
+  "background": "launcher\\lexiw-background.png",
+  "footer": "Twój świat. Twoje tempo.    •    Lexiw Metin2 na bazie MT2009 Classic (ZAXEP) i Metin2 Playerbots (Tieru)",
+  "footerEn": "Your world. Your pace.    •    Lexiw Metin2, based on MT2009 Classic (ZAXEP) and Metin2 Playerbots (Tieru)",
+  "websiteLabel": "Panel WWW  >",
+  "websiteUrl": "panel",
+  "communityLabel": "Repozytorium na GitHubie  >",
+  "communityLabelEn": "GitHub repository  >",
+  "communityUrl": "https://github.com/marekmiskowiec/lexiw-metin2-singleplayer",
+  "supportUrl": "",
+  "reportMode": "local",
+  "authorUpdates": false
+}
