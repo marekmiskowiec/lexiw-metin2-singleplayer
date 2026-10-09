@@ -12,6 +12,20 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
+## 2.21.1-lexiw.6 — 2026-10-09 — Wiadomości ze świata: ulepszenia +8 i +9
+
+- [panel] Wiadomości ze świata pokazują ulepszenia na +8 i +9 z właściwym poziomem. Gra zapisuje w tabeli ulepszeń przedmiot sprzed ulepszenia, więc dotąd ulepszenie na +8 pojawiało się jako „+7” (np. „Sejmitar+7” zamiast „Sejmitar+8”), ulepszenie na +7 nie pojawiało się wcale, a +9 pojawiłoby się dwa razy. Teraz przedmiot po ulepszeniu jest brany z głównego logu gry, a sposób (kowal, zwój, kuźnia gildii) dalej z tabeli ulepszeń.
+- [panel] Ulepszenia na +7 celowo nie trafiają do wiadomości (około 250 dziennie).
+- [panel] 13 zapisanych już wiadomości „+7” poprawione na „+8”; teraz są wyróżnione jak rzadkie ulepszenia.
+
+## 2.21.1-lexiw.5 — 2026-10-09 — Panel WWW: wspólny wygląd tabel
+
+- [panel] Sortowanie każdej tabeli kliknięciem nagłówka: malejąco, rosnąco, z powrotem do kolejności strony (strzałka pokazuje kierunek). Liczby sortują się jak liczby („44 614 744”, „91,3%”, „Lv 18”, „13 h”), daty jak daty; puste pola („—”) zawsze na końcu. Działa też z klawiatury (Enter).
+- [panel] Tabele z kolumną „Klasa” dostają przyciski Wszystkie / Wojownik / Ninja / Sura / Szaman (np. Osobowości botów); Rankingi i Postacie zostają przy swoim filtrze, który liczy miejsca w klasie.
+- [panel] Tabele od 15 wierszy mają pole „Filtruj tabelę…” z licznikiem („22 z 200”).
+- [panel] Liczby wyrównane do prawej, podświetlenie wiersza pod kursorem.
+- [panel] Bez zmian: tabele w formularzach (ustawienia, edytory dropu i szkatułek) i tabele z wierszami łączącymi kolumny — sortowanie przestawiłoby pola. Sortowanie i filtr dotyczą wierszy widocznych na stronie.
+
 ## 2.21.1-lexiw.4 — 2026-10-09 — Pulpit: ostatnie 24 godziny
 
 - [panel] Na Pulpicie, pod kafelkami, wiersz „Ostatnie 24 godziny” z czterema mini-wykresami: boty online, yang w obiegu (ze zmianą w %), ulepszenia u kowala na godzinę (z odsetkiem udanych) i zgony na godzinę (z liczbą zgonów w PvP). Po najechaniu na wykres widać wartość dla danej chwili.
