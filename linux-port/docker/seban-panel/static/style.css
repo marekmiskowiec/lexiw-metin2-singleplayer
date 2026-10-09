@@ -66,6 +66,11 @@ body[data-theme="empire"] .bot-log, body[data-theme="empire"] .log-lines{
    background/border are already themed correctly via the --live-* variables
    (this file, below) and the base var(--edge) border rule -- no extra rule
    needed here now that clip-path is gone. */
+/* The same for .inventory-panel on /player/: the tooltip of a top-row slot
+   (weapon, helmet, necklace) opens upwards past the panel's top edge, and the
+   cut corners clipped its first lines - the item's name with its +N and the
+   VNUM. Square corners there, every tooltip whole. */
+body[data-theme="empire"] .inventory-panel{clip-path:none}
 /* Stat cells (STR/VIT/DEX/INT on /player/): true hexagons, not cut corners. */
 body[data-theme="empire"] .stat-cells div{
   background:linear-gradient(160deg,#2c2014,#1a1109)!important; border:0!important;
