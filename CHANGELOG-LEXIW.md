@@ -12,7 +12,11 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
-## 2.21.1-lexiw.8 — 2026-10-09 — Wiki serwera, etap 2: potwory, Metiny i bossowie
+## 2.21.1-lexiw.8 — 2026-10-09 — Wiki serwera: potwory, Metiny, bossowie i mapy
+
+- [panel] Mapy w wiki (Wiki → Mapy): lista map działających w tym świecie z poziomami potworów, liczbą rodzajów potworów, Metinów i bossów; strona każdej mapy z potworami, Metinami, bossami i NPC — poziom, ranga, jak się pojawiają, liczba miejsc, ile stoi naraz i co ile się odradzają (z czasem po przyspieszeniu ze strony Respawny).
+- [panel] Wyszukiwarka wiki znajduje też mapy; mapy na stronach potworów prowadzą do stron map.
+- [panel] Ten sam potwór pojawiający się tak samo na jednej mapie to jeden wiersz z zakresem czasu respawnu (pliki map dają czasy różniące się o sekundę).
 
 - [panel] Strona każdego potwora, Metina i bossa w wiki: rodzaj, ranga, poziom, PŻ, doświadczenie, obrażenia, obrona, yang z zabicia; rasa i bonus, który na niego działa (np. „Silny przeciw zwierzętom”), odporności i specjalne ataki.
 - [panel] „Gdzie się pojawia”: mapy, liczba miejsc, ile stoi naraz (średnio) i co ile się odradza — z plików map działającej gry; gdy strona Respawny przyspiesza respawn, obok czasu z pliku widać czas po przyspieszeniu.

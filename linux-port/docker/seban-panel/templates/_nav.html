@@ -11,6 +11,7 @@
 {%- set nav_groups = [
   {'id': 'wiki', 'icon': '📖', 'label': 'Wiki', 'items': [
     {'ep': 'wiki', 'label': 'Wiki serwera', 'desc': 'przedmioty, potwory, drop i szkatułki z danych serwera', 'kw': 'wiki baza wiedzy przedmiot potwor drop skad'},
+    {'ep': 'wiki_maps', 'label': 'Mapy', 'desc': 'mapy świata: potwory, Metiny, bossowie i respawn', 'kw': 'mapa mapy expowisko gdzie expic respawn metiny bossy'},
   ]},
   {'id': 'swiat', 'icon': '🗺', 'label': 'Świat', 'items': [
     {'ep': 'maps', 'label': 'Aktywność map', 'desc': 'natężenie na mapach w czasie, mapa cieplna', 'kw': 'mapy heatmapa natezenie mapa cieplna'},
@@ -69,7 +70,7 @@
   'player': 'players', 'account_detail': 'accounts', 'guild': 'guilds',
   'economy_item': 'economy', 'chest_edit': 'chests', 'drop_edit': 'drops',
   'daily_summary': 'dashboard',
-  'wiki_item': 'wiki', 'wiki_mob': 'wiki',
+  'wiki_item': 'wiki', 'wiki_mob': 'wiki', 'wiki_map': 'wiki_maps',
 } -%}
 {%- set nav_sections = [
   {'ep': 'manage', 'anchor': 'raty-i-restart', 'label': 'Raty, liczba botów, ustawienia z restartem', 'short': 'Raty i restart', 'part': 'Serwer'},

@@ -358,13 +358,17 @@ def install_wiki(m):
                     else:
                         continue  # "e": an area where nothing spawns
                     for mob, chance, how in members:
+                        # One row per map, file and way: the files give
+                        # the same monster times a second apart (10m28s,
+                        # 10m29s...) - the row keeps their range.
                         slot = found.setdefault(mob, {}).setdefault(
-                            (map_dir.name, file_name, how, start, end),
+                            (map_dir.name, file_name, how),
                             {"dir": map_dir.name, "file": file_name, "how": how, "start": start, "end": end,
                              "points": 0, "count": 0.0, "chance": chance})
                         slot["points"] += 1
                         slot["count"] += count * chance
                         slot["chance"] = max(slot["chance"], chance)
+                        slot["start"], slot["end"] = min(slot["start"], start), max(slot["end"], end)
         index = {mob: list(slots.values()) for mob, slots in found.items()}
         spawn_cache.update(key=key, index=index)
         return index
@@ -388,6 +392,20 @@ def install_wiki(m):
         except m.pymysql.MySQLError:
             return {}
 
+    def annotate_spawn(entry, mob_kind, number, active, flags):
+        """One spawn entry as a page shows it: the map's name, the time from
+        the file and - when the Respawny page speeds this map or the whole
+        world up - the time after it (the engine's MAX(3 s, time * % / 100))."""
+        prefix = "fastBossSpawn" if mob_kind in ("boss", "metin") else "fastMobSpawn"
+        percent = flags.get(f"{prefix}{number}", 0) or flags.get(prefix, 0)
+        percent = percent if 0 < percent < 100 else 0
+        effective = None
+        if percent:
+            effective = spawn_time_text(max(3, entry["start"] * percent // 100), max(3, entry["end"] * percent // 100))
+        return dict(entry, number=number, map=m.map_name(number) if number else entry["dir"], active=active,
+                    kind_label=SPAWN_FILES[entry["file"]], time=spawn_time_text(entry["start"], entry["end"]),
+                    effective=effective, percent=percent, count=round(entry["count"], 1))
+
     def spawns_of(mob):
         """Where a monster appears, each map once per file and way, with the
         respawn time in the file and as the panel's speed setting makes it."""
@@ -395,22 +413,37 @@ def install_wiki(m):
         if not entries:
             return []
         indexes, flags = map_indexes(), regen_flags()
-        prefix = "fastBossSpawn" if mob["kind"] in ("boss", "metin") else "fastMobSpawn"
         out = []
         for entry in entries:
             numbers = indexes.get(entry["dir"], [])
             active = [n for n in numbers if n in m.MAP_NAMES]
             number = (active or numbers or [0])[0]
-            percent = flags.get(f"{prefix}{number}", 0) or flags.get(prefix, 0)
-            percent = percent if 0 < percent < 100 else 0
-            effective = None
-            if percent:
-                effective = spawn_time_text(max(3, entry["start"] * percent // 100), max(3, entry["end"] * percent // 100))
-            out.append(dict(entry, map=m.map_name(number) if number else entry["dir"], active=bool(active),
-                            kind_label=SPAWN_FILES[entry["file"]], time=spawn_time_text(entry["start"], entry["end"]),
-                            effective=effective, percent=percent, count=round(entry["count"], 1)))
+            out.append(annotate_spawn(entry, mob["kind"], number, bool(active), flags))
         out.sort(key=lambda e: (not e["active"], e["map"], e["start"]))
         return out
+
+    def map_dirs():
+        """map number -> its folder (map/index)."""
+        return {number: folder for folder, numbers in map_indexes().items() for number in numbers}
+
+    def map_spawns(folder):
+        """Everything a map's files put down: [(mob, entry)]."""
+        return [(vnum, entry) for vnum, entries in spawn_index().items() for entry in entries if entry["dir"] == folder]
+
+    def map_summary(number, folder, mobs):
+        spawns = map_spawns(folder)
+        by_kind = {"mob": set(), "metin": set(), "boss": set()}
+        levels = []
+        for vnum, entry in spawns:
+            mob = mobs.get(vnum)
+            if not mob or mob["kind"] not in by_kind:
+                continue
+            by_kind[mob["kind"]].add(vnum)
+            if mob["kind"] == "mob":
+                levels.append(mob["level"])
+        return {"number": number, "name": m.map_name(number), "folder": folder,
+                "levels": (min(levels), max(levels)) if levels else None,
+                "mobs": len(by_kind["mob"]), "metins": len(by_kind["metin"]), "bosses": len(by_kind["boss"])}
 
     def drops_of(mob):
         """What a monster drops: the groups the engine uses (the operator's
@@ -480,7 +513,38 @@ def install_wiki(m):
         mobs.sort(key=lambda mob: (len(mob["name"]), mob["level"]))
         found_mobs = [{"vnum": mob["vnum"], "name": mob["name"], "level": mob["level"], "kind": mob["kind_name"]}
                       for mob in mobs[:12]]
-        return jsonify(ok=True, items=found_items, mobs=found_mobs)
+        dirs = map_dirs()
+        found_maps = [{"number": number, "name": name} for number, name in sorted(m.MAP_NAMES.items())
+                      if number in dirs and folded in name.lower()][:8]
+        return jsonify(ok=True, items=found_items, mobs=found_mobs, maps=found_maps)
+
+    @app.route("/wiki/maps")
+    @m.login_required
+    def wiki_maps():
+        """The maps this world runs, with what lives on them."""
+        dirs, mobs = map_dirs(), m.drop_mob_rows()
+        maps = [map_summary(number, dirs[number], mobs) for number in sorted(m.MAP_NAMES) if number in dirs]
+        return render_template("wiki_maps.html", maps=maps, spawn_files_ready=spawn_dir.is_dir())
+
+    @app.route("/wiki/map/<int:number>")
+    @m.login_required
+    def wiki_map(number):
+        folder = map_dirs().get(number)
+        if not folder:
+            abort(404)
+        mobs, flags = m.drop_mob_rows(), regen_flags()
+        sections = {"mob": [], "metin": [], "boss": [], "npc": []}
+        for vnum, entry in map_spawns(folder):
+            mob = mobs.get(vnum)
+            if not mob:
+                continue
+            kind = mob["kind"] if mob["kind"] in ("mob", "metin", "boss") else "npc"
+            sections[kind].append(dict(annotate_spawn(entry, mob["kind"], number, number in m.MAP_NAMES, flags),
+                                       vnum=vnum, name=mob["name"], level=mob["level"], rank_name=mob["rank_name"]))
+        for rows in sections.values():
+            rows.sort(key=lambda e: (e["level"], e["name"], e["start"]))
+        return render_template("wiki_map.html", summary=map_summary(number, folder, mobs), sections=sections,
+                               active=number in m.MAP_NAMES, spawn_files_ready=spawn_dir.is_dir())
 
     @app.route("/wiki/mob/<int:vnum>")
     @m.login_required

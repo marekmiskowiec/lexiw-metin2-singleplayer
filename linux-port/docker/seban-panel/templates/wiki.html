@@ -8,7 +8,7 @@
 <p class="muted wiki-hint" id="wikiHint">Wpisz co najmniej 2 litery.</p>
 <div class="wiki-results" id="wikiResults" hidden>
   <section class="panel"><h2>Przedmioty</h2><ul class="wiki-list" id="wikiItems"></ul></section>
-  <section class="panel"><h2>Potwory, Metiny i bossowie</h2><ul class="wiki-list" id="wikiMobs"></ul>
+  <section class="panel"><div id="wikiMapsBox" hidden><h2>Mapy</h2><ul class="wiki-list" id="wikiMaps"></ul></div><h2>Potwory, Metiny i bossowie</h2><ul class="wiki-list" id="wikiMobs"></ul>
 </section>
 </div>
 <script>
@@ -17,6 +17,7 @@
   const box = document.getElementById('wikiResults'), items = document.getElementById('wikiItems'), mobs = document.getElementById('wikiMobs');
   const itemUrl = "{{ url_for('wiki_item', vnum=0) }}".replace(/0$/, '');
   const mobUrl = "{{ url_for('wiki_mob', vnum=0) }}".replace(/0$/, '');
+  const mapUrl = "{{ url_for('wiki_map', number=0) }}".replace(/0$/, '');
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   let timer = null, last = '';
   function search() {
@@ -31,6 +32,10 @@
         items.innerHTML = data.items.length ? data.items.map((i) =>
           `<li><a href="${itemUrl}${i.vnum}">${i.icon ? `<img src="${esc(i.icon)}" alt="" loading="lazy">` : '<span class="wiki-noicon"></span>'}<span><b>${esc(i.name)}</b><small>${esc(i.type)} · VNUM ${i.vnum}${i.sources ? ' · <em>ma drop</em>' : ''}</small></span></a></li>`).join('')
           : '<li class="muted">Brak przedmiotów.</li>';
+        const maps = data.maps || [];
+        document.getElementById('wikiMapsBox').hidden = !maps.length;
+        document.getElementById('wikiMaps').innerHTML = maps.map((m) =>
+          `<li><a href="${mapUrl}${m.number}"><span class="wiki-mobicon" aria-hidden="true">⌖</span><span><b>${esc(m.name)}</b><small>mapa nr ${m.number}</small></span></a></li>`).join('');
         mobs.innerHTML = data.mobs.length ? data.mobs.map((m) =>
           `<li><a href="${mobUrl}${m.vnum}"><span class="wiki-mobicon" aria-hidden="true">${m.kind === 'Metin' ? '◆' : m.kind === 'Boss' ? '☠' : '●'}</span><span><b>${esc(m.name)}</b><small>${esc(m.kind)} · poziom ${m.level} · VNUM ${m.vnum}</small></span></a></li>`).join('')
           : '<li class="muted">Brak potworów.</li>';
