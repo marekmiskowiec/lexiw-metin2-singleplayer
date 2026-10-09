@@ -1,0 +1,78 @@
+{% extends 'base.html' %}{% block title %}{{ mob.name }} · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+{%- macro pct(value) -%}{% if value is none %}—{% elif value >= 10 %}{{ '%.0f'|format(value) }}%{% elif value >= 1 %}{{ ('%.1f'|format(value)).replace('.', ',') }}%{% elif value > 0 %}{{ ('%.3g'|format(value)).replace('.', ',') }}%{% else %}0%{% endif %}{%- endmacro -%}
+{%- macro num(value) -%}{{ '{:,}'.format(value|int).replace(',', ' ') }}{%- endmacro -%}
+<p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · {{ mob.kind_name|upper }}</p>
+<section class="wiki-head">
+  <div class="wiki-icon wiki-mob-mark" aria-hidden="true">{{ '◆' if mob.kind == 'metin' else '☠' if mob.kind == 'boss' else '●' }}</div>
+  <div>
+    <h1>{{ mob.name }}</h1>
+    <p class="muted">{{ mob.kind_name }} · {{ mob.rank_name }} · poziom {{ mob.level }} · VNUM {{ mob.vnum }}</p>
+    <p class="wiki-classes">{% for race in races %}<span class="on">{{ race }}</span>{% endfor %}{% if aggressive %}<span class="on">Agresywny</span>{% endif %}{% if static %}<span class="on">Nie porusza się</span>{% endif %}</p>
+  </div>
+</section>
+
+<div class="wiki-grid">
+  <section class="panel">
+    <h2>Statystyki</h2>
+    <ul class="wiki-stats">
+      <li>PŻ: <b>{{ num(row.max_hp) }}</b></li>
+      <li>Doświadczenie: <b>{{ num(row.exp) }}</b></li>
+      {% if row.damage_max %}<li>Obrażenia: <b>{{ num(row.damage_min) }}–{{ num(row.damage_max) }}</b></li>{% endif %}
+      <li>Obrona: <b>{{ num(row.def) }}</b></li>
+      {% if row.gold_max %}<li>Yang z zabicia: <b>{{ num(row.gold_min) }}–{{ num(row.gold_max) }}</b></li>{% endif %}
+      {% if not static %}<li>Szybkość ataku / ruchu: {{ row.attack_speed }} / {{ row.move_speed }}</li>{% endif %}
+    </ul>
+  </section>
+  <section class="panel">
+    <h2>Walka</h2>
+    <ul class="wiki-stats">
+      {% if bonuses %}<li>Działa na niego: <b>{{ bonuses|join(', ') }}</b></li>{% endif %}
+      {% if immune %}<li>Odporny na: {{ immune|join(', ') }}</li>{% endif %}
+      {% for label, value in resists %}<li>Odporność · {{ label }}: {{ value }}%</li>{% endfor %}
+      {% for label, value in enchants %}<li class="bonus">Szansa na {{ label|lower }}: {{ value }}%</li>{% endfor %}
+      {% if not (bonuses or immune or resists or enchants) %}<li class="muted">Bez odporności i specjalnych ataków.</li>{% endif %}
+    </ul>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>Gdzie się pojawia</h2>
+  {% if spawns %}
+  <table><thead><tr><th>Mapa</th><th>Plik</th><th>Jak</th><th>Punkty</th><th>Naraz (średnio)</th><th>Respawn</th></tr></thead><tbody>
+  {% for s in spawns %}<tr{% if not s.active %} class="muted"{% endif %}><td>{{ s.map }}</td><td>{{ s.kind_label }}</td><td>{{ s.how }}{% if s.how == 'w losowej grupie' %} ({{ pct(s.chance * 100) }}){% endif %}</td><td>{{ s.points }}</td><td>{{ s.count|round(1)|string|replace('.0', '')|replace('.', ',') }}</td><td data-sort="{{ s.start }}">{{ s.time }}{% if s.effective %} <small class="muted">→ {{ s.effective }} (Respawny: {{ s.percent }}%)</small>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+  <p class="muted wiki-note">„Punkty” to miejsca na mapie, „Naraz” — ile takich potworów stoi tam razem, średnio (losowa grupa nie zawsze go wybiera). Respawn to czas z plików mapy; strzałka pokazuje czas po przyspieszeniu ze strony Respawny. Szare mapy nie działają w tym świecie.</p>
+  {% elif not spawn_files_ready %}
+  <p class="muted">Gra nie wyeksportowała jeszcze plików map dla wiki — pojawią się po następnym starcie serwera.</p>
+  {% else %}
+  <p class="muted">Nie ma go w plikach map — pojawia się z questów, w lochach albo z innego potwora.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Drop</h2>
+  {% for group in drops %}
+  <h3>{{ group.label }}{% if group.kind == 'kill' %} · 1 przedmiot co {{ group.kill_drop }} zabójstw{% elif group.kind == 'limit' %} · od poziomu {{ group.level_limit }}{% endif %}{% if group.custom %} <small class="muted">(zmienione w edytorze dropu)</small>{% endif %}</h3>
+  <table><thead><tr><th>Przedmiot</th><th>Ilość</th><th>Szansa</th></tr></thead><tbody>
+  {% for e in group.entries %}<tr><td class="item-cell">{% if e.chest_draw and e.vnum %}<a href="{{ url_for('chest_edit', vnum=e.vnum) }}" title="Zawartość tej grupy w edytorze szkatułek">{{ e.name }}</a>{% elif e.vnum %}<a href="{{ url_for('wiki_item', vnum=e.vnum) }}">{% if e.icon %}<img src="{{ e.icon }}" alt="" loading="lazy">{% endif %}{{ e.name }}</a>{% else %}{{ e.name }}{% endif %}</td><td>{{ e.count }}</td><td data-sort="{{ e.chance }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}
+  <p class="muted">Nie ma własnej tabeli dropu.</p>
+  {% endfor %}
+  {% if drops %}<p class="muted wiki-note">Szansa na jedno zabójstwo dla zabójcy na poziomie potwora, bez bonusów do dropu i bez rat serwera.</p>{% endif %}
+
+  {% if common %}
+  <h3>Wspólny drop dla jego rangi</h3>
+  <table><thead><tr><th>Przedmiot</th><th>Poziomy potworów</th><th>Szansa</th></tr></thead><tbody>
+  {% for e in common %}<tr><td class="item-cell"><a href="{{ url_for('wiki_item', vnum=e.item) }}">{% if e.icon %}<img src="{{ e.icon }}" alt="" loading="lazy">{% endif %}{{ e.name }}</a></td><td>{{ e.levels }}</td><td data-sort="{{ e.chance }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+
+  {% if other %}
+  <h3>Poza tabelami dropu</h3>
+  <ul class="wiki-stats">{% for e in other %}<li>{% if e.item %}<a href="{{ url_for('wiki_item', vnum=e.item) }}">{{ e.name or ('VNUM ' ~ e.item) }}</a> · {% endif %}<b>{{ e.chance }}</b> — <span class="muted">{{ e.note }}</span></li>{% endfor %}</ul>
+  {% endif %}
+  <p><a href="{{ url_for('drop_edit', mob=mob.vnum) }}">Zmień drop w edytorze →</a></p>
+</section>
+{% endblock %}

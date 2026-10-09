@@ -1,0 +1,48 @@
+#!/bin/sh
+# =============================================================================
+#  m2-wiki-export -- Lexiw: the files the panel's wiki shows the spawns from.
+#
+#  Where a monster appears and how often it comes back is in the maps' regen
+#  files (regen.txt, boss.txt, stone.txt, npc.txt), with the groups they
+#  name in group.txt and group_group.txt. They live in this image only, as
+#  the image build left them (it appends groups and empties some dungeons),
+#  and the panel cannot see them - so a copy goes to the spool both
+#  containers share:
+#      $SPOOL/wiki/locale/{group.txt,group_group.txt}
+#      $SPOOL/wiki/locale/map/index
+#      $SPOOL/wiki/locale/map/<map>/{regen,boss,stone,npc}.txt
+#  m2-supervise runs it before the cores boot; it only reads the image's
+#  files and never stops a start: whatever fails is said and skipped.
+# =============================================================================
+set -u
+
+LOCALE="${M2_LOCALE_DIR:-/opt/metin2/share/locale/poland}"
+OUT="${M2_RATES_SPOOL:-/opt/m2spool}/wiki/locale"
+NEW="$OUT.new.$$"
+
+[ -d "$LOCALE/map" ] || { echo "m2-wiki-export: no $LOCALE/map"; exit 0; }
+
+rm -rf "$NEW"
+mkdir -p "$NEW/map" || { echo "m2-wiki-export: cannot write $NEW"; exit 0; }
+for f in group.txt group_group.txt; do
+    [ -f "$LOCALE/$f" ] && cp "$LOCALE/$f" "$NEW/$f"
+done
+[ -f "$LOCALE/map/index" ] && cp "$LOCALE/map/index" "$NEW/map/index"
+for dir in "$LOCALE"/map/*/; do
+    name=$(basename "$dir")
+    for f in regen.txt boss.txt stone.txt npc.txt; do
+        if [ -s "$dir$f" ]; then
+            mkdir -p "$NEW/map/$name" && cp "$dir$f" "$NEW/map/$name/$f"
+        fi
+    done
+done
+
+# The whole copy at once: the panel never reads half of an old and half of
+# a new one.
+rm -rf "$OUT.old"
+[ -d "$OUT" ] && mv "$OUT" "$OUT.old"
+mv "$NEW" "$OUT" && rm -rf "$OUT.old"
+chgrp -R m2spool "${OUT%/locale}" 2>/dev/null
+chmod -R g+rX "${OUT%/locale}" 2>/dev/null
+echo "m2-wiki-export: $(find "$OUT/map" -name '*.txt' | wc -l) spawn files to $OUT"
+exit 0
