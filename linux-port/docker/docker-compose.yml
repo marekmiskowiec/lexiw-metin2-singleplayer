@@ -543,6 +543,10 @@ services:
       # writes a request there and reads the updater's status back. Without
       # the mount the button can only say "the updater is not running".
       - update-spool:/opt/m2update
+      # The installed package's own changelog: a Classic world's dashboard
+      # and changelog page read it (classic_changelog_entries) instead of
+      # the Plus edition's file on GitHub.
+      - ../../CHANGELOG.md:/opt/m2package/CHANGELOG.md:ro
     networks: [backend]
 
   # The ItemShop (OskarPWA): a PHP shop for Dragon Coins (account.cash) and

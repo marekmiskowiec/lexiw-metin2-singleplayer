@@ -756,6 +756,9 @@ MT2009_PLUS_CHANGELOG_URL = os.environ.get(
 MT2009_PLUS_DISCORD_URL = "https://metin2sp.pl/discord"
 MT2009_PLUS_WEBSITE_URL = "https://metin2sp.pl/"
 _mt2009_changelog_cache = {"at": 0.0, "entries": None}
+# MT2009 Classic: the package's own CHANGELOG.md (compose mounts it here).
+CLASSIC_CHANGELOG_PATH = os.environ.get("M2_PACKAGE_CHANGELOG", "/opt/m2package/CHANGELOG.md")
+_classic_changelog_cache = {"mtime": None, "entries": None}
 
 
 def _clean_changelog_text(text):
@@ -785,7 +788,10 @@ def parse_mt2009_changelog(markdown):
             date = next((part for part in parts if re.fullmatch(r"\d{4}-\d\d-\d\d", part)), "")
             title = " — ".join(part for part in parts if part != date)
             version = ("Klient " if heading.group(1) else "") + heading.group(2)
-            current = {"timestamp": date or "—", "version": version + (" · " + title if title else ""), "changes": []}
+            # number and title apart too: the dashboard's tile shows the
+            # number large and the title as its small line.
+            current = {"timestamp": date or "—", "version": version + (" · " + title if title else ""),
+                       "number": version, "title": title, "changes": []}
             entries.append(current)
             continue
         if current is None or line.startswith("## ") or line.strip() == "---":
@@ -810,8 +816,28 @@ def parse_mt2009_changelog(markdown):
     return [entry for entry in entries if entry["changes"]][:40]
 
 
+def classic_changelog_entries():
+    """A MT2009 Classic world's changelog: the installed package's own
+    CHANGELOG.md (mounted read-only by compose), read again when it changes.
+    The Plus repository's file on GitHub is another edition's - on a Classic
+    2.21.1 world the dashboard announced Plus 2.28.0 as the latest change."""
+    try:
+        mtime = os.path.getmtime(CLASSIC_CHANGELOG_PATH)
+        if _classic_changelog_cache["entries"] is not None and _classic_changelog_cache["mtime"] == mtime:
+            return _classic_changelog_cache["entries"]
+        with open(CLASSIC_CHANGELOG_PATH, encoding="utf-8", errors="replace") as handle:
+            entries = parse_mt2009_changelog(handle.read())
+    except OSError:
+        return []
+    _classic_changelog_cache.update(mtime=mtime, entries=entries)
+    return entries
+
+
 def changelog_entries():
-    """MT2009 Plus's own changelog from GitHub, else the panel's file."""
+    """MT2009 Plus's own changelog from GitHub, else the panel's file; a
+    Classic world's from its package (classic_changelog_entries)."""
+    if M2_CLASSIC:
+        return classic_changelog_entries()
     now = time.time()
     cached = _mt2009_changelog_cache["entries"]
     if cached is not None and now - _mt2009_changelog_cache["at"] < 900:
