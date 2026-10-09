@@ -18,6 +18,7 @@
   const itemUrl = "{{ url_for('wiki_item', vnum=0) }}".replace(/0$/, '');
   const mobUrl = "{{ url_for('wiki_mob', vnum=0) }}".replace(/0$/, '');
   const mapUrl = "{{ url_for('wiki_map', number=0) }}".replace(/0$/, '');
+  const regionUrl = "{{ url_for('wiki_region', key='m1') }}".replace(/m1$/, '');
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   let timer = null, last = '';
   function search() {
@@ -35,7 +36,7 @@
         const maps = data.maps || [];
         document.getElementById('wikiMapsBox').hidden = !maps.length;
         document.getElementById('wikiMaps').innerHTML = maps.map((m) =>
-          `<li><a href="${mapUrl}${m.number}"><span class="wiki-mobicon" aria-hidden="true">⌖</span><span><b>${esc(m.name)}</b><small>mapa nr ${m.number}</small></span></a></li>`).join('');
+          `<li><a href="${m.region ? regionUrl + m.region : mapUrl + m.number}"><span class="wiki-mobicon" aria-hidden="true">⌖</span><span><b>${esc(m.name)}</b><small>${m.region ? 'trzy królestwa razem' : 'mapa nr ' + m.number}</small></span></a></li>`).join('');
         mobs.innerHTML = data.mobs.length ? data.mobs.map((m) =>
           `<li><a href="${mobUrl}${m.vnum}"><span class="wiki-mobicon" aria-hidden="true">${m.kind === 'Metin' ? '◆' : m.kind === 'Boss' ? '☠' : '●'}</span><span><b>${esc(m.name)}</b><small>${esc(m.kind)} · poziom ${m.level} · VNUM ${m.vnum}</small></span></a></li>`).join('')
           : '<li class="muted">Brak potworów.</li>';

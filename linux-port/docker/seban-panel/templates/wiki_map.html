@@ -3,7 +3,7 @@
 {%- macro pct(value) -%}{% if value >= 10 %}{{ '%.0f'|format(value) }}%{% else %}{{ ('%.1f'|format(value)).replace('.', ',') }}%{% endif %}{%- endmacro -%}
 <p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · <a href="{{ url_for('wiki_maps') }}">MAPY</a></p>
 <h1>{{ summary.name }}</h1>
-<p class="muted">Mapa nr {{ summary.number }} · folder {{ summary.folder }}{% if not active %} · nie działa w tym świecie{% endif %}</p>
+<p class="muted">Mapa nr {{ summary.number }} · folder {{ summary.folder }}{% if not active %} · nie działa w tym świecie{% endif %}{% if region %} · wszystkie trzy królestwa razem: <a href="{{ url_for('wiki_region', key=region) }}">{{ region_name }}</a>{% endif %}</p>
 <div class="trend-grid wiki-map-cards">
   <article class="trend-card"><span>Poziomy potworów</span><strong>{% if summary.levels %}{{ summary.levels[0] }}–{{ summary.levels[1] }}{% else %}—{% endif %}</strong></article>
   <article class="trend-card"><span>Rodzaje potworów</span><strong>{{ summary.mobs }}</strong></article>
@@ -15,7 +15,7 @@
 <section class="panel">
   <h2>{{ titles[key] }} ({{ rows|map(attribute='vnum')|unique|list|length }})</h2>
   <table><thead><tr><th>{{ 'Kto' if key == 'npc' else 'Potwór' }}</th><th>Poziom</th>{% if key != 'npc' %}<th>Ranga</th><th>Jak</th><th>Punkty</th><th>Naraz (średnio)</th><th>Respawn</th>{% endif %}</tr></thead><tbody>
-  {% for e in rows %}<tr><td><a href="{{ url_for('wiki_mob', vnum=e.vnum) }}">{{ e.name }}</a></td><td>{{ e.level }}</td>{% if key != 'npc' %}<td>{{ e.rank_name }}</td><td>{{ e.how }}{% if e.how == 'w losowej grupie' %} ({{ pct(e.chance * 100) }}){% endif %}</td><td>{{ e.points }}</td><td>{{ e.count|string|replace('.0', '')|replace('.', ',') }}</td><td data-sort="{{ e.start }}">{{ e.time }}{% if e.effective %} <small class="muted">→ {{ e.effective }} (Respawny: {{ e.percent }}%)</small>{% endif %}</td>{% endif %}</tr>{% endfor %}
+  {% for e in rows %}<tr><td><a href="{{ url_for('wiki_mob', vnum=e.vnum) }}">{{ e.name }}</a></td><td>{{ e.level }}</td>{% if key != 'npc' %}<td>{{ e.rank_name }}</td><td>{{ e.how }}{% if e.how == 'w losowej grupie' %} ({{ pct(e.chance * 100) }}){% endif %}</td><td>{{ e.points_text }}</td><td data-sort="{{ e.count }}">{{ e.count_text }}</td><td data-sort="{{ e.start }}">{{ e.time }}{% if e.effective %} <small class="muted">→ {{ e.effective }} (Respawny: {{ e.percent }}%)</small>{% endif %}</td>{% endif %}</tr>{% endfor %}
   </tbody></table>
 </section>
 {% endif %}{% endfor %}

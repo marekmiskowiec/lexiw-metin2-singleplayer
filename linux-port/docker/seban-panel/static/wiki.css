@@ -34,3 +34,4 @@
 @media(max-width:900px){.wiki-results,.wiki-grid{grid-template-columns:1fr}}
 .wiki-mob-mark{font-size:34px;color:var(--gold, #e8b93f)}
 .wiki-map-cards{margin:14px 0 22px}
+.wiki-split{color:var(--gold, #e8b93f);white-space:nowrap}

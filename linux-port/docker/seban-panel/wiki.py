@@ -54,6 +54,18 @@ ENCHANTS = (("enchant_poison", "Otrucie"), ("enchant_stun", "Omdlenie"), ("encha
             ("enchant_critical", "Cios krytyczny"), ("enchant_penetrate", "Cios przeszywający"), ("enchant_curse", "Klątwa"))
 SPAWN_FILES = {"regen.txt": "Potwory", "stone.txt": "Metiny", "boss.txt": "Bossowie", "npc.txt": "NPC"}
 
+# The three kingdoms' first and second villages, one page each: the same
+# monsters, Metins and bosses in all three (checked 9 October: the same
+# kinds and groups), only the number of spots differs with the map's shape
+# (e.g. 36 / 46 / 35), a respawn time here and there (1000 s / 1100 s), and
+# the NPCs - every kingdom its own guards and shopkeepers, by the same name.
+MAP_FAMILIES = {
+    "m1": {"name": "Pierwsze wioski (M1)", "numbers": (1, 21, 41)},
+    "m2": {"name": "Drugie wioski (M2)", "numbers": (3, 23, 43)},
+}
+KINGDOM_OF_MAP = {1: "Shinsoo", 3: "Shinsoo", 21: "Chunjo", 23: "Chunjo", 41: "Jinno", 43: "Jinno"}
+FAMILY_OF_MAP = {number: key for key, family in MAP_FAMILIES.items() for number in family["numbers"]}
+
 
 def spawn_seconds(text):
     """A regen time as regen.cpp reads it: "20m-25m", "5s", "1h30m"; a bare
@@ -73,6 +85,19 @@ def spawn_seconds(text):
     if part == 0:
         ends[1] = ends[0]
     return ends[0], max(ends[0], ends[1])
+
+
+def count_text(value):
+    """1, 2,5, 148,8 - a count as the tables show it."""
+    value = round(float(value), 1)
+    return str(int(value)) if value == int(value) else str(value).replace(".", ",")
+
+
+def per_kingdom_text(values, fmt=count_text):
+    """One number when the kingdoms agree, else "36 · 46 · 35" (Shinsoo,
+    Chunjo, Jinno; "–" where a kingdom has none)."""
+    shown = [fmt(v) if v else "–" for v in values]
+    return shown[0] if len(set(shown)) == 1 else " · ".join(shown)
 
 
 def spawn_time_text(start, end):
@@ -404,7 +429,37 @@ def install_wiki(m):
             effective = spawn_time_text(max(3, entry["start"] * percent // 100), max(3, entry["end"] * percent // 100))
         return dict(entry, number=number, map=m.map_name(number) if number else entry["dir"], active=active,
                     kind_label=SPAWN_FILES[entry["file"]], time=spawn_time_text(entry["start"], entry["end"]),
-                    effective=effective, percent=percent, count=round(entry["count"], 1))
+                    effective=effective, percent=percent, count=round(entry["count"], 1),
+                    points_text=str(entry["points"]), count_text=count_text(entry["count"]), region=None)
+
+    def merge_kingdoms(rows, key_of):
+        """The rows of the three kingdoms' M1 (or M2) as one row each: the
+        numbers per kingdom where they differ, the respawn as one range.
+        key_of(row): what makes rows the same (the monster, its file and way)."""
+        merged, out = {}, []
+        for row in rows:
+            family = FAMILY_OF_MAP.get(row["number"])
+            if not family:
+                out.append(row)
+                continue
+            merged.setdefault((family,) + key_of(row), []).append(row)
+        for key, group in merged.items():
+            family = MAP_FAMILIES[key[0]]
+            by_number = {row["number"]: row for row in group}
+            per = [by_number.get(number) for number in family["numbers"]]
+            first = group[0]
+            effective = {row["effective"] for row in group}
+            out.append(dict(
+                first, map=family["name"], region=key[0], active=True,
+                start=min(r["start"] for r in group), end=max(r["end"] for r in group),
+                time=spawn_time_text(min(r["start"] for r in group), max(r["end"] for r in group)),
+                points=sum(r["points"] for r in group), count=round(sum(r["count"] for r in group), 1),
+                points_text=per_kingdom_text([r["points"] if r else 0 for r in per]),
+                count_text=per_kingdom_text([r["count"] if r else 0 for r in per]),
+                effective=effective.pop() if len(effective) == 1 else "różnie w królestwach",
+                kingdoms=[KINGDOM_OF_MAP[n] for n in family["numbers"] if by_number.get(n)],
+                split=len({(r["points"], r["start"], r["end"]) for r in group}) > 1 or len(group) < len(family["numbers"])))
+        return out
 
     def spawns_of(mob):
         """Where a monster appears, each map once per file and way, with the
@@ -419,7 +474,8 @@ def install_wiki(m):
             active = [n for n in numbers if n in m.MAP_NAMES]
             number = (active or numbers or [0])[0]
             out.append(annotate_spawn(entry, mob["kind"], number, bool(active), flags))
-        out.sort(key=lambda e: (not e["active"], e["map"], e["start"]))
+        out = merge_kingdoms(out, lambda row: (row["file"], row["how"]))
+        out.sort(key=lambda e: (not e["active"], e["region"] is None, e["map"], e["start"]))
         return out
 
     def map_dirs():
@@ -514,17 +570,80 @@ def install_wiki(m):
         found_mobs = [{"vnum": mob["vnum"], "name": mob["name"], "level": mob["level"], "kind": mob["kind_name"]}
                       for mob in mobs[:12]]
         dirs = map_dirs()
-        found_maps = [{"number": number, "name": name} for number, name in sorted(m.MAP_NAMES.items())
-                      if number in dirs and folded in name.lower()][:8]
+        found_maps = [{"region": key, "name": family["name"]} for key, family in MAP_FAMILIES.items()
+                      if folded in family["name"].lower() or folded == key]
+        found_maps += [{"number": number, "name": name} for number, name in sorted(m.MAP_NAMES.items())
+                       if number in dirs and folded in name.lower()][:8]
         return jsonify(ok=True, items=found_items, mobs=found_mobs, maps=found_maps)
+
+    def region_summary(key, mobs):
+        """The three kingdoms' maps of a family as one line of the list."""
+        dirs = map_dirs()
+        parts = [map_summary(number, dirs[number], mobs) for number in MAP_FAMILIES[key]["numbers"] if number in dirs]
+        kinds = {"mob": set(), "metin": set(), "boss": set()}
+        for number in MAP_FAMILIES[key]["numbers"]:
+            for vnum, _entry in map_spawns(dirs.get(number, "")):
+                mob = mobs.get(vnum)
+                if mob and mob["kind"] in kinds:
+                    kinds[mob["kind"]].add(vnum)
+        levels = [p["levels"] for p in parts if p["levels"]]
+        return {"region": key, "name": MAP_FAMILIES[key]["name"], "number": None,
+                "levels": (min(l[0] for l in levels), max(l[1] for l in levels)) if levels else None,
+                "mobs": len(kinds["mob"]), "metins": len(kinds["metin"]), "bosses": len(kinds["boss"]),
+                "kingdoms": [(KINGDOM_OF_MAP[p["number"]], p["number"]) for p in parts]}
 
     @app.route("/wiki/maps")
     @m.login_required
     def wiki_maps():
-        """The maps this world runs, with what lives on them."""
+        """The maps this world runs, with what lives on them - the three
+        kingdoms' M1 and M2 as one line each."""
         dirs, mobs = map_dirs(), m.drop_mob_rows()
-        maps = [map_summary(number, dirs[number], mobs) for number in sorted(m.MAP_NAMES) if number in dirs]
+        maps, regions_done = [], set()
+        for number in sorted(m.MAP_NAMES):
+            if number not in dirs:
+                continue
+            region = FAMILY_OF_MAP.get(number)
+            if region:
+                if region not in regions_done:
+                    regions_done.add(region)
+                    maps.append(region_summary(region, mobs))
+                continue
+            maps.append(map_summary(number, dirs[number], mobs))
         return render_template("wiki_maps.html", maps=maps, spawn_files_ready=spawn_dir.is_dir())
+
+    @app.route("/wiki/region/<key>")
+    @m.login_required
+    def wiki_region(key):
+        """M1 or M2 of all three kingdoms on one page."""
+        family = MAP_FAMILIES.get(key)
+        if not family:
+            abort(404)
+        dirs, mobs, flags = map_dirs(), m.drop_mob_rows(), regen_flags()
+        rows, npcs = [], {}
+        for number in family["numbers"]:
+            for vnum, entry in map_spawns(dirs.get(number, "")):
+                mob = mobs.get(vnum)
+                if not mob:
+                    continue
+                if mob["kind"] not in ("mob", "metin", "boss"):
+                    # Every kingdom its own NPCs, by the same name: one line
+                    # per name, a link for each kingdom's own.
+                    npc = npcs.setdefault(mob["name"], {"name": mob["name"], "level": mob["level"], "kingdoms": {}})
+                    npc["kingdoms"].setdefault(KINGDOM_OF_MAP[number], vnum)
+                    continue
+                rows.append(dict(annotate_spawn(entry, mob["kind"], number, True, flags), vnum=vnum, name=mob["name"],
+                                 level=mob["level"], rank_name=mob["rank_name"], mob_kind=mob["kind"]))
+        merged = merge_kingdoms(rows, lambda row: (row["vnum"], row["file"], row["how"]))
+        sections = {"mob": [], "metin": [], "boss": []}
+        for row in merged:
+            sections[row["mob_kind"]].append(row)
+        for section in sections.values():
+            section.sort(key=lambda e: (e["level"], e["name"], e["start"]))
+        npc_rows = sorted(npcs.values(), key=lambda n: n["name"])
+        for npc in npc_rows:
+            npc["links"] = [(kingdom, npc["kingdoms"].get(kingdom)) for kingdom in ("Shinsoo", "Chunjo", "Jinno")]
+        return render_template("wiki_region.html", key=key, family=family, summary=region_summary(key, mobs),
+                               sections=sections, npcs=npc_rows, spawn_files_ready=spawn_dir.is_dir())
 
     @app.route("/wiki/map/<int:number>")
     @m.login_required
@@ -543,7 +662,9 @@ def install_wiki(m):
                                        vnum=vnum, name=mob["name"], level=mob["level"], rank_name=mob["rank_name"]))
         for rows in sections.values():
             rows.sort(key=lambda e: (e["level"], e["name"], e["start"]))
+        region = FAMILY_OF_MAP.get(number)
         return render_template("wiki_map.html", summary=map_summary(number, folder, mobs), sections=sections,
+                               region=region, region_name=MAP_FAMILIES[region]["name"] if region else None,
                                active=number in m.MAP_NAMES, spawn_files_ready=spawn_dir.is_dir())
 
     @app.route("/wiki/mob/<int:vnum>")
