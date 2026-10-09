@@ -4,6 +4,35 @@ $ErrorActionPreference = 'Stop'
 # Fallback used when the manifest carries no support block (offline, or an old manifest).
 $script:M2_DEFAULT_SUPPORT_CONTACT = 'https://metin2sp.pl/discord'
 
+# Lexiw: this fork's look and links, and whether the launcher talks to the
+# package author's update channel at all - launcher\branding.json. No file is
+# the author's launcher unchanged.
+$script:M2BrandingPath = Join-Path $PSScriptRoot 'branding.json'
+$script:M2Branding = $null
+function Get-M2Branding {
+    if ($null -eq $script:M2Branding) {
+        $script:M2Branding = [pscustomobject]@{}
+        if (Test-Path -LiteralPath $script:M2BrandingPath -PathType Leaf) {
+            try { $script:M2Branding = [IO.File]::ReadAllText($script:M2BrandingPath, [Text.Encoding]::UTF8) | ConvertFrom-Json }
+            catch { }
+        }
+    }
+    return $script:M2Branding
+}
+function Get-M2BrandValue {
+    # The branding file's value, or $Default when it has none.
+    param([Parameter(Mandatory = $true)][string]$Name, $Default = '')
+    $property = (Get-M2Branding).PSObject.Properties[$Name]
+    if ($property -and $null -ne $property.Value -and [string]$property.Value -ne '') { return $property.Value }
+    return $Default
+}
+function Test-M2AuthorUpdatesEnabled {
+    # "authorUpdates": false - no check, no package, no client file list and
+    # no support address from the author's channel (GitHub or its mirror).
+    return [bool](Get-M2BrandValue -Name 'authorUpdates' -Default $true)
+}
+$script:M2_AUTHOR_UPDATES_OFF = 'Aktualizacje od autora paczki są w tej wersji wyłączone (launcher\branding.json: authorUpdates). Nową wersję autora wgrywamy przez Gita: gałąź upstream, potem połączenie z main.'
+
 # MT2009 Plus: updates come from the mod's own repository, never from
 # upstream (TieruYT/metin2-playerbots) - an upstream package unpacked over the
 # mod would overwrite its changes. The raw URL is also read through the GitHub
@@ -684,6 +713,10 @@ function Get-M2UpdateManifest {
         $text = Get-Content -LiteralPath $Source -Raw -Encoding UTF8
         return ConvertFrom-M2ManifestText -Text $text -Origin $Source
     }
+    # Lexiw: everything past here is the network - the author's GitHub or its
+    # mirror. Every manifest, client file list and support address is read
+    # through this function, so this one line keeps the launcher off it.
+    if (-not (Test-M2AuthorUpdatesEnabled)) { throw $script:M2_AUTHOR_UPDATES_OFF }
 
     $uri = $null
     if (-not [Uri]::TryCreate($Source, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -ne 'https') {
@@ -3417,6 +3450,9 @@ function Reset-M2WorldToFreshInstall {
 }
 
 Export-ModuleMember -Function @(
+    'Get-M2Branding',
+    'Get-M2BrandValue',
+    'Test-M2AuthorUpdatesEnabled',
     'Get-M2DefaultLauncherConfig',
     'Get-M2LauncherConfig',
     'Save-M2LauncherConfig',
