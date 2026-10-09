@@ -12,6 +12,14 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
+## 2.21.1-lexiw.8 — 2026-10-09 — Wiki serwera, etap 2: potwory, Metiny i bossowie
+
+- [panel] Strona każdego potwora, Metina i bossa w wiki: rodzaj, ranga, poziom, PŻ, doświadczenie, obrażenia, obrona, yang z zabicia; rasa i bonus, który na niego działa (np. „Silny przeciw zwierzętom”), odporności i specjalne ataki.
+- [panel] „Gdzie się pojawia”: mapy, liczba miejsc, ile stoi naraz (średnio) i co ile się odradza — z plików map działającej gry; gdy strona Respawny przyspiesza respawn, obok czasu z pliku widać czas po przyspieszeniu.
+- [panel] Pełny drop potwora z szansą na zabójstwo (zmiany z edytora dropu zaznaczone), wspólny drop dla jego rangi i drop spoza tabel (księgi, Cor Draconis, szkatułki Blasku Księżyca…), z linkami do stron przedmiotów i do edytora dropu.
+- [panel] Potwory w wyszukiwarce wiki i na stronach przedmiotów prowadzą do stron potworów.
+- [serwer] Nowy skrypt m2-wiki-export: gra przy każdym starcie kopiuje pliki map (regen, Metiny, bossowie, NPC) i grupy potworów do wspólnego folderu, z którego czyta panel. Działa od następnej przebudowy obrazu gry; tym razem uruchomiony raz ręcznie (sam odczyt i kopia, bez restartu).
+
 ## 2.21.1-lexiw.7 — 2026-10-09 — Wiki serwera, etap 1: wyszukiwarka i przedmioty
 
 - [panel] Nowa zakładka Wiki w menu: wyszukiwarka przedmiotów i potworów (nazwa albo VNUM), wyniki od razu przy pisaniu; przedmioty, które dropią albo są w szkatułkach, pokazują się najpierw.

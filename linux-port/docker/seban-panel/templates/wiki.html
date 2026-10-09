@@ -9,14 +9,14 @@
 <div class="wiki-results" id="wikiResults" hidden>
   <section class="panel"><h2>Przedmioty</h2><ul class="wiki-list" id="wikiItems"></ul></section>
   <section class="panel"><h2>Potwory, Metiny i bossowie</h2><ul class="wiki-list" id="wikiMobs"></ul>
-    <p class="muted wiki-note">Strony potworów będą w następnym etapie wiki — na razie link prowadzi do ich dropu w edytorze.</p></section>
+</section>
 </div>
 <script>
 (function () {
   const input = document.getElementById('wikiQuery'), hint = document.getElementById('wikiHint');
   const box = document.getElementById('wikiResults'), items = document.getElementById('wikiItems'), mobs = document.getElementById('wikiMobs');
   const itemUrl = "{{ url_for('wiki_item', vnum=0) }}".replace(/0$/, '');
-  const mobUrl = "{{ url_for('drop_edit', mob=0) }}".replace(/0$/, '');
+  const mobUrl = "{{ url_for('wiki_mob', vnum=0) }}".replace(/0$/, '');
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   let timer = null, last = '';
   function search() {

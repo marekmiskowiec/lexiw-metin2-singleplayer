@@ -35,6 +35,59 @@ WEAPON_SUBTYPE_NAMES = {0: "Miecz", 1: "Sztylet", 2: "Łuk", 3: "Broń dwuręczn
 ARMOR_SUBTYPE_NAMES = {0: "Zbroja", 1: "Hełm", 2: "Tarcza", 3: "Bransoleta", 4: "Buty", 5: "Naszyjnik", 6: "Kolczyki"}
 COMMON_RANKS = {0: "zwykłe potwory", 1: "silniejsze potwory", 2: "rycerze", 3: "elitarne potwory"}
 
+# mob_proto's flag sets, as the wiki names them. RACE: what a "Silny
+# przeciw ..." bonus works on.
+RACE_NAMES = {
+    "ANIMAL": "Zwierzę", "UNDEAD": "Nieumarły", "DEVIL": "Diabeł", "HUMAN": "Człowiek", "ORC": "Ork",
+    "MILGYO": "Mistyk", "INSECT": "Owad", "FIRE": "Ognisty", "ICE": "Lodowy", "DESERT": "Pustynny", "TREE": "Drzewo",
+    "ATT_ELEC": "Żywioł: błyskawica", "ATT_FIRE": "Żywioł: ogień", "ATT_ICE": "Żywioł: lód",
+    "ATT_WIND": "Żywioł: wiatr", "ATT_EARTH": "Żywioł: ziemia", "ATT_DARK": "Żywioł: mrok",
+}
+RACE_BONUS = {"ANIMAL": "Silny przeciw zwierzętom", "UNDEAD": "Silny przeciw nieumarłym", "DEVIL": "Silny przeciw diabłom",
+              "HUMAN": "Silny przeciw ludziom", "ORC": "Silny przeciw orkom", "MILGYO": "Silny przeciw mistykom"}
+IMMUNE_NAMES = {"STUN": "omdlenie", "SLOW": "spowolnienie", "FALL": "przewrócenie", "CURSE": "klątwa",
+                "POISON": "trucizna", "TERROR": "strach", "REFLECT": "odbicie"}
+RESISTS = (("resist_sword", "Miecze"), ("resist_twohand", "Broń dwuręczna"), ("resist_dagger", "Sztylety"),
+           ("resist_bell", "Dzwony"), ("resist_fan", "Wachlarze"), ("resist_bow", "Łuki"), ("resist_fire", "Ogień"),
+           ("resist_elect", "Błyskawice"), ("resist_magic", "Magia"), ("resist_wind", "Wiatr"), ("resist_poison", "Trucizna"))
+ENCHANTS = (("enchant_poison", "Otrucie"), ("enchant_stun", "Omdlenie"), ("enchant_slow", "Spowolnienie"),
+            ("enchant_critical", "Cios krytyczny"), ("enchant_penetrate", "Cios przeszywający"), ("enchant_curse", "Klątwa"))
+SPAWN_FILES = {"regen.txt": "Potwory", "stone.txt": "Metiny", "boss.txt": "Bossowie", "npc.txt": "NPC"}
+
+
+def spawn_seconds(text):
+    """A regen time as regen.cpp reads it: "20m-25m", "5s", "1h30m"; a bare
+    number is seconds. -> (from, to) in seconds."""
+    ends, value, number = [0, 0], 0, 0
+    part = 0
+    for ch in text:
+        if ch.isdigit():
+            number = number * 10 + int(ch)
+        elif ch in "hms":
+            value += number * {"h": 3600, "m": 60, "s": 1}[ch]
+            number = 0
+        elif ch == "-":
+            ends[part] = value + number
+            value, number, part = 0, 0, 1
+    ends[part] = value + number
+    if part == 0:
+        ends[1] = ends[0]
+    return ends[0], max(ends[0], ends[1])
+
+
+def spawn_time_text(start, end):
+    def one(seconds):
+        if seconds >= 3600 and seconds % 3600 == 0:
+            return f"{seconds // 3600} h"
+        if seconds >= 3600:
+            return f"{seconds // 3600} h {seconds % 3600 // 60} min"
+        if seconds >= 60 and seconds % 60 == 0:
+            return f"{seconds // 60} min"
+        if seconds >= 60:
+            return f"{seconds // 60} min {seconds % 60} s"
+        return f"{seconds} s"
+    return one(start) if start == end else f"{one(start)} – {one(end)}"
+
 
 def install_wiki(m):
     """m: app.py itself (its app, helpers and file paths)."""
@@ -236,6 +289,163 @@ def install_wiki(m):
         common = [dict(e, rank_label=COMMON_RANKS[e["rank"]]) for e in found["common"]]
         return {"mobs": mobs, "chests": chests, "common": common, "etc": etc}
 
+    # ---------------------------------------------------------- the spawns
+
+    spawn_cache = {"key": None, "index": None}
+    spawn_dir = m.RATES_SPOOL / "wiki" / "locale"
+
+    def _read(path):
+        try:
+            return path.read_bytes().decode("cp1250", "replace")
+        except OSError:
+            return ""
+
+    def _groups(text, member_line):
+        """group.txt / group_group.txt -> {Vnum: [what member_line makes of
+        each entry line]} - the leader counted as a member."""
+        groups, current, members = {}, None, []
+        for raw in text.replace("\r", "").split("\n"):
+            tokens = raw.split()
+            if not tokens or tokens[0].startswith(("#", "//")):
+                continue
+            key = tokens[0].lower()
+            if key == "group":
+                current, members = None, []
+            elif key == "vnum" and len(tokens) > 1 and tokens[1].isdigit():
+                current = int(tokens[1])
+            elif key == "}":
+                if current is not None:
+                    groups[current] = members
+                current, members = None, []
+            elif key == "leader" or tokens[0].isdigit():
+                member = member_line(tokens)
+                if member:
+                    members.append(member)
+        return groups
+
+    def spawn_index():
+        """{mob vnum: [{dir, file, how, points, count, start, end, chance}]}
+        from the maps' regen files the game exported (m2-wiki-export)."""
+        key = _mtime(spawn_dir)
+        if spawn_cache["key"] == key and spawn_cache["index"] is not None:
+            return spawn_cache["index"]
+        groups = _groups(_read(spawn_dir / "group.txt"),
+                         lambda t: int(t[-1]) if t[-1].isdigit() else None)
+        group_groups = _groups(_read(spawn_dir / "group_group.txt"),
+                               lambda t: (int(t[1]), int(t[2]) if len(t) > 2 and t[2].isdigit() else 1)
+                               if len(t) > 1 and t[0].isdigit() and t[1].isdigit() else None)
+        found = {}
+        maps = spawn_dir / "map"
+        for map_dir in sorted(maps.iterdir()) if maps.is_dir() else []:
+            for file_name in SPAWN_FILES:
+                text = _read(map_dir / file_name)
+                for raw in text.replace("\r", "").split("\n"):
+                    tokens = raw.split()
+                    if len(tokens) < 11 or tokens[0].startswith(("#", "//")) or not tokens[10].isdigit():
+                        continue
+                    kind, vnum = tokens[0][0].lower(), int(tokens[10])
+                    count = int(tokens[9]) if tokens[9].isdigit() else 1
+                    start, end = spawn_seconds(tokens[7])
+                    if kind in ("m", "s"):
+                        members = [(vnum, 1.0, "pojedynczo")]
+                    elif kind == "g":
+                        members = [(mob, 1.0, "w grupie") for mob in groups.get(vnum, [])]
+                    elif kind == "r":
+                        options = group_groups.get(vnum, [])
+                        total = sum(weight for _group, weight in options) or 1
+                        members = [(mob, weight / total, "w losowej grupie")
+                                   for group, weight in options for mob in groups.get(group, [])]
+                    else:
+                        continue  # "e": an area where nothing spawns
+                    for mob, chance, how in members:
+                        slot = found.setdefault(mob, {}).setdefault(
+                            (map_dir.name, file_name, how, start, end),
+                            {"dir": map_dir.name, "file": file_name, "how": how, "start": start, "end": end,
+                             "points": 0, "count": 0.0, "chance": chance})
+                        slot["points"] += 1
+                        slot["count"] += count * chance
+                        slot["chance"] = max(slot["chance"], chance)
+        index = {mob: list(slots.values()) for mob, slots in found.items()}
+        spawn_cache.update(key=key, index=index)
+        return index
+
+    def map_indexes():
+        """map folder -> its map numbers (map/index)."""
+        out = {}
+        for line in _read(spawn_dir / "map" / "index").replace("\r", "").split("\n"):
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].isdigit():
+                out.setdefault(parts[1], []).append(int(parts[0]))
+        return out
+
+    def regen_flags():
+        """The respawn speed the panel's Respawny page set: per map and for
+        the whole world (fastMobSpawn / fastBossSpawn, % of the file's time)."""
+        try:
+            return {r["szName"]: int(r["lValue"] or 0) for r in m.rows(
+                "SELECT szName, lValue FROM player.quest WHERE dwPID=0 AND "
+                "(szName LIKE 'fastMobSpawn%%' OR szName LIKE 'fastBossSpawn%%')")}
+        except m.pymysql.MySQLError:
+            return {}
+
+    def spawns_of(mob):
+        """Where a monster appears, each map once per file and way, with the
+        respawn time in the file and as the panel's speed setting makes it."""
+        entries = spawn_index().get(mob["vnum"], [])
+        if not entries:
+            return []
+        indexes, flags = map_indexes(), regen_flags()
+        prefix = "fastBossSpawn" if mob["kind"] in ("boss", "metin") else "fastMobSpawn"
+        out = []
+        for entry in entries:
+            numbers = indexes.get(entry["dir"], [])
+            active = [n for n in numbers if n in m.MAP_NAMES]
+            number = (active or numbers or [0])[0]
+            percent = flags.get(f"{prefix}{number}", 0) or flags.get(prefix, 0)
+            percent = percent if 0 < percent < 100 else 0
+            effective = None
+            if percent:
+                effective = spawn_time_text(max(3, entry["start"] * percent // 100), max(3, entry["end"] * percent // 100))
+            out.append(dict(entry, map=m.map_name(number) if number else entry["dir"], active=bool(active),
+                            kind_label=SPAWN_FILES[entry["file"]], time=spawn_time_text(entry["start"], entry["end"]),
+                            effective=effective, percent=percent, count=round(entry["count"], 1)))
+        out.sort(key=lambda e: (not e["active"], e["map"], e["start"]))
+        return out
+
+    def drops_of(mob):
+        """What a monster drops: the groups the engine uses (the operator's
+        or the image's), with the chance per kill, and the other sources."""
+        state = m.drop_state()
+        chest_groups = m.chest_effective(m.chest_state())
+        items_seen = set()
+        kinds = []
+        for kind, info in m.drop_mob_groups(state, mob["vnum"]).items():
+            for group in info["groups"]:
+                weights = sum(max(0.0, m.drop_float(e["prob"])) for e in group["items"]) if kind == "kill" else 0
+                entries = []
+                for entry in group["items"]:
+                    item = str(entry["item"]).lower()
+                    vnum = int(item) if item.isdigit() else (int(item[1:]) if item[1:].isdigit() else None)
+                    if vnum:
+                        items_seen.add(vnum)
+                    entries.append({"vnum": vnum, "chest_draw": not item.isdigit(), "count": entry["count"],
+                                    "chance": m.drop_chance(kind, entry, group, weights)})
+                kinds.append({"kind": kind, "label": m.DROP_TYPES.get(kind, kind), "entries": entries,
+                              "kill_drop": group.get("kill_drop"), "level_limit": group.get("level_limit"),
+                              "custom": info["source"] == "custom"})
+        names = m.chest_item_names(sorted(items_seen))
+        for group in kinds:
+            for entry in group["entries"]:
+                known = names.get(entry["vnum"]) or {}
+                name = known.get("name") or (f"VNUM {entry['vnum']}" if entry["vnum"] else "?")
+                if entry["chest_draw"]:
+                    title = name if known.get("type") == 23 else (chest_groups.get(entry["vnum"]) or {}).get("name", "")
+                    name = f"Losowanie ze szkatułki {entry['vnum']}" + (f" ({title})" if title else "")
+                entry.update(name=name, icon=m.item_icon_url(entry["vnum"]) if entry["vnum"] else None)
+            group["entries"].sort(key=lambda e: -(e["chance"] or 0))
+        other, common = m.drop_other_sources(mob)
+        return kinds, other, common
+
     # ----------------------------------------------------------------- pages
 
     @app.route("/wiki")
@@ -271,6 +481,27 @@ def install_wiki(m):
         found_mobs = [{"vnum": mob["vnum"], "name": mob["name"], "level": mob["level"], "kind": mob["kind_name"]}
                       for mob in mobs[:12]]
         return jsonify(ok=True, items=found_items, mobs=found_mobs)
+
+    @app.route("/wiki/mob/<int:vnum>")
+    @m.login_required
+    def wiki_mob(vnum):
+        mob = m.drop_mob_rows().get(vnum)
+        row = m.one("SELECT * FROM player.mob_proto WHERE vnum=%s", (vnum,))
+        if not mob or not row:
+            abort(404)
+        flags = lambda column: [f for f in str(row.get(column) or "").split(",") if f]
+        races = flags("setRaceFlag")
+        kinds, other, common = drops_of(mob)
+        return render_template(
+            "wiki_mob.html", mob=mob, row=row,
+            races=[RACE_NAMES.get(r, r) for r in races],
+            bonuses=[RACE_BONUS[r] for r in races if r in RACE_BONUS],
+            immune=[IMMUNE_NAMES.get(f, f.lower()) for f in flags("setImmuneFlag")],
+            aggressive="AGGR" in flags("ai_flag"), static="NOMOVE" in flags("ai_flag"),
+            resists=[(label, int(row.get(col) or 0)) for col, label in RESISTS if int(row.get(col) or 0)],
+            enchants=[(label, int(row.get(col) or 0)) for col, label in ENCHANTS if int(row.get(col) or 0)],
+            drops=kinds, other=other, common=common, spawns=spawns_of(mob),
+            spawn_files_ready=spawn_dir.is_dir())
 
     @app.route("/wiki/item/<int:vnum>")
     @m.login_required

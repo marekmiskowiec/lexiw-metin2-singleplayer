@@ -51,7 +51,7 @@
   {% if s.mobs %}
   <h3>Wypada z potworów ({{ s.mobs|length }})</h3>
   <table><thead><tr><th>Potwór</th><th>Typ</th><th>Poziom</th><th>Rodzaj dropu</th><th>Ilość</th><th>Szansa</th></tr></thead><tbody>
-  {% for e in s.mobs %}<tr><td><a href="{{ url_for('drop_edit', mob=e.mob) }}">{{ e.name }}</a></td><td>{{ e.kind_name }}</td><td>{{ e.level }}</td><td>{{ e.kind_label }}{% if e.kind == 'kill' %} (co {{ e.kill_drop }} zabójstw){% elif e.kind == 'limit' %} (od poz. {{ e.level_limit }}){% endif %}</td><td>{{ e.count }}</td><td data-sort="{{ e.chance }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
+  {% for e in s.mobs %}<tr><td><a href="{{ url_for('wiki_mob', vnum=e.mob) }}">{{ e.name }}</a></td><td>{{ e.kind_name }}</td><td>{{ e.level }}</td><td>{{ e.kind_label }}{% if e.kind == 'kill' %} (co {{ e.kill_drop }} zabójstw){% elif e.kind == 'limit' %} (od poz. {{ e.level_limit }}){% endif %}</td><td>{{ e.count }}</td><td data-sort="{{ e.chance }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
   </tbody></table>
   <p class="muted wiki-note">Szansa na jedno zabójstwo dla zabójcy na poziomie potwora, bez bonusów do dropu i bez rat serwera.</p>
   {% endif %}
@@ -73,7 +73,7 @@
   {% if s.etc %}
   <h3>Drop dodatkowy ({{ s.etc|length }})</h3>
   <table><thead><tr><th>Potwór</th><th>Typ</th><th>Poziom</th><th>Szansa</th></tr></thead><tbody>
-  {% for e in s.etc %}<tr><td><a href="{{ url_for('drop_edit', mob=e.mob) }}">{{ e.name }}</a></td><td>{{ e.kind_name }}</td><td>{{ e.level }}</td><td data-sort="{{ e.chance }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
+  {% for e in s.etc %}<tr><td><a href="{{ url_for('wiki_mob', vnum=e.mob) }}">{{ e.name }}</a></td><td>{{ e.kind_name }}</td><td>{{ e.level }}</td><td data-sort="{{ e.chance }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
   </tbody></table>
   {% endif %}
 </section>

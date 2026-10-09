@@ -214,6 +214,10 @@ boot_cores() {
   if [ "${HAVE_DROPS:-0}" = "1" ]; then
     m2-drops apply || log "the panel's drops could not be applied -- the image's drops stay"
   fi
+  # Lexiw: the spawn files for the panel's wiki (m2-wiki-export); reads only.
+  if command -v m2-wiki-export >/dev/null 2>&1; then
+    m2-wiki-export || log "the wiki's spawn files could not be exported"
+  fi
 
   for name in "${CORE_ORDER[@]}"; do
     [ "$SHUTTING_DOWN" = "0" ] || return "$rc"
