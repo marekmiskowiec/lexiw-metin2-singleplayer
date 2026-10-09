@@ -4653,6 +4653,67 @@ def _schedule_dashboard_deferred_refresh():
                      name="dashboard-cache-refresh", daemon=True).start()
 
 
+# Lexiw: the dashboard's row of 24-hour mini charts. The collector's 5-minute
+# snapshots give the bots online and the yang; the game's own logs the
+# refines and the deaths, an hour a point. log.refinelog has no index on its
+# time, so the whole answer is kept for five minutes.
+DASHBOARD_TRENDS_TTL = 300
+_dashboard_trends_cache = {"at": 0.0, "data": None}
+
+
+def _hourly_points(found, now, keys):
+    """The last 24 hours, an hour a point, the hours nothing happened in
+    as zeros. found: {"YYYY-mm-dd HH": {key: value}}."""
+    start = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=23)
+    labels, values = [], {key: [] for key in keys}
+    for step in range(24):
+        hour = start + timedelta(hours=step)
+        labels.append(hour.strftime("%H:00"))
+        row = found.get(hour.strftime("%Y-%m-%d %H"), {})
+        for key in keys:
+            values[key].append(int(row.get(key) or 0))
+    return labels, values
+
+
+def _dashboard_trends():
+    now = one("SELECT NOW() AS now")["now"]
+    trends = {}
+    snapshots = rows(
+        "SELECT captured_at, metric, value FROM player.web_seban_metric_snapshot"
+        " WHERE metric IN ('bots_count','total_yang') AND captured_at >= NOW() - INTERVAL 24 HOUR"
+        " ORDER BY captured_at")
+    for metric, key in (("bots_count", "bots"), ("total_yang", "yang")):
+        points = [row for row in snapshots if row["metric"] == metric]
+        trends[key] = {"labels": [row["captured_at"].strftime("%H:%M") for row in points],
+                       "values": [int(row["value"]) for row in points]}
+    refines = rows(
+        "SELECT DATE_FORMAT(time, '%%Y-%%m-%%d %%H') AS hour, COUNT(*) AS total, SUM(is_success) AS ok"
+        " FROM log.refinelog WHERE time >= NOW() - INTERVAL 24 HOUR GROUP BY hour")
+    labels, values = _hourly_points({row["hour"]: row for row in refines}, now, ("total", "ok"))
+    trends["refines"] = {"labels": labels, "values": values["total"], "ok": values["ok"]}
+    deaths = rows(
+        "SELECT DATE_FORMAT(time, '%%Y-%%m-%%d %%H') AS hour, SUM(how = 'DEAD_BY_NPC') AS npc,"
+        " SUM(how = 'DEAD_BY_PC') AS pc FROM log.log"
+        " WHERE how IN ('DEAD_BY_NPC', 'DEAD_BY_PC') AND time >= NOW() - INTERVAL 24 HOUR GROUP BY hour")
+    labels, values = _hourly_points({row["hour"]: row for row in deaths}, now, ("npc", "pc"))
+    trends["deaths"] = {"labels": labels, "values": [a + b for a, b in zip(values["npc"], values["pc"])],
+                        "pvp": values["pc"]}
+    return trends
+
+
+@app.get("/api/dashboard-trends")
+@login_required
+def api_dashboard_trends():
+    if _dashboard_trends_cache["data"] is None or time.time() - _dashboard_trends_cache["at"] >= DASHBOARD_TRENDS_TTL:
+        try:
+            _dashboard_trends_cache.update(data=_dashboard_trends(), at=time.time())
+        except pymysql.MySQLError:
+            app.logger.exception("Dashboard trends failed")
+            if _dashboard_trends_cache["data"] is None:
+                return jsonify(ok=False), 503
+    return jsonify(ok=True, **_dashboard_trends_cache["data"])
+
+
 @app.route("/api/dashboard-deferred")
 @login_required
 def api_dashboard_deferred():

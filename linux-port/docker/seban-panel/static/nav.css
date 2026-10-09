@@ -168,7 +168,7 @@ main a:not([class]):visited{color:var(--sn-accent-ink)}
    name's own wrapper is set back to the name's look here. */
 aside.sn .brand.brand--mark{display:flex;align-items:center;gap:10px}
 aside.sn .brand.brand--mark>.brand-mark{flex:0 0 34px;width:34px;height:34px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45))}
-aside.sn .brand.brand--mark>.brand-words{display:block;min-width:0;margin:0;font-size:16px;white-space:nowrap;}font-weight:inherit;color:inherit;letter-spacing:normal;line-height:1.15}
+aside.sn .brand.brand--mark>.brand-words{display:block;min-width:0;margin:0;font-size:16px;white-space:nowrap;font-weight:inherit;color:inherit;letter-spacing:normal;line-height:1.15}
 /* The projects this panel is built on, at the foot of the sidebar. */
 .sn-credit{margin:10px 6px 4px;font-size:11px;line-height:1.4;color:var(--muted)}
 aside.sn .brand.brand--mark>.brand-words>span{font-size:10px;letter-spacing:.4px;white-space:nowrap}

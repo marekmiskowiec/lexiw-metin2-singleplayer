@@ -12,6 +12,12 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
+## 2.21.1-lexiw.4 — 2026-10-09 — Pulpit: ostatnie 24 godziny
+
+- [panel] Na Pulpicie, pod kafelkami, wiersz „Ostatnie 24 godziny” z czterema mini-wykresami: boty online, yang w obiegu (ze zmianą w %), ulepszenia u kowala na godzinę (z odsetkiem udanych) i zgony na godzinę (z liczbą zgonów w PvP). Po najechaniu na wykres widać wartość dla danej chwili.
+- [panel] Dane wczytują się po otwarciu strony (Pulpit nie otwiera się wolniej) i są odświeżane co 5 minut.
+- [panel] Poprawka: informacja o pochodzeniu na dole paska bocznego znowu jest mała i szara (błąd w stylach z poprzedniej zmiany).
+
 ## 2.21.1-lexiw.3 — 2026-10-09 — Panel WWW: nazwa i logo Lexiw Metin2
 
 - [panel] Nazwa panelu LEXIW METIN2 — w pasku bocznym, na banerze Pulpitu i w tytułach kart przeglądarki (zamiast MT2009 PLUS / Seban Panel); pod nazwą „Singleplayer · by Lexiw”. Nazwę dalej można zmienić w Panel webowy.
