@@ -493,6 +493,16 @@ POINT_TO_APPLY = {6: 1, 8: 2, 13: 3, 15: 4, 12: 5, 14: 6, 17: 7, 19: 8, 21: 9, 3
 EMPIRE_EXPR = "COALESCE(NULLIF(pi.empire,0),0)" if ENGINE_MT2009 else "COALESCE(NULLIF(pi.empire,0),a.empire,0)"
 
 JOB_NAMES = ("Wojownik", "Ninja", "Sura", "Szaman")
+# The class filter of /rankings and /players (?cls=): the URL key, and the
+# class it keeps - player.job % 4, the index into JOB_NAMES (both races of a
+# class: 0/4 Wojownik, 1/5 Ninja, 2/6 Sura, 3/7 Szaman).
+CLASS_FILTERS = {"woj": 0, "ninja": 1, "sura": 2, "szaman": 3}
+
+
+def class_filter_arg():
+    """The ?cls= of the request when it names a class, else None."""
+    cls = request.args.get("cls")
+    return cls if cls in CLASS_FILTERS else None
 # Each class's two skill trees (player.player.skill_group, 1 or 2 once chosen,
 # 0 before level 5ish/the first pick) -- same job+group keys as SKILLS below,
 # named after the path rather than listing its five/six skills. Requested for
@@ -4612,21 +4622,31 @@ def api_dashboard_deferred():
 @login_required
 def players():
     query = request.args.get("q", "").strip()
+    cls = class_filter_arg()
+    # One class only: the list keeps it, and the place is counted among it.
+    class_sql = (" AND MOD(rp.job, 4) = %d" % CLASS_FILTERS[cls]) if cls else ""
     sql = ("SELECT p.id, p.name, p.level, p.job, p.map_index, p.gold, p.playtime, p.last_play, " + EMPIRE_EXPR + " AS empire, "
-           "EXISTS (SELECT 1 FROM player.playerbot_sidekick sb WHERE sb.sidekick_pid=p.id) AS is_sidekick"
-           " FROM player.player p LEFT JOIN player.player_index pi ON pi.id=p.account_id LEFT JOIN account.account a ON a.id=p.account_id")
+           "EXISTS (SELECT 1 FROM player.playerbot_sidekick sb WHERE sb.sidekick_pid=p.id) AS is_sidekick, "
+           "lp.place"
+           " FROM player.player p LEFT JOIN player.player_index pi ON pi.id=p.account_id LEFT JOIN account.account a ON a.id=p.account_id"
+           # The place in the level order this list keeps, game masters left
+           # out - the same for a character found by a search; a GM has none.
+           " LEFT JOIN (SELECT rp.id, ROW_NUMBER() OVER (ORDER BY rp.level DESC, rp.exp DESC, rp.id) AS place"
+           " FROM player.player rp WHERE " + not_game_master("rp") + class_sql + ") lp ON lp.id=p.id")
     args = []
     if query:
         # player.name is latin1: a query with Polish letters compared in its own
         # utf8mb4 collation stopped the page with "Illegal mix of collations".
-        sql += " WHERE CONVERT(p.name USING utf8mb4) LIKE %s OR p.id=%s"
+        sql += " WHERE (CONVERT(p.name USING utf8mb4) LIKE %s OR p.id=%s)"
         args = [f"%{query}%", query if query.isdigit() else -1]
     else:
         # The list is read as the level ranking, and the admin account's
         # level-90 game masters topped it. Left out as in /rankings
         # (not_game_master); a search by name or id still finds them.
         sql += " WHERE " + not_game_master("p")
-    sql += " ORDER BY p.level DESC, p.exp DESC LIMIT 250"
+    if cls:
+        sql += " AND MOD(p.job, 4) = %d" % CLASS_FILTERS[cls]
+    sql += " ORDER BY p.level DESC, p.exp DESC, p.id LIMIT 250"
     roster, live = rows(sql, args), live_statuses()
     full_plus9_ids = full_plus9_equipment_ids(character["id"] for character in roster)
     for character in roster:
@@ -4639,7 +4659,7 @@ def players():
     legends = legend_tiers(character["id"] for character in roster)
     for character in roster:
         character["legend"] = legends.get(character["id"])
-    return render_template("players.html", players=roster, query=query)
+    return render_template("players.html", players=roster, query=query, cls=cls, class_filters=CLASS_FILTERS)
 
 
 @app.route("/legends")
@@ -8302,6 +8322,17 @@ def rankings():
     people_ranked = include_real_players_in_rankings()
     people_only = people_ranked and request.args.get("people") == "1"
     all_ranking = bot_ranking(kind, weapon30_sort, people_only, weapon_type)
+    # One class only (?cls=), numbered among itself as "Tylko gracze" is:
+    # bot_ranking() is cached and shared, so the class is kept here, before
+    # the pages are cut, from one look at the ranked characters' jobs.
+    cls = class_filter_arg()
+    if cls and all_ranking:
+        all_ids = [row["id"] for row in all_ranking]
+        marks = ",".join(["%s"] * len(all_ids))
+        in_class = {row["id"] for row in rows(
+            "SELECT id FROM player.player WHERE id IN (" + marks + ") AND MOD(job, 4) = %s",
+            all_ids + [CLASS_FILTERS[cls]])}
+        all_ranking = [row for row in all_ranking if row["id"] in in_class]
     total = len(all_ranking)
     total_pages = max(1, -(-total // per_page))  # ceil division
     # "goto_page" (the jump-to-page box, 1-based, what the operator actually
@@ -8368,7 +8399,8 @@ def rankings():
     return render_template("rankings.html", kinds=kinds, kind=kind, ranking=ranking, weapon30_sort=weapon30_sort,
                            weapon_type=weapon_type, weapon_subtypes=WEAPON_SUBTYPES,
                            per_page=per_page, page=page, total_pages=total_pages, page_numbers=page_numbers,
-                           people_ranked=people_ranked, people_only=people_only)
+                           people_ranked=people_ranked, people_only=people_only,
+                           cls=cls, class_filters=CLASS_FILTERS)
 
 
 SEASON_CATEGORIES = {
