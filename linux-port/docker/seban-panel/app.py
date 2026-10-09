@@ -357,7 +357,7 @@ try:
 except OSError:
     PANEL_VERSION = os.environ.get("SEBAN_PANEL_VERSION", "dev")
 DEFAULT_SETTINGS = {
-    "panel_name": "MT2009 PLUS", "stuck_minutes": "5", "theme": "ocean", "monitor_mode": "vps", "cursor": "custom",
+    "panel_name": "LEXIW METIN2", "stuck_minutes": "5", "theme": "ocean", "monitor_mode": "vps", "cursor": "custom",
     # Existing installations without this key stay usable. Fresh installations
     # receive setup_complete=0 from the collector and enter the setup wizard.
     "setup_complete": "1", "auth_enabled": "0", "auth_password_hash": "", "allow_student_chest": "0", "allow_alchemy": "1", "allow_sashes": "1", "allow_moonlight_chest": "0", "keep_demo_characters": "0", "update_seban_panel": "0",
@@ -753,6 +753,12 @@ def map_name(index):
 MT2009_PLUS_CHANGELOG_URL = os.environ.get(
     "MT2009_PLUS_CHANGELOG_URL",
     "https://raw.githubusercontent.com/zaxerrrr-dot/mt2009-sp-plus/main/CHANGELOG.md")
+# Lexiw: this fork's name, its line under the name, its repository, and the
+# projects it is built on (named in the sidebar, as the licence asks).
+PANEL_BRAND_DEFAULT = "LEXIW METIN2"
+PANEL_BRAND_TAGLINE = "Singleplayer · by Lexiw"
+LEXIW_REPOSITORY_URL = "https://github.com/marekmiskowiec/lexiw-metin2-singleplayer"
+PANEL_ATTRIBUTION = "Na bazie MT2009 Classic (ZAXEP), Metin2 Playerbots (Tieru) i Seban Panel (Seban)"
 MT2009_PLUS_DISCORD_URL = "https://metin2sp.pl/discord"
 MT2009_PLUS_WEBSITE_URL = "https://metin2sp.pl/"
 _mt2009_changelog_cache = {"at": 0.0, "entries": None}
@@ -4293,16 +4299,20 @@ def globals_for_templates():
         except OSError:
             revision = 0
         return url_for("static", filename=filename, v=revision)
-    brand = current_settings.get("panel_name") or "MT2009 PLUS"
-    if brand == "Metin2 Singleplayer":
-        brand = "MT2009 PLUS"
+    brand = current_settings.get("panel_name") or PANEL_BRAND_DEFAULT
+    # Lexiw: the names the package's installs stored ("Metin2 Singleplayer",
+    # the setup's "MT2009 PLUS") read as this fork's; any other name the
+    # operator typed in /manage/panel stands.
+    if brand in ("Metin2 Singleplayer", "MT2009 PLUS"):
+        brand = PANEL_BRAND_DEFAULT
     def level_badge(pid, level, prefix=""):
         label = f"{prefix}{int(level or 0)}"
         rank = top_level_badge_rank_map().get(int(pid or 0))
         if not rank:
             return escape(label)
         return Markup('<span class="top-level-badge" title="Top 10 poziomu · #%d">%s</span>') % (rank, escape(label))
-    return {"tieru_url": tieru_url, "discord_url": MT2009_PLUS_DISCORD_URL, "website_url": MT2009_PLUS_WEBSITE_URL, "panel_brand": brand, "settings": current_settings, "map_name": map_name, "item_icon": item_icon, "job_name": job_name, "class_profile": class_profile, "class_portrait": class_portrait, "empire_info": empire_info, "empire_flag": empire_flag, "static_asset_url": static_asset_url, "level_badge": level_badge, "top_level_rank": lambda pid: top_level_rank_map().get(int(pid or 0)), "feature_enabled": lambda name: panel_feature_enabled(name, current_settings), "panel_features": panel_feature_states(current_settings), "class_label": class_label, "ui_language": "pl", "i18n_payload": None, "ds_kind_count": 7 if ENGINE_MT2009 else 6, "m2_classic": M2_CLASSIC}
+    return {"tieru_url": tieru_url, "discord_url": MT2009_PLUS_DISCORD_URL, "website_url": MT2009_PLUS_WEBSITE_URL, "panel_brand": brand, "settings": current_settings, "map_name": map_name, "item_icon": item_icon, "job_name": job_name, "class_profile": class_profile, "class_portrait": class_portrait, "empire_info": empire_info, "empire_flag": empire_flag, "static_asset_url": static_asset_url, "level_badge": level_badge, "top_level_rank": lambda pid: top_level_rank_map().get(int(pid or 0)), "feature_enabled": lambda name: panel_feature_enabled(name, current_settings), "panel_features": panel_feature_states(current_settings), "class_label": class_label, "ui_language": "pl", "i18n_payload": None, "ds_kind_count": 7 if ENGINE_MT2009 else 6, "m2_classic": M2_CLASSIC,
+            "panel_tagline": PANEL_BRAND_TAGLINE, "repo_url": LEXIW_REPOSITORY_URL, "panel_attribution": PANEL_ATTRIBUTION}
 
 
 @app.after_request

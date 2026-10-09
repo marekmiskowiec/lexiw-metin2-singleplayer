@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% block title %}Rankingi · Seban Panel{% endblock %}{% block content %}
+{% extends 'base.html' %}{% block title %}Rankingi · {{ panel_brand }}{% endblock %}{% block content %}
 <p class="eyebrow">RYWALIZACJA</p><h1>Rankingi</h1><p class="muted">{% if people_ranked %}Boty i gracze razem: 👤 oznacza postać gracza, a postaci GM-ów (z rangą w common.gmlist) nie są liczone. {% else %}Liczone są tylko boty (przełącznik „Prawdziwi gracze w rankingach” w Zarządzaniu). {% endif %}Dane pochodzą bezpośrednio z postaci, wyposażenia i questów.</p>
 {% set rank_people_arg = 1 if people_only else none %}{% set rank_cls_arg = cls %}
 <section class="rank-tabs">{% for key,label in kinds.items() %}<a class="{{ 'active' if key==kind else '' }}" href="{{ url_for('rankings',cls=rank_cls_arg,type=key,people=rank_people_arg) }}">{{ label }}</a>{% endfor %}</section>

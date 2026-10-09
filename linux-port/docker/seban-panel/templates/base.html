@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}{{ panel_brand }} · Seban Panel{% endblock %}</title>
+<title>{% block title %}{{ panel_brand }}{% endblock %}</title>
+<link rel="icon" type="image/svg+xml" href="{{ static_asset_url('branding/lexiw-mark.svg') }}">
 <link rel="stylesheet" href="{{ static_asset_url('style.css') }}">
 <link rel="stylesheet" href="{{ static_asset_url('manage.css') }}"><link rel="stylesheet" href="{{ static_asset_url('enhancements.css') }}"><link rel="stylesheet" href="{{ static_asset_url('events.css') }}"><link rel="stylesheet" href="{{ static_asset_url('respawns.css') }}"><link rel="stylesheet" href="{{ static_asset_url('live-chat.css') }}"><link rel="stylesheet" href="{{ static_asset_url('world-feed.css') }}"><link rel="stylesheet" href="{{ static_asset_url('notifications-bell.css') }}"><link rel="stylesheet" href="{{ static_asset_url('action-toast.css') }}"><link rel="stylesheet" href="{{ static_asset_url('live-overrides.css') }}"><link rel="stylesheet" href="{{ static_asset_url('nav.css') }}">
 <script>window.SEBAN_ROOT={{ request.script_root|tojson }};</script>
@@ -30,7 +31,7 @@
 {%- set nav_page_sections = nav_sections|selectattr('ep', 'equalto', nav_ep)|list -%}
 {%- set nav.index = [] -%}
 {%- for g in nav_groups %}{% for it in g['items'] if it.get('index') %}{% set _ = nav.index.append({'u': url_for(it.ep), 'l': it.label, 'g': g.label}) %}{% endfor %}{% endfor -%}
-<aside class="site-nav sn" id="site-nav"><a class="brand" href="{{ url_for('dashboard') }}">{{ panel_brand }}<span>Seban Control Center</span></a>
+<aside class="site-nav sn" id="site-nav"><a class="brand brand--mark" href="{{ url_for('dashboard') }}"><img class="brand-mark" src="{{ static_asset_url('branding/lexiw-mark.svg') }}" alt="" width="34" height="34"><span class="brand-words">{{ panel_brand }}<span>{{ panel_tagline }}</span></span></a>
 <button type="button" class="sn-search" data-cmdk-open aria-label="Szukaj w panelu (Ctrl+K)"><span aria-hidden="true">⌕</span><span class="sn-search-label">Szukaj w panelu…</span><kbd>Ctrl K</kbd></button>
 <div class="sn-nav" role="navigation" aria-label="Menu panelu">
 <a class="sn-link sn-top{% if nav_active == 'dashboard' %} is-active{% endif %}" href="{{ url_for('dashboard') }}"{% if nav_ep == 'dashboard' %} aria-current="page"{% endif %}><span class="sn-ico" aria-hidden="true">⌂</span><span class="sn-label">Pulpit</span></a>
@@ -39,9 +40,9 @@
 {%- for it in g['items'] %}<a class="sn-link{% if it.ep == nav_active %} is-active{% endif %}" href="{{ url_for(it.ep) }}" title="{{ it.desc }}"{% if it.ep == nav_ep %} aria-current="page"{% endif %}>{{ it.label }}</a>{% endfor -%}
 </div></details>
 {%- endfor %}
-<details class="sn-group sn-group--ext" data-group="linki" open><summary><span class="sn-ico" aria-hidden="true">↗</span><span class="sn-label">Linki zewnętrzne</span><span class="sn-chev" aria-hidden="true"></span></summary><div class="sn-items"><a class="sn-link" href="{{ tieru_url }}" target="_blank" rel="noopener">Panel klasyczny ↗</a><a class="sn-link" href="{{ discord_url }}" target="_blank" rel="noopener noreferrer">Discord MT2009 PLUS ↗</a><a class="sn-link" href="{{ website_url }}" target="_blank" rel="noopener noreferrer">metin2sp.pl ↗</a></div></details>
+<details class="sn-group sn-group--ext" data-group="linki" open><summary><span class="sn-ico" aria-hidden="true">↗</span><span class="sn-label">Linki zewnętrzne</span><span class="sn-chev" aria-hidden="true"></span></summary><div class="sn-items"><a class="sn-link" href="{{ tieru_url }}" target="_blank" rel="noopener">Panel klasyczny ↗</a><a class="sn-link" href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">Repozytorium na GitHubie ↗</a></div></details>
 </div>
-<a class="sn-coffee" href="https://buycoffee.to/mt2009plus" target="_blank" rel="noopener noreferrer" title="Wesprzyj rozwój MT2009 PLUS na buycoffee.to"><span aria-hidden="true">☕</span> Postaw kawę</a>
+<p class="sn-credit">{{ panel_attribution }}.</p>
 <form class="nav-logout" action="{{ url_for('logout') }}" method="post"><button class="quiet">Wyloguj</button></form></aside>
 <main>{%- set nav_detail = (self.title()|striptags).split(' · ')[0]|trim -%}
 {%- if nav.item and nav_detail == nav.item.label and request.view_args %}{% set nav_detail = '#' ~ (request.view_args.values()|join(' · ')) %}{% endif -%}

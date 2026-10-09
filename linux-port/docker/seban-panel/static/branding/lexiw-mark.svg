@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Lexiw Metin2">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8e3a3"/>
+      <stop offset="0.55" stop-color="#e8b93f"/>
+      <stop offset="1" stop-color="#a8761c"/>
+    </linearGradient>
+    <linearGradient id="field" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a1d12"/>
+      <stop offset="1" stop-color="#120c07"/>
+    </linearGradient>
+  </defs>
+  <!-- A shield with cut corners, the panel's Empire cards in small. -->
+  <path d="M14 3 H50 L61 14 V40 C61 50 47 58 32 62 C17 58 3 50 3 40 V14 Z" fill="url(#field)" stroke="url(#gold)" stroke-width="3"/>
+  <path d="M17 10 H47 L54 17 V39 C54 46 44 52 32 55.5 C20 52 10 46 10 39 V17 Z" fill="none" stroke="#e8b93f" stroke-opacity="0.35" stroke-width="1.2"/>
+  <!-- The L, a blade's edge on its foot. -->
+  <path d="M24 15 H33 V40 H44 L40 47 H24 Z" fill="url(#gold)"/>
+  <path d="M33 15 L30 18.5 V43.5 H41.5" fill="none" stroke="#fff3cc" stroke-opacity="0.55" stroke-width="1"/>
+</svg>
