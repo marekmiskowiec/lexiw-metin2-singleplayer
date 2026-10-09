@@ -1,0 +1,19 @@
+/* Lexiw: one look for every table of the panel (table-tools.js). */
+.tt-table tbody tr:hover>td{background:color-mix(in srgb,var(--gold, #e8b93f) 7%,transparent)}
+.tt-table .tt-num{text-align:right;font-variant-numeric:tabular-nums}
+.tt-table th.tt-sortable{cursor:pointer;user-select:none;white-space:nowrap}
+.tt-table th.tt-sortable:hover,.tt-table th.tt-sortable:focus-visible{color:var(--gold, #e8b93f);outline:none}
+.tt-table th.tt-sortable::after{content:"↕";display:inline-block;margin-left:5px;font-size:11px;opacity:.3}
+.tt-table th.tt-sortable[aria-sort="descending"]::after{content:"↓";opacity:1;color:var(--gold, #e8b93f)}
+.tt-table th.tt-sortable[aria-sort="ascending"]::after{content:"↑";opacity:1;color:var(--gold, #e8b93f)}
+.tt-table tr[hidden]{display:none}
+
+/* The class buttons and the text box above a table. */
+.tt-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 10px}
+.tt-classes{display:flex;flex-wrap:wrap;gap:6px}
+.tt-classes button{padding:5px 11px;border:1px solid var(--edge);border-radius:999px;background:transparent;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer}
+.tt-classes button:hover{border-color:var(--gold, #e8b93f)}
+.tt-classes button[aria-pressed="true"]{background:var(--gold, #e8b93f);border-color:var(--gold, #e8b93f);color:#201705;font-weight:600}
+.tt-search{display:flex;align-items:center;gap:8px;margin-left:auto}
+.tt-search input{width:min(240px,60vw);padding:6px 10px;border:1px solid var(--edge);border-radius:6px;background:color-mix(in srgb,var(--panel) 80%,#000);color:var(--text);font:inherit;font-size:13px}
+.tt-search small{color:var(--muted);font-size:12px;white-space:nowrap}
