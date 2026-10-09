@@ -12,6 +12,12 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
+## 2.21.1-lexiw.3 — 2026-10-09 — Panel WWW: nazwa i logo Lexiw Metin2
+
+- [panel] Nazwa panelu LEXIW METIN2 — w pasku bocznym, na banerze Pulpitu i w tytułach kart przeglądarki (zamiast MT2009 PLUS / Seban Panel); pod nazwą „Singleplayer · by Lexiw”. Nazwę dalej można zmienić w Panel webowy.
+- [panel] Logo: złota tarcza z literą L (branding\lexiw-mark.svg) obok nazwy w pasku bocznym i jako ikona karty przeglądarki; pełny znak LEXIW METIN2 (branding\lexiw-logo.svg) na stronie logowania.
+- [panel] Linki w pasku bocznym: Repozytorium na GitHubie zamiast Discorda i metin2sp.pl autora, bez przycisku „Postaw kawę”; na dole paska informacja o pochodzeniu: MT2009 Classic (ZAXEP), Metin2 Playerbots (Tieru), Seban Panel (Seban).
+
 ## 2.21.1-lexiw.2 — 2026-10-09 — Launcher Lexiw Metin2
 
 - [launcher] Nowa nazwa: LEXIW METIN2 (okno „Lexiw Metin2 Singleplayer”, podtytuł „Singleplayer / na bazie MT2009 Classic / by Lexiw”), stopka z informacją o pochodzeniu (MT2009 Classic — ZAXEP, Metin2 Playerbots — Tieru).
