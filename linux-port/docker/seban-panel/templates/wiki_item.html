@@ -1,0 +1,80 @@
+{% extends 'base.html' %}{% block title %}{{ name }} · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+{%- macro pct(value) -%}{% if value is none %}—{% elif value >= 10 %}{{ '%.0f'|format(value) }}%{% elif value >= 1 %}{{ ('%.1f'|format(value)).replace('.', ',') }}%{% elif value > 0 %}{{ ('%.3g'|format(value)).replace('.', ',') }}%{% else %}0%{% endif %}{%- endmacro -%}
+{%- macro yang(value) -%}{{ '{:,}'.format(value|int).replace(',', ' ') }} Yang{%- endmacro -%}
+<p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · PRZEDMIOT</p>
+<section class="wiki-head">
+  <div class="wiki-icon">{% if icon %}<img src="{{ icon }}" alt="">{% endif %}</div>
+  <div>
+    <h1>{{ name }}</h1>
+    <p class="muted">{{ type_label }} · VNUM {{ item.vnum }}{% if item.size and item.size > 1 %} · zajmuje {{ item.size }} pola{% endif %}</p>
+    {% if item.type in (1, 2) %}<p class="wiki-classes">{% for cls in ('Wojownik', 'Ninja', 'Sura', 'Szaman') %}<span class="{{ 'on' if cls in classes else 'off' }}">{{ cls }}</span>{% endfor %}{% if sex %}<span class="on">{{ sex }}</span>{% endif %}</p>{% endif %}
+  </div>
+</section>
+
+<div class="wiki-grid">
+  <section class="panel">
+    <h2>Właściwości</h2>
+    {% if stats or bonuses %}<ul class="wiki-stats">{% for stat in stats %}<li>{{ stat }}</li>{% endfor %}{% for bonus in bonuses %}<li class="bonus">{{ bonus }}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">Bez statystyk do pokazania.</p>{% endif %}
+  </section>
+  <section class="panel">
+    <h2>Cena</h2>
+    <ul class="wiki-stats">
+      {% if item.gold %}<li>Kupno w sklepie NPC: <b>{{ yang(item.gold) }}</b> <small class="muted">(jeśli któryś NPC go sprzedaje)</small></li>{% endif %}
+      {% if npc_sale is none %}<li class="muted">Nie da się go sprzedać NPC.</li>
+      {% elif npc_sale.price %}<li>Sprzedaż do NPC: <b>{{ yang(npc_sale.price) }}</b> <small class="muted">(po podatku {{ npc_sale.tax }}%)</small></li>{% endif %}
+      {% if market and market.on_market %}<li>Sklepy offline teraz: <b>{{ yang(market.avg_price) }}</b> średnio za sztukę · {{ market.offers }} ofert, {{ market.total_units }} szt.</li>
+      {% elif market and market.last_seen %}<li class="muted">Na rynku ostatnio {{ market.last_seen.strftime('%d.%m %H:%M') }} po średnio {{ yang(market.avg_price) }}.</li>
+      {% else %}<li class="muted">Nikt go teraz nie sprzedaje w sklepach offline.</li>{% endif %}
+    </ul>
+    <p><a href="{{ url_for('economy_item', vnum=item.vnum) }}">Historia na rynku →</a></p>
+  </section>
+</div>
+
+{% if chain %}
+<section class="panel">
+  <h2>Poziomy ulepszeń</h2>
+  <table data-table-tools="off" class="wiki-chain"><thead><tr><th>Poziom</th><th>Statystyki</th></tr></thead><tbody>
+  {% for level in chain %}<tr class="{{ 'current' if level.current else '' }}"><td class="item-cell">{% if level.current %}{% if level.icon %}<img src="{{ level.icon }}" alt="" loading="lazy">{% endif %}<b>{{ level.name }}</b>{% else %}<a href="{{ url_for('wiki_item', vnum=level.vnum) }}">{% if level.icon %}<img src="{{ level.icon }}" alt="" loading="lazy">{% endif %}{{ level.name }}</a>{% endif %}</td><td>{{ level.stats|join(' · ') or '—' }}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Skąd go zdobyć</h2>
+  {% set s = sources %}
+  {% if not (s.mobs or s.chests or s.common or s.etc) %}
+  <p class="muted">Nie ma go w tabelach dropu ani szkatułek tego serwera. Może pochodzić z questów, sklepów NPC, ItemShopu, rzemiosła albo ulepszenia słabszego przedmiotu.</p>
+  {% endif %}
+
+  {% if s.mobs %}
+  <h3>Wypada z potworów ({{ s.mobs|length }})</h3>
+  <table><thead><tr><th>Potwór</th><th>Typ</th><th>Poziom</th><th>Rodzaj dropu</th><th>Ilość</th><th>Szansa</th></tr></thead><tbody>
+  {% for e in s.mobs %}<tr><td><a href="{{ url_for('drop_edit', mob=e.mob) }}">{{ e.name }}</a></td><td>{{ e.kind_name }}</td><td>{{ e.level }}</td><td>{{ e.kind_label }}{% if e.kind == 'kill' %} (co {{ e.kill_drop }} zabójstw){% elif e.kind == 'limit' %} (od poz. {{ e.level_limit }}){% endif %}</td><td>{{ e.count }}</td><td data-sort="{{ e.chance }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
+  </tbody></table>
+  <p class="muted wiki-note">Szansa na jedno zabójstwo dla zabójcy na poziomie potwora, bez bonusów do dropu i bez rat serwera.</p>
+  {% endif %}
+
+  {% if s.chests %}
+  <h3>W szkatułkach i skrzyniach ({{ s.chests|length }})</h3>
+  <table><thead><tr><th>Szkatułka</th><th>Losowanie</th><th>Ilość</th><th>Szansa</th></tr></thead><tbody>
+  {% for e in s.chests %}<tr><td class="item-cell"><a href="{{ url_for('wiki_item', vnum=e.chest) }}">{% if e.icon %}<img src="{{ e.icon }}" alt="" loading="lazy">{% endif %}{{ e.name }}</a></td><td>{{ e.type_label }}</td><td>{{ e.count }}</td><td data-sort="{{ e.chance if e.chance is not none else -1 }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+
+  {% if s.common %}
+  <h3>Wspólny drop ({{ s.common|length }})</h3>
+  <table><thead><tr><th>Z kogo</th><th>Poziomy potworów</th><th>Szansa</th></tr></thead><tbody>
+  {% for e in s.common %}<tr><td>{{ e.rank_label }}</td><td>{{ e.levels }}</td><td data-sort="{{ e.chance }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+
+  {% if s.etc %}
+  <h3>Drop dodatkowy ({{ s.etc|length }})</h3>
+  <table><thead><tr><th>Potwór</th><th>Typ</th><th>Poziom</th><th>Szansa</th></tr></thead><tbody>
+  {% for e in s.etc %}<tr><td><a href="{{ url_for('drop_edit', mob=e.mob) }}">{{ e.name }}</a></td><td>{{ e.kind_name }}</td><td>{{ e.level }}</td><td data-sort="{{ e.chance }}">{{ pct(e.chance) }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% endif %}
+</section>
+{% endblock %}

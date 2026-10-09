@@ -1,0 +1,44 @@
+{% extends 'base.html' %}{% block title %}Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+<p class="eyebrow">WIKI SERWERA</p><h1>Wiki</h1>
+<p class="muted">Przedmioty i potwory tego serwera, prosto z jego danych: {{ '{:,}'.format(item_count).replace(',', ' ') }} przedmiotów, {{ '{:,}'.format(mob_count).replace(',', ' ') }} potworów i NPC; {{ '{:,}'.format(dropped_items).replace(',', ' ') }} przedmiotów ma źródło w tabelach dropu i szkatułek. Drop i szkatułki są te, które działają w grze — także po Twoich zmianach w edytorach.</p>
+<form class="wiki-search" action="{{ url_for('wiki') }}" method="get" role="search">
+  <input id="wikiQuery" name="q" value="{{ query }}" placeholder="Nazwa przedmiotu lub potwora albo VNUM, np. Sejmitar, Dziki Pies, 50011" autocomplete="off" autofocus>
+</form>
+<p class="muted wiki-hint" id="wikiHint">Wpisz co najmniej 2 litery.</p>
+<div class="wiki-results" id="wikiResults" hidden>
+  <section class="panel"><h2>Przedmioty</h2><ul class="wiki-list" id="wikiItems"></ul></section>
+  <section class="panel"><h2>Potwory, Metiny i bossowie</h2><ul class="wiki-list" id="wikiMobs"></ul>
+    <p class="muted wiki-note">Strony potworów będą w następnym etapie wiki — na razie link prowadzi do ich dropu w edytorze.</p></section>
+</div>
+<script>
+(function () {
+  const input = document.getElementById('wikiQuery'), hint = document.getElementById('wikiHint');
+  const box = document.getElementById('wikiResults'), items = document.getElementById('wikiItems'), mobs = document.getElementById('wikiMobs');
+  const itemUrl = "{{ url_for('wiki_item', vnum=0) }}".replace(/0$/, '');
+  const mobUrl = "{{ url_for('drop_edit', mob=0) }}".replace(/0$/, '');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  let timer = null, last = '';
+  function search() {
+    const q = input.value.trim();
+    if (q === last) return;
+    last = q;
+    if (q.length < 2 && !/^\d+$/.test(q)) { box.hidden = true; hint.hidden = false; return; }
+    fetch("{{ url_for('api_wiki_search') }}?q=" + encodeURIComponent(q), {cache: 'no-store'})
+      .then((r) => r.json()).then((data) => {
+        if (q !== input.value.trim()) return;
+        hint.hidden = true; box.hidden = false;
+        items.innerHTML = data.items.length ? data.items.map((i) =>
+          `<li><a href="${itemUrl}${i.vnum}">${i.icon ? `<img src="${esc(i.icon)}" alt="" loading="lazy">` : '<span class="wiki-noicon"></span>'}<span><b>${esc(i.name)}</b><small>${esc(i.type)} · VNUM ${i.vnum}${i.sources ? ' · <em>ma drop</em>' : ''}</small></span></a></li>`).join('')
+          : '<li class="muted">Brak przedmiotów.</li>';
+        mobs.innerHTML = data.mobs.length ? data.mobs.map((m) =>
+          `<li><a href="${mobUrl}${m.vnum}"><span class="wiki-mobicon" aria-hidden="true">${m.kind === 'Metin' ? '◆' : m.kind === 'Boss' ? '☠' : '●'}</span><span><b>${esc(m.name)}</b><small>${esc(m.kind)} · poziom ${m.level} · VNUM ${m.vnum}</small></span></a></li>`).join('')
+          : '<li class="muted">Brak potworów.</li>';
+      }).catch(() => { hint.hidden = false; hint.textContent = 'Nie udało się wyszukać.'; });
+  }
+  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 200); });
+  input.form.addEventListener('submit', (e) => { e.preventDefault(); last = ''; search(); });
+  if (input.value.trim()) search();
+})();
+</script>
+{% endblock %}

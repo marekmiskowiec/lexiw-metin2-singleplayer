@@ -12,6 +12,14 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
+## 2.21.1-lexiw.7 — 2026-10-09 — Wiki serwera, etap 1: wyszukiwarka i przedmioty
+
+- [panel] Nowa zakładka Wiki w menu: wyszukiwarka przedmiotów i potworów (nazwa albo VNUM), wyniki od razu przy pisaniu; przedmioty, które dropią albo są w szkatułkach, pokazują się najpierw.
+- [panel] Strona każdego przedmiotu: rodzaj, klasy, które mogą go nosić, statystyki i bonusy, wszystkie poziomy ulepszeń od +0 do +9 ze statystykami, ceny (kupno w sklepie NPC, sprzedaż do NPC liczona jak w grze — cena / 5 minus podatek, średnia cena w sklepach offline) i skąd go zdobyć: z jakich potworów wypada i z jaką szansą, w jakich szkatułkach jest, wspólny i dodatkowy drop.
+- [panel] Dane z tych samych plików dropu i szkatułek, które działają w grze, razem z Twoimi zmianami z edytorów; odświeżają się same po zmianie pliku.
+- [panel] Karty w Bazie przedmiotów otwierają stronę przedmiotu w wiki.
+- [panel] Potwory w wynikach prowadzą na razie do ich dropu w edytorze — ich strony będą w etapie 2.
+
 ## 2.21.1-lexiw.6 — 2026-10-09 — Wiadomości ze świata: ulepszenia +8 i +9
 
 - [panel] Wiadomości ze świata pokazują ulepszenia na +8 i +9 z właściwym poziomem. Gra zapisuje w tabeli ulepszeń przedmiot sprzed ulepszenia, więc dotąd ulepszenie na +8 pojawiało się jako „+7” (np. „Sejmitar+7” zamiast „Sejmitar+8”), ulepszenie na +7 nie pojawiało się wcale, a +9 pojawiłoby się dwa razy. Teraz przedmiot po ulepszeniu jest brany z głównego logu gry, a sposób (kowal, zwój, kuźnia gildii) dalej z tabeli ulepszeń.

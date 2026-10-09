@@ -11062,6 +11062,11 @@ def drop_file_view():
 from item_grants import install as install_item_grants
 install_item_grants(app, db, login_required, game_text)
 
+# Lexiw: the server wiki (wiki.py), handed this module for its helpers.
+import sys  # noqa: E402
+from wiki import install_wiki  # noqa: E402
+install_wiki(sys.modules[__name__])
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=7789)

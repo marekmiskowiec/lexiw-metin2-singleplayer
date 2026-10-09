@@ -9,6 +9,9 @@
     by the quick search in the background, so it finds their individual
     settings (labels and help texts) too. -#}
 {%- set nav_groups = [
+  {'id': 'wiki', 'icon': '📖', 'label': 'Wiki', 'items': [
+    {'ep': 'wiki', 'label': 'Wiki serwera', 'desc': 'przedmioty, potwory, drop i szkatułki z danych serwera', 'kw': 'wiki baza wiedzy przedmiot potwor drop skad'},
+  ]},
   {'id': 'swiat', 'icon': '🗺', 'label': 'Świat', 'items': [
     {'ep': 'maps', 'label': 'Aktywność map', 'desc': 'natężenie na mapach w czasie, mapa cieplna', 'kw': 'mapy heatmapa natezenie mapa cieplna'},
     {'ep': 'respawns', 'index': 1, 'label': 'Respawny', 'desc': 'tempo i liczebność potworów, metiny, bossy', 'kw': 'spawn potwory metiny bossy respawn'},
@@ -66,6 +69,7 @@
   'player': 'players', 'account_detail': 'accounts', 'guild': 'guilds',
   'economy_item': 'economy', 'chest_edit': 'chests', 'drop_edit': 'drops',
   'daily_summary': 'dashboard',
+  'wiki_item': 'wiki',
 } -%}
 {%- set nav_sections = [
   {'ep': 'manage', 'anchor': 'raty-i-restart', 'label': 'Raty, liczba botów, ustawienia z restartem', 'short': 'Raty i restart', 'part': 'Serwer'},
