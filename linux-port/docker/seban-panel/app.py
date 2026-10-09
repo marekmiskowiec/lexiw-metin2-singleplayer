@@ -1390,16 +1390,23 @@ def _refine9_event_rows(since, before=None, scan_limit=200_000):
     panel-side workaround over an engine rebuild. The one real loss: this
     table has no refine *method* (blacksmith/scroll/guild) -- that is taken
     from the matching refinelog row (same pid and second), see the SELECT."""
-    clauses, params = ["l.how='REFINE SUCCESS'", "l.hint LIKE '%%+9'", "l.time>=%s"], [since]
+    # Lexiw: +8 too, from here. log.refinelog's own rows are a level short
+    # for every refine, not only +9: its "Sejmitar+7" at step 7 was a
+    # Sejmitar+8 (checked against log.log, all 13 of 9 October), and a real
+    # +7 sits there at step 6. The feed showed +8 as "+7", never showed a
+    # +7, and would have shown a +9 twice; it now takes +8 and +9 from
+    # log.log alone (the operator's choice: rarer than +7, ~250 a day).
+    clauses, params = ["l.how='REFINE SUCCESS'", "(l.hint LIKE '%%+8' OR l.hint LIKE '%%+9')", "l.time>=%s"], [since]
     if before:
         clauses.append("l.time<%s")
         params.append(before)
     # The method isn't in log.log, but the same successful refine IS in
-    # log.refinelog at the same pid+second, mislabelled step=8 (the engine
+    # log.refinelog at the same pid+second, one level short (the engine
     # logs the pre-refine item -- see NotifyRefineSuccess()). That row's
     # setType is the real method, so join on it instead of guessing.
     return rows(f"""SELECT l.who AS pid,l.hint AS item_name,l.what AS item_id,l.time,p.name,p.job,{EMPIRE_EXPR} AS empire,
-        (SELECT r.setType FROM log.refinelog r WHERE r.pid=l.who AND r.time=l.time AND r.is_success=1 AND r.step=8 LIMIT 1) AS set_type
+        (SELECT r.setType FROM log.refinelog r WHERE r.pid=l.who AND r.time=l.time AND r.is_success=1
+           AND r.step=CAST(SUBSTRING_INDEX(l.hint,'+',-1) AS UNSIGNED)-1 LIMIT 1) AS set_type
       FROM log.log l JOIN player.player p ON p.id=l.who
       LEFT JOIN player.player_index pi ON pi.id=p.account_id
       LEFT JOIN account.account a ON a.id=p.account_id
@@ -1436,9 +1443,10 @@ def _classify_refine9_events(raw):
         else:
             # no matching refinelog row (rare) -- say so rather than invent a method
             method = None
+        tier = re.search(r"\+(\d+)$", item_name)
         events.append({
             "key": key, "time": row["time"], "message": f"{name} ulepszył {item_name}", "kind": "refine",
-            "actor": name, "method": method, "refine_tier": 9,
+            "actor": name, "method": method, "refine_tier": int(tier.group(1)) if tier else 9,
             "player_id": int(row.get("pid") or 0), "job": int(row.get("job") or 0),
             "empire": int(row.get("empire") or 0), "vnum": method_vnum, "socket0": 0,
         })
@@ -1528,7 +1536,8 @@ def sync_news_events():
             cursor_row = cur.fetchone()
             since = cursor_row["value"] if cursor_row and cursor_row.get("value") else "2020-01-01 00:00:00"
             events = _classify_news_events(_news_event_source_rows(since=since, scan_limit=2_000_000))
-            events += _classify_refine_events(_refine_event_rows(since=since))
+            # Lexiw: +8 and +9 from log.log (_refine9_event_rows); the
+            # log.refinelog path (_refine_event_rows) is a level short.
             events += _classify_refine9_events(_refine9_event_rows(since=since))
             if events:
                 cur.executemany("""INSERT IGNORE INTO player.web_seban_news_event
