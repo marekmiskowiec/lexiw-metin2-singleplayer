@@ -1,0 +1,1662 @@
+#ifndef __INC_METIN2_PLAYERBOT_MARKET_H__
+#define __INC_METIN2_PLAYERBOT_MARKET_H__
+
+// Buying from another bot's stall, and going out of one's way to do it.
+//
+// The stalls existed already; nobody ever bought from one, so a well-refined
+// spare sat on a counter until its keeper packed up and eventually vendored it.
+// This closes the loop: a bot with money in its pocket walks the market strip
+// and buys what it actually needs - a refine material it is short of, a horse
+// medal, or a piece of gear better than what it is wearing.
+//
+// The first version only bought from a counter that happened to be within
+// twenty metres of wherever the bot was standing. That is not shopping, and it
+// showed: twelve purchases in half an hour across seven hundred bots, all of
+// them accidents of where a town errand had left somebody. So a bot that is
+// short of something now walks to the ring, picks the nearest counter with that
+// something on it, walks up to that counter, and buys there - which is also
+// what a market is supposed to look like from the outside.
+//
+// It reads the offer from the seller's own AI state rather than from CShop,
+// whose item list is private. That is not a workaround: we are the ones who put
+// the items on the counter, in that order, so the recorded offer is exactly
+// what is on it and its index is the index CShopManager::Buy expects.
+//
+// The purchase itself goes through the engine's ordinary path. Setting the shop
+// owner is what a client does when a player clicks a stall, and everything
+// after it - the price, the gold, the inventory space, moving the item - is the
+// engine's own code, so a bot cannot buy anything a player could not.
+//
+// An implementation fragment in the sense playerbot_types.h describes: it
+// defines objects, relies on the engine headers playerbot_manager.cpp includes
+// above it, and reopens the same anonymous namespace. Include it exactly once,
+// after playerbot_town.h - that file puts the goods on the counters and owns
+// the walk into town this one borrows.
+
+namespace
+{
+#if defined(PLAYERBOT_ENGINE_MT2009) && defined(ENABLE_IKASHOP_RENEWAL)
+	bool ManagePlayerBotOfflineShopping(LPCHARACTER, TPlayerBotAIState&, DWORD);
+	void AddPlayerBotOfflineLedger(DWORD&, DWORD&);
+	void CorrectPlayerBotStandingSlips(DWORD);
+	bool FindPlayerBotFarOfflinePick(LPCHARACTER, TPlayerBotAIState&, long);
+	bool HandPlayerBotFarPickToBuyer(LPCHARACTER, TPlayerBotAIState&, DWORD);
+	void ClaimPlayerBotFarLine(DWORD, DWORD, DWORD);
+#endif
+	// Defined with the chat trade, after this file: the bot that found the
+	// market empty of what it came for asks the world channel.
+	void AnnouncePlayerBotNeed(LPCHARACTER ch);
+
+	// MT2009_PLUS_BOT_MINIGAMES_V1 (playerbot_minigames.h, after this file):
+	// a mini game's chest off a counter, to open.
+	bool WantsPlayerBotMinigameChest(LPCHARACTER ch, LPITEM offer);
+	bool CanPlayerBotPayForMinigameChest(LPCHARACTER ch, LPITEM item, long long price);
+	void NotePlayerBotMinigameChestBought(LPCHARACTER ch, DWORD dwVnum, long long price, DWORD count);
+
+	class CCollectPlayerBotStalls
+	{
+		public:
+			CCollectPlayerBotStalls(LPCHARACTER buyer, int maxDistance)
+				: m_buyer(buyer), m_maxDistance(maxDistance)
+			{
+			}
+
+			void operator()(LPENTITY entity)
+			{
+				if (!entity || !entity->IsType(ENTITY_CHARACTER) || !m_buyer)
+					return;
+				LPCHARACTER keeper = (LPCHARACTER)entity;
+				if (keeper == m_buyer || !keeper->IsPC() || !keeper->GetMyShop())
+					return;
+				if (DISTANCE_APPROX(m_buyer->GetX() - keeper->GetX(),
+						m_buyer->GetY() - keeper->GetY()) > m_maxDistance)
+					return;
+				m_stalls.push_back(keeper);
+			}
+
+			std::vector<LPCHARACTER> m_stalls;
+
+		private:
+			LPCHARACTER m_buyer;
+			int m_maxDistance;
+	};
+
+	// What a bot saves up for rather than buys on a whim: see
+	// PLAYERBOT_STRATEGIC_BUDGET_PERCENT.
+	bool IsPlayerBotStrategicPurchase(DWORD vnum)
+	{
+		return IsPlayerBotSpecialLevel30WeaponVnum(vnum) || vnum == PLAYERBOT_HORSE_MEDAL_VNUM ||
+				IsPlayerBotSafeRefineScroll(vnum);
+	}
+
+	// The most a strategic purchase may cost this bot: a share of what it can
+	// spend above the reserve and the shopping floor.
+	long long GetPlayerBotStrategicPurchaseCap(LPCHARACTER ch)
+	{
+		if (!ch)
+			return 0;
+		const long long spare = (long long)ch->GetGold() - GetPlayerBotReservedGold(ch) -
+				(long long)PLAYERBOT_SHOPPING_GOLD_FLOOR;
+		return spare > 0 ? spare * PLAYERBOT_STRATEGIC_BUDGET_PERCENT / 100 : 0;
+	}
+
+	// A Moonlight chest is opened, so a bot with room buys one off a counter
+	// (Tieru, 15 September: "wazne przedmioty dla botow, duzo fajnych itemow im
+	// z tego dropi"). No rule wanted one before: every chest a trader listed
+	// stayed listed - 3 000 on AkhiGubernator's counters and not one sold. Not a
+	// dropper, which sells them (IsPlayerBotMoonlightChestSeller; the resource
+	// trader opens its own since 28 September, so it may buy one too); nobody
+	// under PLAYERBOT_CHEST_BUY_MIN_LEVEL or holding PLAYERBOT_CHEST_BUY_HOLD
+	// already; only with PLAYERBOT_CHEST_BUY_PRICE_MULTIPLE times a counter's
+	// line of them in spare gold - a line asks the chests' worth by what they
+	// hold now (GetPlayerBotMoonlightChestAskingBase), and CanPlayerBotPayForOffer
+	// pays it from that share; and only into a bag that takes the chest's whole
+	// group and the engine's free column of three.
+	// When each bot last bought a chest, for PLAYERBOT_CHEST_BUY_COOLDOWN.
+	std::map<DWORD, DWORD> s_mapPlayerBotChestBoughtAt;
+
+	void NotePlayerBotChestBought(DWORD dwPlayerID, DWORD dwNow)
+	{
+		s_mapPlayerBotChestBoughtAt[dwPlayerID] = dwNow;
+	}
+
+	bool WantsPlayerBotMoonlightChest(LPCHARACTER ch)
+	{
+		// The counters are not emptied for the players' sake: while the ledger
+		// counts no more than the reserve on every counter of the world, or this
+		// bot bought one within the cooldown, the answer is no.
+		if (ch)
+		{
+			const TPlayerBotMarketLedgerEntry* chests =
+					GetPlayerBotMarketLedgerEntry(PLAYERBOT_MOONLIGHT_CHEST_VNUM);
+			if (chests && chests->dwSupplyUnits <= PLAYERBOT_CHEST_MARKET_RESERVE)
+				return false;
+			std::map<DWORD, DWORD>::const_iterator bought =
+					s_mapPlayerBotChestBoughtAt.find(ch->GetPlayerID());
+			if (bought != s_mapPlayerBotChestBoughtAt.end() &&
+					get_dword_time() - bought->second < PLAYERBOT_CHEST_BUY_COOLDOWN)
+				return false;
+		}
+		if (!ch || !ch->IsItemLoaded() || (int)ch->GetLevel() < PLAYERBOT_CHEST_BUY_MIN_LEVEL ||
+				IsPlayerBotMoonlightChestSeller(ch->GetPlayerID()) ||
+				(long long)ch->GetGold() - GetPlayerBotReservedGold(ch) -
+					(long long)PLAYERBOT_SHOPPING_GOLD_FLOOR <
+					MAX(PLAYERBOT_CHEST_BUY_MIN_GOLD, PLAYERBOT_CHEST_BUY_PRICE_MULTIPLE *
+						(long long)GetPlayerBotMoonlightChestAskingBase() * PLAYERBOT_CHEST_LINE_UNITS) ||
+				(int)ch->CountSpecifyItem(PLAYERBOT_MOONLIGHT_CHEST_VNUM) >= PLAYERBOT_CHEST_BUY_HOLD ||
+				CountPlayerBotFreeInventoryCells(ch) < PLAYERBOT_CHEST_BUY_MIN_FREE_CELLS ||
+				ch->GetEmptyInventory(3) < 0)
+			return false;
+		int cellsNeeded = 0;
+		return PlayerBotBagTakesGroup(ch, PLAYERBOT_MOONLIGHT_CHEST_VNUM, cellsNeeded);
+	}
+
+	// A bot with a weapon that goes to the anvil under scrolls - one it may
+	// refine no other way, a level-30 weapon in its hand, a weapon of the
+	// operator's anvil table standing at its ceiling, the one it is grinding,
+	// or the only weapon it has at a step that burns - buys a few, up to
+	// PLAYERBOT_LEVEL30_SCROLL_WANT. Never for a weapon no scroll goes on
+	// (IsPlayerBotScrollFreeGear).
+	bool PlayerBotNeedsScrollForWeapon(LPCHARACTER ch)
+	{
+		if (!ch || !ch->IsItemLoaded() ||
+				CountPlayerBotSafeRefineScrolls(ch) >= PLAYERBOT_LEVEL30_SCROLL_WANT)
+			return false;
+		LPITEM worn = ch->GetWear(WEAR_WEAPON);
+		if (worn && IsPlayerBotScrollFreeGear(worn))
+			worn = NULL;
+		if (worn && worn->GetRefinedVnum() != 0 &&
+				(IsPlayerBotScrollOnlyWeapon(worn) || IsPlayerBotSpecialLevel30Weapon(worn)))
+			return true;
+		if (worn && worn->GetRefinedVnum() != 0 && IsPlayerBotAnvilTableWeapon(worn) &&
+				(int)worn->GetRefineLevel() >= GetPlayerBotWeaponAnvilCeiling(ch, worn) &&
+				worn->GetRefineLevel() < GetPlayerBotRefineTarget(ch, worn))
+			return true;
+		// The weapon in the hand the anvil would burn with nothing behind it
+		// (IsPlayerBotWornWeaponAtRisk), while it is short of its target: a rich
+		// bot buys its way past the hold rather than waiting for a drop.
+		if (worn && worn->GetRefineLevel() < GetPlayerBotRefineTarget(ch, worn) &&
+				IsPlayerBotWornWeaponAtRisk(ch, worn))
+			return true;
+		TPlayerBotLevel30View view;
+		ReadPlayerBotLevel30View(ch, view);
+		return view.project != NULL && view.project->GetRefinedVnum() != 0;
+	}
+
+	// Would this bot rather have the item than the money?
+	bool WantsPlayerBotStallItem(LPCHARACTER ch, LPITEM offer)
+	{
+		if (!ch || !offer)
+			return false;
+
+		// MT2009_PLUS_DROPPER_INVEST_V1: a dropper buys no medal off another
+		// dropper's counter, and in its shopping window wants the materials
+		// and scrolls of its next steps first.
+		if (IsPlayerBotDropper(GetPlayerBotPersonalityByPID(ch->GetPlayerID())))
+		{
+			if (offer->GetVnum() == PLAYERBOT_HORSE_MEDAL_VNUM)
+				return false;
+			if (WantsPlayerBotDropperInvestOffer(ch, offer->GetVnum()))
+				return true;
+		}
+
+		// Cor Draconis and Dragon Stones, for an alchemy bot (playerbot_alchemy.h).
+		if (IsPlayerBotCorVnum(offer->GetVnum()) || offer->IsDragonSoul())
+			return WantsPlayerBotAlchemyOffer(ch, offer);
+
+		// MT2009_PLUS_BOT_HERBALIST_BREW_V2: a recipe a brewer can still
+		// learn from (playerbot_herbalism.h), one at a time.
+		if (IsPlayerBotCraftRecipeItem(offer))
+			return WantsPlayerBotRecipeOffer(ch, offer);
+
+		// The guild building materials, for a master whose next building
+		// lacks them (playerbot_guild_land.h); nobody else buys them.
+		if (IsPlayerBotGuildBuildMaterial(offer->GetVnum()))
+			return GetPlayerBotGuildMaterialWant(ch, offer->GetVnum()) > 0;
+
+		// Materialy Rzemieslnicze and the refine goods that make them, for a
+		// saddlebag bot short of its next row (playerbot_saddlebag.h).
+		if (offer->GetVnum() == PLAYERBOT_CRAFT_MATERIAL_VNUM_PRICED)
+			return WantsPlayerBotCraftMaterialOffer(ch, offer);
+		if (IsPlayerBotCraftExchangeVnum(offer->GetVnum()) && WantsPlayerBotCraftGoodsOffer(ch, offer) &&
+				!PlayerBotNeedsRefineMaterial(ch, offer->GetVnum()))
+			return true;
+
+		// A sash, for a bot that builds its own (playerbot_sash.h).
+		if (offer->GetType() == ITEM_COSTUME && IsPlayerBotSashVnum(offer->GetVnum()))
+			return WantsPlayerBotSashOffer(ch, offer);
+		// A weapon or body armour worth absorbing into that sash, for a
+		// keeper with nothing in its bag for it (playerbot_sash.h).
+		if (WantsPlayerBotSashPieceOffer(ch, offer))
+			return true;
+
+		// The piece over an outdated shield, helmet or body armour
+		// (IsPlayerBotOutdatedGearOffer, playerbot_gear.h).
+		if (IsPlayerBotOutdatedGearOffer(ch, offer))
+			return true;
+
+		// Development demand is shared with the journey and own-shop reclaim.
+		if (offer->GetType() == ITEM_SKILLBOOK || offer->GetVnum() == PLAYERBOT_GRAND_MASTER_STONE_VNUM)
+			return IsPlayerBotProgressionOffer(ch, offer);
+		if (GetPlayerBotBiologistPurchaseNeed(ch, offer->GetVnum()) > 0)
+			return IsPlayerBotProgressionOffer(ch, offer);
+
+		// The bean for a bot standing out a negative rank in town: the one thing
+		// that lifts it there (KeepPlayerBotNegativeRankInTown), one at a time.
+		// MT2009_PLUS_BOT_RANK_GLOVE_V1: not while it hunts the rank back
+		// (IsPlayerBotRankHunting) - the town gave it no bean, and a trip back
+		// for one would only stand it there again.
+		if (offer->GetVnum() == PLAYERBOT_ZEN_BEAN_VNUM)
+			return ch->GetRealAlignment() < 0 &&
+					ch->CountSpecifyItem(PLAYERBOT_ZEN_BEAN_VNUM) == 0 &&
+					!IsPlayerBotRankHunting(ch, get_dword_time());
+
+		// A Moonlight chest, to open (WantsPlayerBotMoonlightChest).
+		if (offer->GetVnum() == PLAYERBOT_MOONLIGHT_CHEST_VNUM)
+			return WantsPlayerBotMoonlightChest(ch);
+
+		// MT2009_PLUS_BOT_MINIGAMES_V1: a mini game's chest, to open
+		// (WantsPlayerBotMinigameChest) - the gamblers most of all.
+		if (IsPlayerBotMinigameChestVnum(offer->GetVnum()))
+			return WantsPlayerBotMinigameChest(ch, offer);
+
+		// MT2009_PLUS_BOT_CAPE_V1: Peleryna Mestwa, for a bot strong enough to
+		// use it (PlayerBotWantsValourCapes, playerbot_targeting.h).
+		// A line that would take it over what it keeps off its own counter
+		// (PLAYERBOT_CAPE_KEEP) would only go up there again.
+		if (IsPlayerBotValourCapeVnum(offer->GetVnum()))
+			return PlayerBotWantsValourCapes(ch) &&
+					CountPlayerBotValourCapes(ch) + (int)offer->GetCount() <= PLAYERBOT_CAPE_KEEP;
+
+		// A flooded material for the refiners' exchange (playerbot_bonus.h).
+		if (IsPlayerBotExchangeBuyOffer(ch, offer))
+			return true;
+
+		// A material it is short of right now. This is the whole reason a bot
+		// walks the market: the alternative is farming the same material for an
+		// hour while a neighbour has spares on a counter three metres away.
+		if (PlayerBotNeedsRefineMaterial(ch, offer->GetVnum()))
+			return true;
+
+		// Iwakura's gambler buys what its session runs on (playerbot_gambler.h).
+		if (WantsPlayerBotGambleOffer(ch, offer))
+			return true;
+
+		// A skill book for a skill this bot is actually raising.
+		//
+		// There was no branch for these at all, so no bot ever bought one off a
+		// counter: books piled up on stalls, and the only way to a skill was to
+		// find the book yourself. What a bot wants is a small working stock of
+		// its own build's skills - two or three, not every book to Grand Master
+		// - and only while the skill can still be read up.
+		// A Forgetting Scroll on somebody's counter is what a bot past the old
+		// woman's thirty with a skill stuck at seventeen came to market for.
+		// A companion's book must name the skill it reads it for
+		// (ReadPlayerBotSidekickForgetBook); the others write theirs in.
+		if (offer->GetVnum() == PLAYERBOT_SKILL_FORGET_SCROLL_VNUM && IsPlayerBotSidekickPID(ch->GetPlayerID()))
+		{
+			const DWORD skill = (DWORD)offer->GetSocket(0);
+			return skill != 0 && ch->GetSkillMasterType(skill) == SKILL_NORMAL &&
+					ch->GetSkillLevel(skill) >= PLAYERBOT_SKILL_MASTER_TRY_LEVEL && ch->GetSkillLevel(skill) < 20 &&
+					ch->CountSpecifyItem(PLAYERBOT_SKILL_FORGET_SCROLL_VNUM) == 0;
+		}
+		if (offer->GetVnum() == PLAYERBOT_SKILL_FORGET_SCROLL_VNUM)
+			return GetPlayerBotStuckSkill(ch) != 0 &&
+					ch->GetLevel() > PLAYERBOT_SKILL_RESET_MAX_LEVEL &&
+					ch->CountSpecifyItem(PLAYERBOT_SKILL_FORGET_SCROLL_VNUM) == 0;
+
+		// A horse medal, if this bot still has a horse to raise. Buying one is
+		// hours of the Monkey Dungeon it does not have to run.
+		// MT2009_PLUS_HORSE30_V1: while the next paid training lacks medals
+		// (playerbot_horse30.h).
+		if (offer->GetVnum() == PLAYERBOT_HORSE_MEDAL_VNUM)
+			return PlayerBotHorseWantsMedal(ch) || PlayerBotSaddlebagWantsMedal(ch);
+
+		// A Forgetting Scroll, while a skill stands at seventeen unmastered.
+		if (offer->GetVnum() == PLAYERBOT_SKILL_FORGET_SCROLL_VNUM)
+			return GetPlayerBotStuckSkill(ch) != 0;
+
+		// A soul stone of its set, at a grade its piece deserves, for a socket
+		// it has open.
+		// MT2009_PLUS_DIGI_STACK_V1: one stone, never a stack of them (they
+		// stack to 200 now; the socket takes one).
+		if (offer->GetType() == ITEM_METIN)
+			return offer->GetCount() == 1 &&
+					WantsPlayerBotSoulStone(ch, offer->GetVnum(), (DWORD)offer->GetValue(5));
+
+		// A Stalki for its slot, while it holds nothing of the tier and is at
+		// the level or PLAYERBOT_STALKI_BUY_AHEAD_LEVELS short of it
+		// (playerbot_stalki.h): a project like the level-30 weapon, bought at
+		// any plus and made at the anvil, where the gear branch below takes a
+		// finished piece a bot can wear today and nothing else. The operator's
+		// decision of 28 September. Once it holds one it wants no other, so
+		// what it bought is its project and never the next counter's line.
+		if (IsPlayerBotStalkiProjectOffer(ch, offer))
+			return true;
+
+		// A level-30 weapon of its own class. This is the item bots cross the
+		// world to farm; buying one off a counter is the whole point of there
+		// being a market. It used to be "when it has none", so a bot holding any
+		// level-30 weapon at all - a +0 with no line in the bag - never looked
+		// at a better one. Now it is the damage model's answer: the offer's blow
+		// at PLAYERBOT_LEVEL30_PROJECT_PLUS against the best the bot has, its
+		// own project included (IsPlayerBotBetterLevel30Offer).
+		if (IsPlayerBotSpecialLevel30Weapon(offer))
+			return IsPlayerBotBetterLevel30Offer(ch, offer) || IsPlayerBotMandatedLevel30Offer(ch, offer);
+		// And a refine scroll, for a weapon that is refined under one.
+		if (IsPlayerBotSafeRefineScroll(offer->GetVnum()) && PlayerBotNeedsScrollForWeapon(ch))
+			return true;
+		// A key for a chest it holds and cannot open.
+		if (offer->GetType() == ITEM_TREASURE_KEY)
+			return PlayerBotWantsTreasureKey(ch, offer);
+
+		// Gear only when it is genuinely better than what is worn. A bot that
+		// buys sideways upgrades spends its yang on nothing.
+		if (!IsPlayerBotEquipmentCandidate(ch, offer))
+			return false;
+		if (offer->GetLevelLimit() > ch->GetLevel())
+			return false;
+		// And only a finished piece: Iwakura's Patch 4, point 2 - "przedmiot z
+		// rynku musi byc ulepszony na minimum +6" - one grade over the piece
+		// worn, or the same grade with better lines (his answer of 26
+		// September; the worn plus is asked below, once the slot is known).
+		if ((int)offer->GetRefineLevel() < PLAYERBOT_MARKET_GEAR_MIN_PLUS)
+			return false;
+		const int wearCell = offer->FindEquipCell(ch);
+		if (wearCell < 0)
+			return false;
+		// Not when the bag already holds one at least as good for the same
+		// slot. The comparison below is against what is worn, and what is
+		// worn does not change until the gear pass runs - so a bot standing at
+		// the ring bought the same +6 armour three times over, two seconds
+		// apart, each one better than what it had on and none of them on yet.
+		// At least as good, not within the margin: a grade is about seven
+		// percent of an armour's score, and the margin kept a +7 off the
+		// counter from a bot with a +6 of its family in the bag.
+		const long long offerScore = GetPlayerBotEquipmentScore(offer, ch);
+		for (WORD cell = 0; cell < PLAYERBOT_BAG_CELLS; ++cell)
+		{
+			LPITEM spare = ch->GetInventoryItem(cell);
+			if (!spare || spare->IsEquipped() || !IsPlayerBotEquipmentCandidate(ch, spare) ||
+					spare->FindEquipCell(ch) != wearCell)
+				continue;
+			if (GetPlayerBotEquipmentScore(spare, ch) >= offerScore)
+				return false;
+		}
+		LPITEM worn = ch->GetWear((BYTE)wearCell);
+		// A weapon for the tenth level or under in the hand of a bot of thirty
+		// is no weapon to buy over (Community Patch 5, point 2): its +6 asked
+		// every offer for +7, and the market was one of the two ways out of it.
+		if (!worn || IsPlayerBotBannedLowWeapon(ch, worn))
+			return true;
+		// Against the worn piece, playerbot_stall_rules::BuysGearOverWorn: a
+		// grade over it when it scores over it - the grade is the margin now;
+		// the old fifteen percent on top of two grades took three of a level-34
+		// armour, whose defence grows about seven percent a grade. The worn
+		// grade for its lines, when they are worth the market's margin more by
+		// Iwakura's tier table (GetPlayerBotItemLineScore) - "lub gdy ma taki
+		// sam + ale ma sumarycznie lepsze bonusy (z tabeli tierow bonusow) od
+		// noszonego" - and it scores over the worn piece. Both only over the
+		// worn piece's score, because that is the one test the equipment pass
+		// puts a piece on by: a pair of boots scores by its lines of tier three
+		// and up alone, and better low lines would have bought a pair it never
+		// wears. A big line the worn piece lacks - a thousand health, which a
+		// player buys a piece for - used to buy a grade over whatever it scored,
+		// and the piece stayed in the bag for the counter (R2 of Iwakura's
+		// audit).
+		return playerbot_stall_rules::BuysGearOverWorn((int)offer->GetRefineLevel(),
+				(int)worn->GetRefineLevel(), offerScore, GetPlayerBotEquipmentScore(worn, ch),
+				GetPlayerBotItemLineScore(offer, ch), GetPlayerBotItemLineScore(worn, ch),
+				PLAYERBOT_MARKET_GEAR_MIN_PLUS, PLAYERBOT_MARKET_GEAR_PLUS_OVER_WORN,
+				PLAYERBOT_MARKET_GEAR_MARGIN_PERCENT);
+	}
+
+	// The keys a silver or gold chest takes: a key opens a chest whose value0
+	// is its own (ManagePlayerBotChests). The "+" keys carry a lock of 0 on
+	// the 2.x line and open nothing; the proto is asked, not assumed.
+	const DWORD PLAYERBOT_TREASURE_KEY_VNUMS[] = { 50008, 50009, 50014, 50015 };
+
+	// A chest in the bag with no key for it, while some counter holds that
+	// key. On 26 September 43 bots on m2zip carried the silver chests the
+	// Monkey Dungeons' bosses drop and not one of them a key, with 207 silver
+	// keys standing on counters and 3 600 more in other bags: a key was
+	// bought only on a trip made for something else.
+	bool PlayerBotWantsKeyFromMarket(LPCHARACTER ch)
+	{
+		if (!ch)
+			return false;
+		for (WORD cell = 0; cell < PLAYERBOT_BAG_CELLS; ++cell)
+		{
+			LPITEM box = ch->GetInventoryItem(cell);
+			if (!box || box->GetCell() != cell || box->GetType() != ITEM_TREASURE_BOX ||
+					PlayerBotHasTreasureKeyFor(ch, box))
+				continue;
+			for (size_t i = 0; i < sizeof(PLAYERBOT_TREASURE_KEY_VNUMS) / sizeof(PLAYERBOT_TREASURE_KEY_VNUMS[0]); ++i)
+			{
+				const TItemTable* proto = ITEM_MANAGER::instance().GetTable(PLAYERBOT_TREASURE_KEY_VNUMS[i]);
+				if (!proto || proto->bType != ITEM_TREASURE_KEY || proto->alValues[0] != box->GetValue(0))
+					continue;
+				const TPlayerBotMarketLedgerEntry* keys = GetPlayerBotMarketLedgerEntry(PLAYERBOT_TREASURE_KEY_VNUMS[i]);
+				if (keys && keys->dwSupplyUnits > 0)
+					return true;
+			}
+		}
+		return false;
+	}
+
+	// Is there anything at all a market could sell this bot? Asked before the
+	// walk, so it has to be answerable without reading a single counter: these
+	// are the three things a bot is reliably short of and a stall reliably has.
+	bool PlayerBotWantsAnythingFromMarket(LPCHARACTER ch)
+	{
+		if (!ch)
+			return false;
+		// A key for a chest it carries (PlayerBotWantsKeyFromMarket).
+		if (PlayerBotWantsKeyFromMarket(ch))
+			return true;
+		if (PlayerBotNeedsProgressionShopping(ch)) return true;
+		// A bean for a negative rank (WantsPlayerBotStallItem).
+		if (ch->GetRealAlignment() < 0 && ch->CountSpecifyItem(PLAYERBOT_ZEN_BEAN_VNUM) == 0 &&
+				!IsPlayerBotRankHunting(ch, get_dword_time())) // MT2009_PLUS_BOT_RANK_GLOVE_V1
+			return true;
+		// A Moonlight chest, while some counter holds one: the ledger counts the
+		// counters (AddPlayerBotMarketSupply, the offline shops included), so the
+		// question is still answered without reading one. Without this branch the
+		// chest was bought only on a trip made for something else.
+		{
+			const TPlayerBotMarketLedgerEntry* chests =
+					GetPlayerBotMarketLedgerEntry(PLAYERBOT_MOONLIGHT_CHEST_VNUM);
+			if (chests && chests->dwSupplyUnits > 0 && WantsPlayerBotMoonlightChest(ch))
+				return true;
+		}
+		// MT2009_PLUS_BOT_CAPE_V1: capes for a cape build, while a counter has
+		// them (the ledger, as for the chest).
+		{
+			const TPlayerBotMarketLedgerEntry* capes = GetPlayerBotMarketLedgerEntry(PLAYERBOT_CAPE_MARKET_VNUM);
+			if (capes && capes->dwSupplyUnits > 0 && PlayerBotWantsValourCapes(ch))
+				return true;
+		}
+		// A refine material for something it is carrying below its target. This
+		// is the common case by a long way - half the counters in this world are
+		// materials, because half of what a bot needs is.
+		if (PlayerBotNeedsAnyRefineMaterial(ch))
+			return true;
+		// A horse medal, while the next training lacks one (MT2009_PLUS_HORSE30_V1).
+		if (PlayerBotHorseWantsMedal(ch))
+			return true;
+		// Sashes for the one it builds, and the piece to fill it (playerbot_sash.h).
+		if (PlayerBotWantsSashFromMarket(ch) || PlayerBotWantsSashPieceFromMarket(ch))
+			return true;
+		// Medals and materials for a saddlebag row (playerbot_saddlebag.h).
+		if (PlayerBotWantsSaddlebagGoods(ch))
+			return true;
+		// Cors for an alchemy bot (playerbot_alchemy.h).
+		if (PlayerBotWantsAlchemyFromMarket(ch))
+			return true;
+		// A Forgetting Scroll for a skill stuck at seventeen.
+		if (GetPlayerBotStuckSkill(ch) != 0)
+			return true;
+		// MT2009_PLUS_BOT_HERBALIST_BREW_V2: a recipe for a brewer, while a
+		// counter has one it can learn from (the ledger).
+		if (PlayerBotWantsRecipeFromMarket(ch))
+			return true;
+		// A socket open on a piece it keeps.
+		if (PlayerBotHasOpenSoulStoneSocket(ch))
+			return true;
+		// The bases the addict's anvil works (Iwakura's Patch 3, point 7), and
+		// a gambler's between its sessions (PlayerBotGamblerWantsBases).
+		if (PlayerBotAddictWantsBases(ch) || PlayerBotGamblerWantsBases(ch))
+			return true;
+		// And a piece of gear for a slot that is empty or behind the ladder.
+		//
+		// This branch was missing, and it is the whole of why "I put +8 battle
+		// shields on a stall for one yang and the bots would not buy them"
+		// happens: WantsPlayerBotStallItem has always known how to compare an
+		// offered piece against what is worn, but nothing ever walked a bot to
+		// a counter to look. Gear was reachable only by accident, on a trip the
+		// bot made for a refine material. The question has to be answerable
+		// without reading a counter, and these predicates are exactly that -
+		// the same ones the tick uses to decide a merchant trip is due.
+		if (NeedsPlayerBotProgressionWeapon(ch) || NeedsPlayerBotProgressionArmor(ch) ||
+				NeedsPlayerBotProgressionShield(ch) || NeedsPlayerBotProgressionHelmet(ch) ||
+				NeedsPlayerBotProgressionBoots(ch) || NeedsPlayerBotProgressionWrist(ch) ||
+				NeedsPlayerBotProgressionNecklace(ch) || NeedsPlayerBotProgressionEarring(ch))
+			return true;
+		// A scroll for a weapon that is refined under one.
+		if (PlayerBotNeedsScrollForWeapon(ch))
+			return true;
+		// A weapon the atlas says it has outgrown, when it could pay for the one
+		// it is after (playerbot_weapon_goal.h).
+		{
+			const TPlayerBotWeaponGoal& goal = GetPlayerBotWeaponGoal(ch, get_dword_time());
+			if (IsPlayerBotWeaponOutclassed(goal) &&
+					GetPlayerBotStrategicPurchaseCap(ch) >= (long long)GetPlayerBotWeaponGoalPrice(goal.family))
+				return true;
+		}
+		// The finished piece a market Perfectionist's anvil is waiting for
+		// (community patch 2, point 11).
+		if (IsPlayerBotPersonaEnabled())
+		{
+			TPlayerBotAIStateMap::const_iterator st = s_mapPlayerBotAIStates.find(ch->GetPlayerID());
+			const DWORD dwNow = get_dword_time();
+			if (st != s_mapPlayerBotAIStates.end() &&
+					(IsPlayerBotReadyGearHeld(st->second, WEAR_WEAPON, dwNow) ||
+					 IsPlayerBotReadyGearHeld(st->second, WEAR_BODY, dwNow) ||
+					 IsPlayerBotReadyGearHeld(st->second, WEAR_SHIELD, dwNow) ||
+					 IsPlayerBotReadyGearHeld(st->second, WEAR_HEAD, dwNow)))
+				return true;
+		}
+		// The class's level-30 weapon, which a bot of thirty or more without one
+		// has to have (community patch 2, point 1), while a counter holds one
+		// and it can pay for it.
+		if (PlayerBotLacksClassLevel30Weapon(ch) && PlayerBotMarketHasClassLevel30Weapon(ch) &&
+				GetPlayerBotLevel30PurchaseCap(ch) >=
+					(long long)ScalePlayerBotIwakuraPrice(PLAYERBOT_LEVEL30_BASE_PRICE))
+			return true;
+		// And the level-30 weapon it would otherwise cross the world to farm -
+		// unless it is grinding one already, wears a finished one, no such
+		// weapon could beat what it has (PlayerBotCouldUseLevel30Weapon), or it
+		// could not pay for one.
+		return PlayerBotCouldUseLevel30Weapon(ch) &&
+				GetPlayerBotStrategicPurchaseCap(ch) >=
+					(long long)ScalePlayerBotIwakuraPrice(PLAYERBOT_LEVEL30_BASE_PRICE);
+	}
+
+	// MT2009_PLUS_PERSON_PRICE_CAP_V1: a person's counter is never paid more
+	// than 1.5 to 2 times what the market asks for the piece (the server's own
+	// price, GetPlayerBotShopAskingPrice) - the more the bot needs it, the
+	// nearer to 2. A player bought the bots' horse medals at 160k and sold them
+	// back at 2M, and a 1.4M sword for 9M: the purses below had no fair price
+	// for the level-30 weapon, the medal and finished gear. A bot's counter
+	// has no cap: what bots ask of each other is their own economy.
+	int GetPlayerBotPersonPriceCapPercent(LPCHARACTER ch, LPITEM item)
+	{
+		int need = 0;
+		if (IsPlayerBotProgressionOffer(ch, item))
+			need = 100;
+		else if (IsPlayerBotClassLevel30Weapon(ch, item))
+			need = 80;
+		else if (item->GetVnum() == PLAYERBOT_HORSE_MEDAL_VNUM || PlayerBotNeedsRefineMaterial(ch, item->GetVnum()))
+			need = 60;
+		else if (item->GetType() == ITEM_SKILLBOOK || IsPlayerBotStrategicPurchase(item->GetVnum()))
+			need = 40;
+		return 150 + need / 2;
+	}
+
+	bool IsPlayerBotPersonPriceFair(LPCHARACTER ch, LPITEM item, long long price)
+	{
+		const long long fair = (long long)GetPlayerBotShopAskingPrice(item);
+		if (fair <= 0)
+			return false;	// nothing to measure a person's price against
+		return price * 100 <= fair * GetPlayerBotPersonPriceCapPercent(ch, item);
+	}
+
+	bool CanPlayerBotPayForOffer(LPCHARACTER ch, LPITEM item, long long price, DWORD sellerPID) {
+		if (!ch || !item || price <= 0) return false;
+		if (sellerPID != 0 && !CPlayerBotManager::instance().IsRegisteredBotPID(sellerPID) &&
+				!IsPlayerBotPersonPriceFair(ch, item, price))
+			return false;
+		// Community Patch 5, point 6 - "Boty otrzymuja bezwzgledny zakaz
+		// kupowania takich przedmiotow": a line with a keeper's slip in its
+		// price, one zero too many, is never bought by a bot, before any of the
+		// purses below gets a say (IsPlayerBotPriceSlipOffer). The fair-price
+		// caps further down refused most of them already; the ban does not
+		// hang on what any one of those caps is set to.
+		if (IsPlayerBotPriceSlipOffer(item, price)) return false;
+		// A master's building materials come out of its guild's fund, which
+		// the reserve below keeps from everything else (playerbot_guild_land.h).
+		if (IsPlayerBotGuildBuildMaterial(item->GetVnum()))
+			return CanPlayerBotPayForGuildMaterial(ch, item, price);
+		const long long spare = (long long)ch->GetGold() - GetPlayerBotReservedGold(ch) - PLAYERBOT_SHOPPING_GOLD_FLOOR;
+		if (price > spare) return false;
+		// MT2009_PLUS_BOT_MINIGAMES_V1: no dearer than what it holds (a gambler
+		// a little over), out of a share of the purse.
+		if (IsPlayerBotMinigameChestVnum(item->GetVnum()))
+			return CanPlayerBotPayForMinigameChest(ch, item, price);
+		// MT2009_PLUS_BOT_HERBALIST_BREW_V2: a recipe near the price list's
+		// 450 000, out of a quarter of what the brewer can spare.
+		if (IsPlayerBotCraftRecipeItem(item))
+		{
+			const long long fair = GetPlayerBotShopAskingPrice(item);
+			return fair > 0 && price <= fair * PLAYERBOT_HERBALISM_RECIPE_FAIR_PERCENT / 100 &&
+					price <= spare * PLAYERBOT_HERBALISM_RECIPE_BUY_PERCENT / 100;
+		}
+		if (item->GetType() == ITEM_COSTUME && IsPlayerBotSashVnum(item->GetVnum()))
+			return CanPlayerBotPayForSashOffer(ch, item, price);
+		if (WantsPlayerBotSashPieceOffer(ch, item))
+			return CanPlayerBotPayForSashPiece(ch, item, price);
+		if (item->GetVnum() == PLAYERBOT_CRAFT_MATERIAL_VNUM_PRICED)
+			return CanPlayerBotPayForCraftMaterial(ch, item, price);
+		if (IsPlayerBotCorVnum(item->GetVnum()) || item->IsDragonSoul())
+			return CanPlayerBotPayForAlchemyOffer(ch, item, price);
+		if (IsPlayerBotCraftExchangeVnum(item->GetVnum()) && WantsPlayerBotCraftGoodsOffer(ch, item) &&
+				!PlayerBotNeedsRefineMaterial(ch, item->GetVnum()))
+			return CanPlayerBotPayForCraftGoods(ch, item, price);
+		if (IsPlayerBotProgressionOffer(ch, item)) {
+			const long long fair = GetPlayerBotShopAskingPrice(item);
+			// A book comes out of the visit's book purse (community patch 2,
+			// point 5), which counts what the visit has already spent on books.
+			// Or out of what the bot holds over PLAYERBOT_BOOK_SURPLUS_GOLD.
+			if (item->GetType() == ITEM_SKILLBOOK)
+				return fair > 0 && price <= fair * 2 &&
+						price <= std::max(GetPlayerBotBookBudgetLeft(ch), GetPlayerBotBookSurplus(ch));
+			return fair > 0 && price <= fair * 2 && price <= spare * 30 / 100;
+		}
+		// A flooded material for the exchange: at no more than the flood's
+		// price a piece, out of PLAYERBOT_EXCHANGE_BUY_PERCENT of the spare.
+		if (IsPlayerBotExchangeBuyOffer(ch, item) && !PlayerBotNeedsRefineMaterial(ch, item->GetVnum()))
+			return price / std::max<long long>(1, (long long)item->GetCount()) <=
+					(long long)ScalePlayerBotIwakuraPrice(PLAYERBOT_EXCHANGE_UNIT_PRICE_MAX) &&
+					price <= spare * PLAYERBOT_EXCHANGE_BUY_PERCENT / 100;
+		// The piece over outdated gear: PLAYERBOT_OUTDATED_GEAR_BUDGET_PERCENT
+		// of what the bot can spend, near the market's price for it.
+		if (IsPlayerBotOutdatedGearOffer(ch, item)) {
+			const long long fair = GetPlayerBotShopAskingPrice(item);
+			return (fair <= 0 || price <= fair * 2) &&
+					price <= spare * PLAYERBOT_OUTDATED_GEAR_BUDGET_PERCENT / 100;
+		}
+		// The class's level-30 weapon has its own share (community patch 2,
+		// point 1): PLAYERBOT_LEVEL30_BUDGET_PERCENT for the purchase and the
+		// anvil together.
+		if (IsPlayerBotClassLevel30Weapon(ch, item))
+			return price <= GetPlayerBotLevel30PurchaseCap(ch);
+		// A Stalki project comes out of the strategic share, the level-30
+		// weapon's and the horse medal's, and no nearer than
+		// PLAYERBOT_STALKI_FAIR_PRICE_PERCENT of what the market asks for the
+		// piece: the one purchase a bot of sixty-four saves for, and a keeper's
+		// one zero too many is not it.
+		if (IsPlayerBotStalkiProjectOffer(ch, item))
+			return playerbot_stalki_rules::WithinFairPrice(price, GetPlayerBotShopAskingPrice(item),
+					PLAYERBOT_STALKI_FAIR_PRICE_PERCENT) && price <= GetPlayerBotStalkiBudget(ch);
+		// A finished piece the market Perfectionist came for is paid from the
+		// Perfectionist's share (community patch 2, point 11).
+		if (IsPlayerBotReadyGearOffer(ch, item))
+			return price <= spare * playerbot_persona::PERFECT_BUDGET_PERCENT / 100;
+		if (IsPlayerBotStrategicPurchase(item->GetVnum()) || IsPlayerBotStrategicWeaponOffer(ch, item))
+			return price <= GetPlayerBotStrategicPurchaseCap(ch);
+		// The addict's bases and materials come out of its own budget
+		// (GetPlayerBotAddictBudgetLeft, Iwakura's Patch 3, point 7) - a
+		// material near what the market asks for it, like anybody's: this
+		// branch stood before the fair-price test below and let the addict pay
+		// a counter's one zero too many (B07 of Iwakura's audit).
+		{
+			const long long addictLeft = GetPlayerBotAddictBudgetLeft(ch);
+			if (addictLeft > 0 && WantsPlayerBotGambleOffer(ch, item))
+			{
+				if (IsPlayerBotTradeableMaterial(item))
+				{
+					const long long fair = GetPlayerBotShopAskingPrice(item);
+					if (fair > 0 && price > fair * PLAYERBOT_MARKET_MATERIAL_FAIR_MULTIPLE)
+						return false;
+				}
+				return price <= addictLeft;
+			}
+		}
+		// A gambler's base between its sessions (IsPlayerBotGamblerBaseOffer)
+		// near what Iwakura's sheet asks for the piece: the browse takes the
+		// cheapest line, and this keeps it off a counter's one zero too many.
+		if (IsPlayerBotGamblerBaseOffer(ch, item))
+		{
+			const long long fair = GetPlayerBotShopAskingPrice(item);
+			if (fair > 0 && price > fair * PLAYERBOT_GAMBLE_BASE_FAIR_MULTIPLE)
+				return false;
+		}
+		// A finished piece of gear (WantsPlayerBotStallItem: +6 and a grade over
+		// the one worn, or its grade with better lines) comes out of the
+		// Perfectionist's half of the purse
+		// (Iwakura's Patch 4, point 2) - the median wallet's share below was a
+		// fraction of one +6 piece at m2zip's rates.
+		if (item->GetType() == ITEM_WEAPON || item->GetType() == ITEM_ARMOR)
+			return price <= spare * playerbot_persona::PERFECT_BUDGET_PERCENT / 100;
+		// A refine material is bought near what the market asks for its line,
+		// never at a counter's one zero too many (Iwakura's Patch 4, point 4,
+		// and the ban at the top): the wallet's cap below would have let a
+		// rich bot pay it.
+		if (IsPlayerBotTradeableMaterial(item))
+		{
+			const long long fair = GetPlayerBotShopAskingPrice(item);
+			if (fair > 0 && price > fair * PLAYERBOT_MARKET_MATERIAL_FAIR_MULTIPLE)
+				return false;
+		}
+		// MT2009_PLUS_BOT_CAPE_V1: a line of capes near what the market asks for
+		// it (PLAYERBOT_CAPE_FAIR_PERCENT) and out of PLAYERBOT_CAPE_BUDGET_PERCENT
+		// of the spare gold.
+		if (IsPlayerBotValourCapeVnum(item->GetVnum()))
+		{
+			const long long fair = GetPlayerBotShopAskingPrice(item);
+			return fair > 0 && price * 100 <= fair * PLAYERBOT_CAPE_FAIR_PERCENT &&
+					price <= spare * PLAYERBOT_CAPE_BUDGET_PERCENT / 100;
+		}
+		// A Moonlight chest asks what it holds since 28 September, and a line of
+		// five is several times the median wallet's share below, so it is paid
+		// from the buyer's own spare gold - a line at most the share the want
+		// asked for (WantsPlayerBotMoonlightChest), or the walk to it would be
+		// made for a line the purse then refused - and never over a counter's
+		// price for it by the material's multiple.
+		if (item->GetVnum() == PLAYERBOT_MOONLIGHT_CHEST_VNUM)
+		{
+			const long long fair = GetPlayerBotShopAskingPrice(item);
+			return fair > 0 && price <= fair * PLAYERBOT_MARKET_MATERIAL_FAIR_MULTIPLE &&
+					price <= spare / PLAYERBOT_CHEST_BUY_PRICE_MULTIPLE;
+		}
+		const long long cap = (long long)GetPlayerBotMarketMedianWallet() * PLAYERBOT_MARKET_STACK_WALLET_PERCENT / 100;
+		return cap <= 0 || price <= cap;
+	}
+
+	// One line of one counter: what a buyer decided it wants, where it is, and
+	// which slot number CShopManager::Buy will need.
+	struct TPlayerBotStallPick
+	{
+		LPCHARACTER keeper;
+		DWORD dwVnum;
+		DWORD dwPrice;
+		// Which skill, for a skill book. The purchase is recorded against the
+		// book's own market, not against every book that shares vnum 50300.
+		DWORD dwSkillVnum;
+		BYTE bSlot;
+		BYTE bRefine;
+		WORD wCount;
+
+		TPlayerBotStallPick()
+			: keeper(NULL), dwVnum(0), dwPrice(0), dwSkillVnum(0), bSlot(0),
+			  bRefine(0), wCount(0)
+		{
+		}
+	};
+
+	// The nearest counter in reach with something on it this bot would rather
+	// have than its money. Nearest rather than best: the counters are all within
+	// the same ring, so walking past three of them to reach a fourth buys nothing
+	// extra, and a bot that goes to the closest one gets there before the keeper
+	// packs up.
+	bool FindPlayerBotStallPick(LPCHARACTER ch, TPlayerBotStallPick& outPick)
+	{
+		if (!ch || !ch->GetSectree())
+			return false;
+
+		CCollectPlayerBotStalls collector(ch, PLAYERBOT_SHOPPING_RANGE);
+		ch->GetSectree()->ForEachAround(collector);
+
+		int bestDistance = -1;
+		for (size_t i = 0; i < collector.m_stalls.size(); ++i)
+		{
+			LPCHARACTER keeper = collector.m_stalls[i];
+			if (!keeper || !keeper->GetMyShop())
+				continue;
+			TPlayerBotAIStateMap::const_iterator it =
+					s_mapPlayerBotAIStates.find(keeper->GetPlayerID());
+			// A player's counter is read from the engine's own shop through the
+			// accessor patch 0007 adds - the offer list only exists for bots. A
+			// line a player asks more than a share of the median wallet for is
+			// passed over: the bots are customers, not a way to print yang.
+			std::vector<TPlayerBotShopOffer> playerOffers;
+			if (it == s_mapPlayerBotAIStates.end())
+			{
+				if (keeper->GetDesc() && keeper->GetDesc()->IsBot())
+					continue;
+				const std::vector<CShop::SHOP_ITEM>& lines = keeper->GetMyShop()->GetItemVector();
+				for (size_t k = 0; k < lines.size(); ++k)
+				{
+					const CShop::SHOP_ITEM& line = lines[k];
+					if (!line.pkItem || line.vnum == 0 || !CanPlayerBotPayForOffer(ch, line.pkItem, line.price, keeper->GetPlayerID()))
+						continue;
+					TPlayerBotShopOffer offer;
+					offer.dwVnum = line.vnum;
+					offer.dwPrice = (DWORD)line.price;
+					offer.bRefine = line.pkItem->GetRefineLevel();
+					offer.wCount = line.count;
+					offer.dwItemID = (DWORD)line.itemid;
+					offer.bSlot = (BYTE)k;
+					// A player's counter, read only to decide what to buy from
+					// it: nothing here asks this offer for a book's skill, and
+					// the demand signal is the keeper's own bookkeeping. Set
+					// anyway - TPlayerBotShopOffer has no constructor, so a
+					// field left alone is whatever was on the stack.
+					offer.dwSkillVnum = 0;
+					playerOffers.push_back(offer);
+				}
+			}
+			const std::vector<TPlayerBotShopOffer>& offers =
+					it != s_mapPlayerBotAIStates.end() ? it->second.vecShopOffers : playerOffers;
+			if (offers.empty())
+				continue;
+
+			const int distance = DISTANCE_APPROX(ch->GetX() - keeper->GetX(),
+					ch->GetY() - keeper->GetY());
+			if (bestDistance >= 0 && distance >= bestDistance)
+				continue; // a nearer counter has already offered something
+
+			// A counter holds several things. Walk it and take the first line the
+			// buyer actually wants; the offer carries the engine's slot for it.
+			for (size_t k = 0; k < offers.size(); ++k)
+			{
+				const TPlayerBotShopOffer& candidate = offers[k];
+				// Never spend down to nothing: potions and the next weapon first.
+				if (candidate.dwPrice == 0 ||
+						ch->GetGold() - (int)candidate.dwPrice <
+							(int)PLAYERBOT_SHOPPING_GOLD_FLOOR)
+					continue;
+				// The real item, with its sockets and bonus lines, is still in
+				// the keeper's bag to be looked at - or it is sold, and it is not.
+				LPITEM candidateItem = FindPlayerBotOfferItem(keeper, candidate);
+				if (!WantsPlayerBotStallItem(ch, candidateItem) ||
+						!CanPlayerBotPayForOffer(ch, candidateItem, candidate.dwPrice, keeper->GetPlayerID()))
+					continue;
+				// Room for this particular thing, not room in general. The engine
+				// refuses the whole purchase when the item does not fit, and a
+				// weapon is three cells against the two the trip checked for -
+				// so a bot with a two-cell gap would ask for a sword, be refused,
+				// and ask again.
+				if (ch->GetEmptyInventory(candidateItem->GetSize()) < 0)
+					continue;
+				outPick.keeper = keeper;
+				outPick.dwVnum = candidate.dwVnum;
+				outPick.dwPrice = candidate.dwPrice;
+				outPick.bSlot = candidate.bSlot;
+				outPick.bRefine = candidate.bRefine;
+				outPick.wCount = candidate.wCount;
+				outPick.dwSkillVnum = candidateItem->GetType() == ITEM_SKILLBOOK
+						? GetPlayerBotSkillBookSkillVnum(candidateItem) : 0;
+				bestDistance = distance;
+				break;
+			}
+		}
+		return bestDistance >= 0;
+	}
+
+	// Exactly what a client does when a player clicks a stall, in the same order.
+	// Both halves are required and neither is optional: CShopManager::Buy returns
+	// immediately unless the buyer is registered as a guest of the shop (AddGuest
+	// is what sets ch->GetShop()) *and* has the shop owner set. Setting only the
+	// owner, which is the obvious half, silently bought nothing at all.
+	bool BuyFromPlayerBotStall(LPCHARACTER ch, const TPlayerBotStallPick& pick)
+	{
+		if (!ch || !pick.keeper)
+			return false;
+		LPSHOP shop = pick.keeper->GetMyShop();
+		if (!shop || ch->GetShop() || ch->GetExchange())
+			return false;
+		// Revalidate the native slot immediately before sending the buy.
+		const std::vector<CShop::SHOP_ITEM>& lines = shop->GetItemVector();
+		if (pick.bSlot >= lines.size()) return false;
+		const CShop::SHOP_ITEM& line = lines[pick.bSlot];
+		if (!line.pkItem || line.price != pick.dwPrice || !WantsPlayerBotStallItem(ch, line.pkItem) ||
+				!CanPlayerBotPayForOffer(ch, line.pkItem, line.price, pick.keeper->GetPlayerID())) return false;
+		if (!shop->AddGuest(ch, pick.keeper->GetVID(), false))
+			return false;
+
+		const int goldBefore = ch->GetGold();
+		// Read before the purchase: a sold line's item is the buyer's after it.
+		const bool book = line.pkItem->GetType() == ITEM_SKILLBOOK;
+		const bool level30 = IsPlayerBotClassLevel30Weapon(ch, line.pkItem);
+		const bool gambleBase = IsPlayerBotGamblerBaseOffer(ch, line.pkItem);
+		ch->SetShopOwner(pick.keeper);
+		CShopManager::instance().Buy(ch, pick.bSlot);
+		// Leaving either of these set would point this bot at a character it is no
+		// longer standing next to.
+		ch->SetShopOwner(NULL);
+		shop->RemoveGuest(ch);
+
+		if (ch->GetGold() >= goldBefore)
+			return false;
+
+		const int paid = goldBefore - ch->GetGold();
+		if (book)
+			NotePlayerBotBookBought(ch, paid);
+		// The class's level-30 weapon goes on the budget its anvil shares.
+		if (level30)
+			NotePlayerBotLevel30Spend(ch, paid);
+		// A sale is the one measurement of demand there is. The asking price on
+		// a counter is what a seller hoped for; this is what a buyer did.
+		// With the skill, so a book sale lands on its own market.
+		RememberPlayerBotSale(pick.dwVnum, pick.bRefine,
+				(DWORD)paid / std::max<DWORD>(1, pick.wCount), get_dword_time(),
+				pick.dwSkillVnum);
+		if (pick.dwVnum == PLAYERBOT_MOONLIGHT_CHEST_VNUM)
+			NotePlayerBotChestBought(ch->GetPlayerID(), get_dword_time());
+		NotePlayerBotMinigameChestBought(ch, pick.dwVnum, paid, pick.wCount); // MT2009_PLUS_BOT_MINIGAMES_V1
+		NotePlayerBotRecipeBought(ch, pick.dwVnum, paid);   // MT2009_PLUS_BOT_HERBALIST_BREW_V2
+		// A gambler's purchase is charged to the session's budget.
+		NotePlayerBotGamblePurchase(ch, paid);
+		NotePlayerBotGuildMaterialBought(ch, pick.dwVnum, paid);
+		if (gambleBase)
+			NotePlayerBotGambleBaseBought(ch, pick.dwVnum, paid);
+		sys_log(0, "PLAYERBOT_MARKET: bought pid=%u name=%s from=%s slot=%u vnum=%u refine=%u count=%u asked=%u paid=%lld gold=%lld",
+				ch->GetPlayerID(), ch->GetName(), pick.keeper->GetName(),
+				(unsigned int)pick.bSlot, pick.dwVnum, (unsigned int)pick.bRefine,
+				(unsigned int)pick.wCount, pick.dwPrice, (long long)paid, (long long)ch->GetGold());
+		return true;
+	}
+
+	// Ending a trip says why, the way closing a stall does. Without it the only
+	// measurable thing about shopping was the purchases, and a market with no
+	// purchases could equally mean nobody set off, nobody arrived, or nobody
+	// found anything - three different faults with three different fixes.
+	void EndPlayerBotMarketTrip(LPCHARACTER ch, TPlayerBotAIState& state,
+			const char* reason)
+	{
+		if (ch && state.bMarketTrip)
+			sys_log(0, "PLAYERBOT_MARKET: trip over pid=%u name=%s reason=%s pos=(%ld,%ld)",
+					ch->GetPlayerID(), ch->GetName(), reason, ch->GetX(), ch->GetY());
+		// Joan was looked at and had nothing this bot wanted, so Bokjung is
+		// worth a walk for a while. Without this a shopper would cross to the
+		// quiet market for ever and never see the busy one.
+		// A walk to Joan that ran out of time counts as Joan looked at, or the
+		// next shopping pass would set off again from wherever it gave up.
+		if (ch && state.bMarketTrip &&
+				(IsPlayerBotM1Map(ch->GetMapIndex()) || state.bMarketToJoan))
+			state.dwMarketM2AllowedUntil = get_dword_time() +
+					PLAYERBOT_MARKET_M2_FALLBACK;
+		state.bMarketTrip = false;
+		state.bMarketToJoan = false;
+		state.dwMarketTripUntil = 0;
+		state.dwMarketBrowseTime = 0;
+		state.dwMarketStallVID = 0;
+	}
+
+	// Money it may actually spend, and somewhere to put what it buys. Both are
+	// re-asked every tick of a trip: a bot whose bag filled up on the way has
+	// nothing left to go to the market for.
+	bool CanPlayerBotAffordMarket(LPCHARACTER ch)
+	{
+		return ch && ch->GetGold() - GetPlayerBotReservedGold(ch) >
+					(int)PLAYERBOT_SHOPPING_GOLD_FLOOR &&
+				ch->GetEmptyInventory(2) >= 0;
+	}
+
+	// One tick of a shopping trip: read the counters now and then, walk to the
+	// one that has something, and buy when standing at it. Claims the tick for as
+	// long as the trip lasts, which is what keeps the bot walking instead of
+	// planning a hunt halfway across the market.
+	bool ContinuePlayerBotMarketTrip(LPCHARACTER ch, TPlayerBotAIState& state,
+			DWORD dwNow, long pitchX, long pitchY)
+	{
+		if (dwNow >= state.dwMarketTripUntil || !CanPlayerBotAffordMarket(ch))
+		{
+			EndPlayerBotMarketTrip(ch, state,
+					dwNow >= state.dwMarketTripUntil ? "timeout" : "broke");
+			return false;
+		}
+		// The first leg of a "Joan first" trip: keep walking the portal until
+		// the map changes. The shopping pass runs every two to five minutes,
+		// and asking for the portal once left the route to the tick's
+		// continuation passes - which walked the bot to the gate cell and
+		// then handed it to the wander. 152 of 160 walks to that gate in ten
+		// minutes were this, with one crossing; the bots stood at the gate
+		// with "Sohan" or "Monkey Dungeon" over their heads and rode off.
+		if (state.bMarketToJoan)
+		{
+			if (!IsPlayerBotM2Map(ch->GetMapIndex()))
+			{
+#if defined(PLAYERBOT_ENGINE_MT2009) && defined(ENABLE_IKASHOP_RENEWAL)
+				// Across. On this engine the walk was made for one line of one
+				// stand (StartPlayerBotFarMarketWalk), and the classic browse
+				// below has nothing to read here: a keeper's goods are a shop
+				// entity, not a counter it stands behind. The buyer takes it on.
+				EndPlayerBotMarketTrip(ch, state, "arrived");
+				return HandPlayerBotFarPickToBuyer(ch, state, dwNow);
+#endif
+				state.bMarketToJoan = false;
+				state.dwMarketTripUntil = dwNow + PLAYERBOT_MARKET_TRIP_TIMEOUT;
+				state.dwMarketBrowseTime = dwNow;
+			}
+			else
+			{
+				if (state.lDepartureMap != 0)
+				{
+					EndPlayerBotMarketTrip(ch, state, "departure_set");
+					return false;
+				}
+				// This kingdom's own gate and this kingdom's own first village.
+				// The walk is the same one it has always been; which market it
+				// ends at is whichever one the bot's second village opens onto.
+				const int owner = playerbot_empire_rules::GetMapOwnerEmpire(ch->GetMapIndex());
+				const long firstVillage = playerbot_empire_rules::GetHomeMap(owner,
+						playerbot_empire_rules::MAP_ROLE_M1);
+				playerbot_empire_rules::TKingdomGate gate;
+				playerbot_empire_rules::TPoint pitch;
+				if (!playerbot_empire_rules::FindKingdomGate(owner, ch->GetMapIndex(),
+							firstVillage, gate) ||
+						!playerbot_empire_rules::GetTownPitch(firstVillage, pitch))
+				{
+					EndPlayerBotMarketTrip(ch, state, "no_gate_home");
+					return false;
+				}
+				return MovePlayerBotToWorldPortal(ch, state,
+						gate.gate.x, gate.gate.y,
+						firstVillage, pitch.x, pitch.y, dwNow, "market_to_m1");
+			}
+		}
+		SetPlayerBotAction(state, BOT_ACTION_MARKET, dwNow);
+
+		// The counters change while their customer is walking over - a keeper
+		// packs up, another opens - so what the bot is heading for is re-decided
+		// every couple of seconds rather than once at the start of the trip.
+		TPlayerBotStallPick pick;
+		bool havePick = false;
+		if (dwNow >= state.dwMarketBrowseTime)
+		{
+			state.dwMarketBrowseTime = dwNow + PLAYERBOT_MARKET_BROWSE_INTERVAL;
+			havePick = FindPlayerBotStallPick(ch, pick);
+			state.dwMarketStallVID = havePick ? pick.keeper->GetVID() : 0;
+			if (!havePick &&
+					DISTANCE_APPROX(ch->GetX() - pitchX, ch->GetY() - pitchY) <=
+						PLAYERBOT_SHOP_RING_RADIUS)
+			{
+				// Standing in the ring with nothing on it worth buying. The trip
+				// is over rather than a bot loitering for another minute - and
+				// the world channel hears what it came for.
+				EndPlayerBotMarketTrip(ch, state, "nothing_on_offer");
+				AnnouncePlayerBotNeed(ch);
+				return false;
+			}
+		}
+
+		// A keeper that has packed up since the last look stops being a
+		// destination, and the bot falls back on the middle of the ring.
+		LPCHARACTER keeper = state.dwMarketStallVID != 0
+				? CHARACTER_MANAGER::instance().Find(state.dwMarketStallVID) : NULL;
+		if (keeper && !keeper->GetMyShop())
+		{
+			keeper = NULL;
+			state.dwMarketStallVID = 0;
+		}
+
+		if (!MovePlayerBotTownLeg(ch, state, dwNow,
+				keeper ? keeper->GetX() : pitchX,
+				keeper ? keeper->GetY() : pitchY,
+				keeper ? PLAYERBOT_MARKET_STALL_APPROACH : PLAYERBOT_MARKET_ARRIVE))
+			return true; // still walking
+
+		// Standing at the counter. The line is read again now, whatever the
+		// browse clock says: what was on it two seconds ago is what the bot
+		// walked over for, what is on it this tick is what it can buy. Gone,
+		// and the bot heads for the next counter that has it, or the ring.
+		if (keeper && !havePick)
+		{
+			havePick = FindPlayerBotStallPick(ch, pick);
+			state.dwMarketBrowseTime = dwNow + PLAYERBOT_MARKET_BROWSE_INTERVAL;
+			state.dwMarketStallVID = havePick ? pick.keeper->GetVID() : 0;
+			if (!havePick || pick.keeper != keeper)
+				return true;
+		}
+		if (keeper && havePick && pick.keeper == keeper)
+		{
+			if (!BuyFromPlayerBotStall(ch, pick))
+			{
+				// The engine said no - no room for that size, not enough gold,
+				// the line sold to somebody else while this bot walked over - and
+				// it says so at a log level nobody runs with. Whatever it was, it
+				// will be just as true on the next tick, so asking again only
+				// produces one Shop::Buy per second until the trip times out.
+				// Which is precisely what an operator photographed.
+				EndPlayerBotMarketTrip(ch, state, "refused");
+				return false;
+			}
+			// Bought. A bot that came for two things gets the second without
+			// walking off, but through the ordinary browse interval rather than
+			// on this same tick - and the gear pass runs first, so a bought piece
+			// is worn before the next counter is read.
+			state.dwNextEquipmentCheckTime = dwNow;
+			state.dwMarketStallVID = 0;
+			state.dwMarketBrowseTime = dwNow + PLAYERBOT_MARKET_BROWSE_INTERVAL;
+		}
+		return true;
+	}
+
+#if defined(PLAYERBOT_ENGINE_MT2009) && defined(ENABLE_IKASHOP_RENEWAL)
+	// The one walk the offline buyer cannot make: from a second village over
+	// to its own first village's stands, and only for a line one of them holds
+	// that this bot would buy and can pay for - the same rule the buyer asks
+	// in reach, applied to the far market first (FindPlayerBotFarOfflinePick).
+	// The walk keeps "Joan first"'s own conditions: not for a bot on its way
+	// to the frontier or the Monkey Dungeon, nor one serving a person.
+	bool StartPlayerBotFarMarketWalk(LPCHARACTER ch, TPlayerBotAIState& state, DWORD dwNow,
+			long pitchX, long pitchY)
+	{
+		// MT2009_PLUS_HORSE_ECONOMY_V2: the frontier's bots and the ones on
+		// their horse errand are held back only when the line found is no
+		// sink good (below): a bot of thirty-five short of a medal lives on
+		// the frontier, and the medals stand in the first village.
+		if (!IsPlayerBotM2Map(ch->GetMapIndex()) || dwNow < state.dwMarketM2AllowedUntil ||
+				state.lDepartureMap != 0 ||
+				(ch->GetParty() && IsPlayerBotHumanLedParty(ch->GetParty())) ||
+				IsPlayerBotHeldForCompany(ch) || !PlayerBotWantsAnythingFromMarket(ch))
+			return false;
+		const int owner = playerbot_empire_rules::GetMapOwnerEmpire(ch->GetMapIndex());
+		const long firstVillage = playerbot_empire_rules::GetHomeMap(owner,
+				playerbot_empire_rules::MAP_ROLE_M1);
+		if (!FindPlayerBotFarOfflinePick(ch, state, firstVillage))
+			return false;
+		if (!state.offlineShop.farPickSink &&
+				(GetPlayerBotFrontierMapForLevel(ch) != 0 || state.bLongTermGoal == BOT_GOAL_HORSE))
+		{
+			state.offlineShop.farPickOwner = state.offlineShop.farPickItem = 0;
+			return false;
+		}
+		// The stands are the first channel's (playerbot_channel_rules.h): a bot
+		// on the second asks to be moved, as the buyer does for a line in
+		// reach, and looks again once it is there.
+		if (CPlayerBotManager::instance().IsChannelTableMode() &&
+				g_bChannel != playerbot_channel_rules::SHOP_CHANNEL)
+		{
+			state.offlineShop.farPickOwner = state.offlineShop.farPickItem = 0;
+			if (playerbot_offline::Due(dwNow, state.dwNextBuyChannelRequestTime))
+			{
+				state.dwNextBuyChannelRequestTime = dwNow + PLAYERBOT_SHOP_CHANNEL_BUY_REQUEST_GAP_MS;
+				if (CPlayerBotManager::instance().RequestShopChannel(ch->GetPlayerID()))
+					PlayerBotLogThrottled("shop_channel_far_buy", dwNow,
+							"PLAYERBOT_CHANNEL: pid=%u name=%s asks for the shop channel to buy in its first village (here %u)",
+							ch->GetPlayerID(), ch->GetName(), (unsigned int)g_bChannel);
+			}
+			return false;
+		}
+		state.bMarketTrip = true;
+		state.bMarketToJoan = true;
+		state.dwMarketTripUntil = dwNow + PLAYERBOT_MARKET_JOAN_WALK_TIMEOUT;
+		state.dwMarketBrowseTime = 0;
+		state.dwMarketStallVID = 0;
+		ClaimPlayerBotFarLine(state.offlineShop.farPickItem, ch->GetPlayerID(), dwNow);
+		sys_log(0, "PLAYERBOT_MARKET: looking in Joan first pid=%u name=%s pos=(%ld,%ld) owner=%u item=%u",
+				ch->GetPlayerID(), ch->GetName(), ch->GetX(), ch->GetY(),
+				state.offlineShop.farPickOwner, state.offlineShop.farPickItem);
+		return ContinuePlayerBotMarketTrip(ch, state, dwNow, pitchX, pitchY);
+	}
+#endif
+
+	bool ManagePlayerBotShopping(LPCHARACTER ch, TPlayerBotAIState& state, DWORD dwNow)
+	{
+		if (!ch || !ch->IsItemLoaded() || ch->IsDead())
+			return false;
+		// The Demon Tower first (playerbot_demon_tower.h).
+		if (IsPlayerBotOnTowerBusiness(ch, state))
+			return false;
+		// And a pirate or a Zuo wave (playerbot_world_events.h): a market trip
+		// is a walk to another village.
+		if (state.bWorldEventKind != 0)
+			return false;
+		// A dropper farms one thing for the counters and buys nothing off them.
+		// The medal droppers went shopping all the same: 350 trips for 116 of
+		// them in the first twenty-five minutes after a restart, 75 of them a
+		// walk from the second village back to the first, while three of them
+		// reached the Monkey Dungeon ("lataja po m2", sizowski). A dropper
+		// standing out a negative rank in town may shop, for the bean that lifts
+		// it (KeepPlayerBotNegativeRankInTown).
+		// MT2009_PLUS_DROPPER_INVEST_V1: in the window after its counter's
+		// service it shops at the stands round it - and makes no trip for it.
+		const bool dropperRefused = IsPlayerBotDropper(state.bPersonality) &&
+				(ch->GetRealAlignment() >= 0 || IsPlayerBotRankHunting(ch, dwNow)); // MT2009_PLUS_BOT_RANK_GLOVE_V1
+		if (dropperRefused && !IsPlayerBotDropperShopping(ch->GetPlayerID(), dwNow))
+		{
+			EndPlayerBotMarketTrip(ch, state, "dropper");
+			return false;
+		}
+#if defined(PLAYERBOT_ENGINE_MT2009) && defined(ENABLE_IKASHOP_RENEWAL)
+		if (ManagePlayerBotOfflineShopping(ch, state, dwNow)) return true;
+		if (playerbot_offline::requests.count(ch->GetPlayerID())) return false;
+#endif
+		if (dropperRefused)
+		{
+			EndPlayerBotMarketTrip(ch, state, "dropper");
+			return false;
+		}
+		// A keeper minding its own counter is not also a customer.
+		if (ch->GetMyShop() || state.bVisitingBiologist || state.bVisitingStable ||
+				state.bRecoveringAfterDeath || state.bTacticalRetreat ||
+				state.bMultiPullActive || state.bFishingSession)
+		{
+			EndPlayerBotMarketTrip(ch, state, "busy");
+			return false;
+		}
+		// Stalls stand in both towns - most of them in Joan, round the village
+		// guard - and nowhere else, so the pitch is both the test for "is there a
+		// market here" and the place a shopping trip walks to.
+		long pitchX = 0, pitchY = 0;
+		if (!GetPlayerBotShopCentre(ch->GetMapIndex(), pitchX, pitchY) ||
+				!ch->GetSectree())
+		{
+			EndPlayerBotMarketTrip(ch, state, "left_town");
+			return false;
+		}
+
+		if (state.bMarketTrip)
+			return ContinuePlayerBotMarketTrip(ch, state, dwNow, pitchX, pitchY);
+
+		if (dwNow < state.dwNextShoppingTime)
+			return false;
+		state.dwNextShoppingTime = dwNow + number(
+				PLAYERBOT_SHOPPING_INTERVAL_MIN, PLAYERBOT_SHOPPING_INTERVAL_MAX);
+		if (!CanPlayerBotAffordMarket(ch))
+			return false;
+
+		// bVisitingShop does not stop a bot buying from a counter it is already
+		// standing beside - a bot anywhere near the market is on a town errand
+		// almost by definition, and excluding them left the market with no
+		// customers at all. It does stop it walking off across town: the errand
+		// owns the bot's feet until it is finished.
+		TPlayerBotStallPick pick;
+		const bool haveStallInReach = FindPlayerBotStallPick(ch, pick);
+		if (state.bVisitingShop)
+			return haveStallInReach && BuyFromPlayerBotStall(ch, pick);
+#if defined(PLAYERBOT_ENGINE_MT2009) && defined(ENABLE_IKASHOP_RENEWAL)
+		// On this engine the bots' counters are offline shops, and the buyer
+		// at the top of this pass reads every one in reach on its own clock.
+		// The trip below looks only for a keeper standing behind a counter -
+		// there are none - so it ended "nothing_on_offer" every time: 4 406
+		// trips in an hour on one core of the test world, the buyer held off
+		// for as long as each walk lasted, and 576 of them a crossing from the
+		// second village to Joan and back, one in ten with a purchase on the
+		// way (23 September). What is left for this pass is the walk the buyer
+		// cannot make.
+		if (!haveStallInReach)
+			return StartPlayerBotFarMarketWalk(ch, state, dwNow, pitchX, pitchY);
+#endif
+
+		// Something in reach, or a reason to go and look: either way it is a trip,
+		// so the bot walks up to the counter instead of buying from twenty metres
+		// off. That is the difference between a market and a vending machine.
+		if (!haveStallInReach && !PlayerBotWantsAnythingFromMarket(ch))
+			return false;
+		// A market is counters, and the ledger counts them once a minute. With
+		// none in reach and none on this map there is nothing to walk to, and
+		// with none in the first village either there is nothing to cross for:
+		// on a young world no bot is old enough to open one, and the trip was
+		// a walk to an empty pitch under "Szukam czegos na straganach".
+		const int owner = playerbot_empire_rules::GetMapOwnerEmpire(ch->GetMapIndex());
+		const long firstVillage = playerbot_empire_rules::GetHomeMap(owner,
+				playerbot_empire_rules::MAP_ROLE_M1);
+		const bool stallsHere = GetPlayerBotStallsOnMap(ch->GetMapIndex()) > 0;
+		const bool stallsInJoan = GetPlayerBotStallsOnMap(firstVillage) > 0;
+		if (!haveStallInReach && !stallsHere && !stallsInJoan)
+			return false;
+		// Joan first. A shopper standing in Bokjung crosses to the quieter market
+		// before browsing the one under its nose: that is what gives the Joan
+		// counters customers, and it is also what stops five hundred bots
+		// circling the same seven stalls. Bokjung opens up again for a while
+		// once Joan has been looked at and had nothing.
+		// Only for a bot whose place is Bokjung: one that is leaving for the
+		// frontier, or is held back from it by an errand, shops in reach and
+		// goes - the same line the stall's walk to Joan draws.
+		// Not a bot in a player's party either: the walk to the Joan gate is a
+		// map change the follow pass undoes a second later. Nor a bot on its way
+		// to the Monkey Dungeon, whose gate stands in this village: the walk to
+		// Joan took it back out through the gate it had just come in by.
+		if (!haveStallInReach && stallsInJoan && IsPlayerBotM2Map(ch->GetMapIndex()) &&
+				dwNow >= state.dwMarketM2AllowedUntil &&
+				state.lDepartureMap == 0 && GetPlayerBotFrontierMapForLevel(ch) == 0 &&
+				state.bLongTermGoal != BOT_GOAL_HORSE &&
+				!(ch->GetParty() && IsPlayerBotHumanLedParty(ch->GetParty())) &&
+				!IsPlayerBotHeldForCompany(ch))
+		{
+			state.bMarketTrip = true;
+			state.bMarketToJoan = true;
+			state.dwMarketTripUntil = dwNow + PLAYERBOT_MARKET_JOAN_WALK_TIMEOUT;
+			state.dwMarketBrowseTime = 0;
+			state.dwMarketStallVID = 0;
+			sys_log(0, "PLAYERBOT_MARKET: looking in Joan first pid=%u name=%s pos=(%ld,%ld)",
+					ch->GetPlayerID(), ch->GetName(), ch->GetX(), ch->GetY());
+			return ContinuePlayerBotMarketTrip(ch, state, dwNow, pitchX, pitchY);
+		}
+		if (!haveStallInReach && !stallsHere)
+			return false; // the only counters are in Joan, and Joan was looked at
+		if (!haveStallInReach &&
+				DISTANCE_APPROX(ch->GetX() - pitchX, ch->GetY() - pitchY) >
+					PLAYERBOT_MARKET_TRIP_RANGE)
+			return false; // wants something, but the market is a hunt away
+
+		state.bMarketTrip = true;
+		state.dwMarketTripUntil = dwNow + PLAYERBOT_MARKET_TRIP_TIMEOUT;
+		state.dwMarketBrowseTime = dwNow + PLAYERBOT_MARKET_BROWSE_INTERVAL;
+		state.dwMarketStallVID = haveStallInReach ? pick.keeper->GetVID() : 0;
+		sys_log(0, "PLAYERBOT_MARKET: trip pid=%u name=%s map=%ld stall=%u pos=(%ld,%ld)",
+				ch->GetPlayerID(), ch->GetName(), ch->GetMapIndex(),
+				(unsigned int)state.dwMarketStallVID, ch->GetX(), ch->GetY());
+		return ContinuePlayerBotMarketTrip(ch, state, dwNow, pitchX, pitchY);
+	}
+
+	// Once a minute, the ledger playerbot_world_memory.h keeps: every open
+	// counter's lines, and every bot short of a material with the money and
+	// the bag room to go and buy it. Walked here rather than kept up to date
+	// by the sites that change it, because those sites are a purchase, a
+	// stall closing, a refine consuming a material, a drop landing in a bag
+	// and a bot outgrowing a piece - and one walk a minute is cheaper than
+	// getting all five right. Eight hundred bags once a minute is what one
+	// target scan costs, and a target scan happens hundreds of times a minute.
+	//
+	// Every ten minutes it is written down: the counters, the shortages, and
+	// what the listing decisions said in between. Read the top of that list
+	// against the drops: a material with thirty bots short and nothing on any
+	// counter is not being held back by the ledger, it is not being found.
+	// Declared in playerbot_economy.h for the junk rule.
+	DWORD GetPlayerBotLedgerDemand(DWORD vnum)
+	{
+		TPlayerBotMarketLedger::const_iterator it = s_mapMarketLedger.find(vnum);
+		return it == s_mapMarketLedger.end() ? 0 : it->second.dwDemandBots;
+	}
+
+	// Community patch 2, point 1, measured with the ledger's report: of the
+	// bots of thirty and more that are not droppers, how many hold the class's
+	// level-30 weapon, at which plus, and how many do not have one at all.
+	void ReportPlayerBotLevel30Census()
+	{
+		unsigned int eligible = 0, lacking = 0, low = 0, mid = 0;
+		unsigned int auPlus[10] = { 0 };
+		for (TPlayerBotAIStateMap::const_iterator it = s_mapPlayerBotAIStates.begin();
+				it != s_mapPlayerBotAIStates.end(); ++it)
+		{
+			LPCHARACTER ch = CHARACTER_MANAGER::instance().FindByPID(it->first);
+			if (!ch || !ch->IsItemLoaded() || ch->GetLevel() < 30 ||
+					IsPlayerBotDropper(GetPlayerBotPersonalityByPID(it->first)))
+				continue;
+			++eligible;
+			LPITEM weapon = FindPlayerBotClassLevel30Weapon(ch);
+			if (!weapon)
+			{
+				++lacking;
+				continue;
+			}
+			const int plus = std::min(9, std::max(0, (int)weapon->GetRefineLevel()));
+			++auPlus[plus];
+			if (plus <= 3)
+				++low;
+			else if (plus <= 5)
+				++mid;
+		}
+		sys_log(0, "PLAYERBOT_MARKET: level-30 census eligible=%u lacking=%u plus0_3=%u plus4_5=%u plus6=%u plus7=%u plus8=%u plus9=%u",
+				eligible, lacking, low, mid, auPlus[6], auPlus[7], auPlus[8], auPlus[9]);
+	}
+
+	// The Stalki (the operator's decision of 28 September) measured the same
+	// way, per kind: of the bots that are not droppers and are within the
+	// keep of the armour's level or past it, how many wear one, keep one for
+	// the level ahead, or are in the market for one; how many other pieces
+	// ride in their bags; and how many stand on the counters the ledger read.
+	// Under the market's tag, which the support bundle keeps.
+	void ReportPlayerBotStalkiCensus()
+	{
+		const int minLevel = playerbot_stalki_rules::ARMOUR_LEVEL - PLAYERBOT_STALKI_KEEP_AHEAD_LEVELS;
+		unsigned int bots = 0;
+		unsigned int auWorn[3] = { 0 }, auKept[3] = { 0 }, auShoppers[3] = { 0 }, auBag[3] = { 0 }, auCounters[3] = { 0 };
+		for (TPlayerBotAIStateMap::const_iterator it = s_mapPlayerBotAIStates.begin();
+				it != s_mapPlayerBotAIStates.end(); ++it)
+		{
+			LPCHARACTER ch = CHARACTER_MANAGER::instance().FindByPID(it->first);
+			if (!ch || !ch->IsItemLoaded() || (int)ch->GetLevel() < minLevel ||
+					IsPlayerBotDropper(GetPlayerBotPersonalityByPID(it->first)))
+				continue;
+			++bots;
+			for (int k = playerbot_stalki_rules::KIND_ARMOUR; k <= playerbot_stalki_rules::KIND_WEAPON; ++k)
+			{
+				const playerbot_stalki_rules::EKind kind = (playerbot_stalki_rules::EKind)k;
+				LPITEM on = ch->GetWear((BYTE)GetPlayerBotStalkiWearCell(kind));
+				if (on && GetPlayerBotStalkiKind(on) == kind)
+					++auWorn[k];
+				if (FindPlayerBotKeptStalki(ch, kind))
+					++auKept[k];
+				if (IsPlayerBotStalkiShopperNow(ch, kind))
+					++auShoppers[k];
+			}
+			for (WORD cell = 0; cell < PLAYERBOT_BAG_CELLS; ++cell)
+			{
+				LPITEM item = ch->GetInventoryItem(cell);
+				if (!item || item->GetCell() != cell || item->IsEquipped())
+					continue;
+				const playerbot_stalki_rules::EKind kind = GetPlayerBotStalkiKind(item);
+				if (kind != playerbot_stalki_rules::KIND_NONE && !IsPlayerBotKeptStalki(ch, item))
+					++auBag[kind];
+			}
+		}
+		for (int k = playerbot_stalki_rules::KIND_ARMOUR; k <= playerbot_stalki_rules::KIND_WEAPON; ++k)
+		{
+			const unsigned* families = k == playerbot_stalki_rules::KIND_ARMOUR
+					? playerbot_stalki_rules::ARMOUR_FAMILIES : playerbot_stalki_rules::WEAPON_FAMILIES;
+			const size_t count = k == playerbot_stalki_rules::KIND_ARMOUR
+					? sizeof(playerbot_stalki_rules::ARMOUR_FAMILIES) / sizeof(playerbot_stalki_rules::ARMOUR_FAMILIES[0])
+					: sizeof(playerbot_stalki_rules::WEAPON_FAMILIES) / sizeof(playerbot_stalki_rules::WEAPON_FAMILIES[0]);
+			for (size_t i = 0; i < count; ++i)
+				for (DWORD plus = 0; plus < playerbot_stalki_rules::FAMILY_GRADES; ++plus)
+				{
+					const TPlayerBotMarketLedgerEntry* entry = GetPlayerBotMarketLedgerEntry(families[i] + plus);
+					if (entry)
+						auCounters[k] += entry->dwSupplyUnits;
+				}
+		}
+		sys_log(0, "PLAYERBOT_MARKET: stalki census bots=%u armour_worn=%u armour_kept=%u armour_shoppers=%u armour_bag=%u armour_counters=%u weapon_worn=%u weapon_kept=%u weapon_shoppers=%u weapon_bag=%u weapon_counters=%u",
+				bots, auWorn[1], auKept[1], auShoppers[1], auBag[1], auCounters[1],
+				auWorn[2], auKept[2], auShoppers[2], auBag[2], auCounters[2]);
+	}
+
+	// MT2009_PLUS_MARKET_V3, point 4: the best copies of every weapon, from the
+	// bots' hands and bags - the counters were counted on the ledger pass this
+	// report follows (AddPlayerBotOfflineLedger) - published for the
+	// prices of the next ten minutes (GetPlayerBotTopCopyPercent) and written
+	// down: how many families have a ranking, and the best of the best.
+	void ReportPlayerBotTopCopies()
+	{
+		for (TPlayerBotAIStateMap::const_iterator it = s_mapPlayerBotAIStates.begin();
+				it != s_mapPlayerBotAIStates.end(); ++it)
+		{
+			LPCHARACTER ch = CHARACTER_MANAGER::instance().FindByPID(it->first);
+			if (!ch || !ch->IsItemLoaded())
+				continue;
+			LPITEM worn = ch->GetWear(WEAR_WEAPON);
+			if (worn)
+				NotePlayerBotAverageDamageCopy(worn->GetVnum(), SumPlayerBotItemLines(worn, APPLY_NORMAL_HIT_DAMAGE_BONUS));
+			for (WORD cell = 0; cell < PLAYERBOT_BAG_CELLS; ++cell)
+			{
+				LPITEM item = ch->GetInventoryItem(cell);
+				if (item && item->GetCell() == cell && item->GetType() == ITEM_WEAPON &&
+						item->GetSubType() != WEAPON_ARROW)
+					NotePlayerBotAverageDamageCopy(item->GetVnum(),
+							SumPlayerBotItemLines(item, APPLY_NORMAL_HIT_DAMAGE_BONUS));
+			}
+		}
+		PublishPlayerBotTopCopies();
+		unsigned int ranked = 0;
+		long best = 0;
+		DWORD bestFamily = 0;
+		for (TPlayerBotTopCopyMap::const_iterator it = s_mapPlayerBotTopCopies.begin();
+				it != s_mapPlayerBotTopCopies.end(); ++it)
+		{
+			if (it->second.copies >= (unsigned int)PLAYERBOT_MARKET_V3_TOP_COPY_MIN_COPIES)
+				++ranked;
+			if (it->second.best > best)
+			{
+				best = it->second.best;
+				bestFamily = it->first;
+			}
+		}
+		sys_log(0, "PLAYERBOT_MARKET: top copies families=%u ranked=%u best=%ld family=%u",
+				(unsigned int)s_mapPlayerBotTopCopies.size(), ranked, best, bestFamily);
+	}
+
+	void RefreshPlayerBotMarketLedger(DWORD dwNow)
+	{
+		if (s_dwMarketLedgerTime != 0 &&
+				dwNow - s_dwMarketLedgerTime < PLAYERBOT_MARKET_LEDGER_INTERVAL)
+			return;
+		s_dwMarketLedgerTime = dwNow;
+		// MT2009_PLUS_MARKET_V3: the counters' weapons go into the census of
+		// the best copies on the pass the report below follows.
+		s_bPlayerBotTopCopyCensus = s_dwMarketReportTime == 0 ||
+				dwNow - s_dwMarketReportTime >= PLAYERBOT_MARKET_REPORT_INTERVAL;
+		s_mapMarketLedger.clear();
+		s_mapMarketLocalSupply.clear();
+		s_mapPlayerBotMissionBooksByMap.clear();
+		s_iPlayerBotJunkWeaponsOnCounters = 0;
+		ResetPlayerBotRareGoodsCensus();
+		s_mapPlayerBotLowArmourOnCounters.clear();
+		RefreshPlayerBotWorldYang(dwNow);
+
+		DWORD stalls = 0, lines = 0, demandBots = 0;
+		DWORD auStallsByReason[PLAYERBOT_SHOP_REASON_MAX] = { 0 };
+		s_iPlayerBotStallsInM2 = 0;
+		s_mapPlayerBotStallsByMap.clear();
+		std::set<DWORD> wanted;
+		std::vector<DWORD> wallets;
+		for (TPlayerBotAIStateMap::const_iterator it = s_mapPlayerBotAIStates.begin();
+				it != s_mapPlayerBotAIStates.end(); ++it)
+		{
+			LPCHARACTER ch = CHARACTER_MANAGER::instance().FindByPID(it->first);
+			if (!ch || !ch->IsItemLoaded())
+				continue;
+			const TPlayerBotAIState& state = it->second;
+			if (ch->GetMyShop() && !state.vecShopOffers.empty())
+			{
+				++stalls;
+				++auStallsByReason[state.bShopOpenReason < PLAYERBOT_SHOP_REASON_MAX
+						? state.bShopOpenReason : PLAYERBOT_SHOP_REASON_NONE];
+				if (IsPlayerBotM2Map(ch->GetMapIndex()))
+					++s_iPlayerBotStallsInM2;
+				++s_mapPlayerBotStallsByMap[ch->GetMapIndex()];
+				for (size_t k = 0; k < state.vecShopOffers.size(); ++k)
+				{
+					const TPlayerBotShopOffer& offer = state.vecShopOffers[k];
+					// A line that has been bought stays in the offer list; the
+					// item does not stay in the bag.
+					if (!FindPlayerBotOfferItem(ch, offer))
+						continue;
+					AddPlayerBotMarketSupply(offer.dwVnum, offer.wCount, ch->GetMapIndex());
+					NotePlayerBotCappedLineOnCounter(offer.dwVnum, offer.wCount);
+					NotePlayerBotMissionBooksOnCounter(ch->GetMapIndex(), offer.dwVnum, offer.wCount);
+					++lines;
+				}
+			}
+			// A keeper counts as a buyer too: its counter closes within the
+			// half hour and its own anvil is still waiting.
+			if (!CanPlayerBotAffordMarket(ch))
+				continue;
+			wallets.push_back((DWORD)std::max<long long>(0,
+					(long long)ch->GetGold() - (long long)GetPlayerBotReservedGold(ch)));
+			CollectPlayerBotWantedMaterials(ch, wanted);
+			if (wanted.empty())
+				continue;
+			++demandBots;
+			for (std::set<DWORD>::const_iterator w = wanted.begin(); w != wanted.end(); ++w)
+				++s_mapMarketLedger[*w].dwDemandBots;
+		}
+
+#if defined(PLAYERBOT_ENGINE_MT2009) && defined(ENABLE_IKASHOP_RENEWAL)
+		AddPlayerBotOfflineLedger(stalls, lines);
+#endif
+		if (!wallets.empty())
+		{
+			std::sort(wallets.begin(), wallets.end());
+			s_dwMarketMedianWallet = wallets[wallets.size() / 2];
+		}
+		// What the counts just made say of the kinds the market keeps selling:
+		// each is looked at against the supply this pass counted (Iwakura, 28
+		// September, point 5).
+		UpdatePlayerBotShortageMarkups(dwNow);
+		// MT2009_PLUS_MARKET_V3, point 1: and every watched kind's index takes a
+		// step towards what the same counts say (UpdatePlayerBotMarketIndex).
+		UpdatePlayerBotMarketIndex(dwNow);
+#if defined(PLAYERBOT_ENGINE_MT2009) && defined(ENABLE_IKASHOP_RENEWAL)
+		// The slips the pass above found, put right where no keeper will -
+		// priced against the ledger and the wallets as they now stand.
+		CorrectPlayerBotStandingSlips(dwNow);
+#endif
+
+		if (s_dwMarketReportTime != 0 &&
+				dwNow - s_dwMarketReportTime < PLAYERBOT_MARKET_REPORT_INTERVAL)
+			return;
+		s_dwMarketReportTime = dwNow;
+
+		std::vector<std::pair<DWORD, DWORD> > ranked; // demand, vnum
+		for (TPlayerBotMarketLedger::const_iterator e = s_mapMarketLedger.begin();
+				e != s_mapMarketLedger.end(); ++e)
+			ranked.push_back(std::make_pair(e->second.dwDemandBots, e->first));
+		std::sort(ranked.rbegin(), ranked.rend());
+		std::string top;
+		for (size_t i = 0; i < ranked.size() && i < 8; ++i)
+		{
+			const TPlayerBotMarketLedgerEntry& entry = s_mapMarketLedger[ranked[i].second];
+			const TItemTable* proto = ITEM_MANAGER::instance().GetTable(ranked[i].second);
+			char buf[128];
+			snprintf(buf, sizeof(buf), " %s(%u) D=%u S=%u/%u ask=%u",
+					proto ? proto->szLocaleName : "?", ranked[i].second,
+					entry.dwDemandBots, entry.dwSupplyUnits, entry.dwSupplyStalls,
+					GetPlayerBotLastAsk(ranked[i].second, 0, dwNow));
+			top += buf;
+		}
+		// Who is trading and why, against the TRADE weight in force: the number
+		// an operator needs before deciding the slider "does nothing".
+		sys_log(0, "PLAYERBOT_SHOP: census stalls=%u trade_weight=%d merchant=%u poor=%u bag_full=%u dropper_pressure=%u books=%u dropper_roll=%u roll=%u spare=%u hoard=%u medals=%u",
+				stalls, GetPlayerBotWeight(PLAYERBOT_WEIGHT_TRADE),
+				auStallsByReason[PLAYERBOT_SHOP_REASON_MERCHANT], auStallsByReason[PLAYERBOT_SHOP_REASON_POOR],
+				auStallsByReason[PLAYERBOT_SHOP_REASON_BAG_FULL], auStallsByReason[PLAYERBOT_SHOP_REASON_DROPPER_PRESSURE],
+				auStallsByReason[PLAYERBOT_SHOP_REASON_BOOKS], auStallsByReason[PLAYERBOT_SHOP_REASON_DROPPER_ROLL],
+				auStallsByReason[PLAYERBOT_SHOP_REASON_ROLL], auStallsByReason[PLAYERBOT_SHOP_REASON_SPARE],
+				auStallsByReason[PLAYERBOT_SHOP_REASON_HOARD],
+				auStallsByReason[PLAYERBOT_SHOP_REASON_MEDALS]);
+		LogPlayerBotSashCensus();
+		LogPlayerBotSaddlebagCensus();
+		LogPlayerBotAlchemyCensus();
+		LogPlayerBotHerbalistCensus(dwNow);   // MT2009_PLUS_BOT_HERBALIST_BREW_V2
+		ReportPlayerBotWeaponGoals(dwNow);
+		ReportPlayerBotLevel30Census();
+		ReportPlayerBotStalkiCensus();
+		ReportPlayerBotTopCopies();
+		// Iwakura's Patch 4, point 5: how much of the refine materials the bots
+		// hold stands on a counter - his mark is sixty-five percent ("przynajmniej
+		// 65% zmagazynowanych ulepszaczy"). The bags of this core's bots, their
+		// boxes as their last visits left them, and the ledger's counters, which
+		// are every bot's; on the unified layout that is the same population.
+		{
+			unsigned long long bagUnits = 0, boxUnits = 0, counterUnits = 0;
+			for (TPlayerBotAIStateMap::const_iterator it = s_mapPlayerBotAIStates.begin();
+					it != s_mapPlayerBotAIStates.end(); ++it)
+			{
+				LPCHARACTER ch = CHARACTER_MANAGER::instance().FindByPID(it->first);
+				if (!ch || !ch->IsItemLoaded())
+					continue;
+				boxUnits += it->second.persona.wBoxMaterialUnits;
+				for (WORD cell = 0; cell < PLAYERBOT_BAG_CELLS; ++cell)
+				{
+					LPITEM item = ch->GetInventoryItem(cell);
+					if (item && item->GetCell() == cell && IsPlayerBotTradeableMaterial(item) &&
+							!IsPlayerBotSafeRefineScroll(item->GetVnum()))
+						bagUnits += std::max<int>(1, item->GetCount());
+				}
+			}
+			const std::set<DWORD>& materials = GetPlayerBotRefineMaterialVnums();
+			for (TPlayerBotMarketLedger::const_iterator e = s_mapMarketLedger.begin();
+					e != s_mapMarketLedger.end(); ++e)
+				if (materials.find(e->first) != materials.end() && !IsPlayerBotNonGearMaterial(e->first) &&
+						!IsPlayerBotSafeRefineScroll(e->first))
+					counterUnits += e->second.dwSupplyUnits;
+			const unsigned long long allUnits = bagUnits + boxUnits + counterUnits;
+			sys_log(0, "PLAYERBOT_MARKET: material census bags=%llu boxes=%llu counters=%llu on_market=%u%%",
+					bagUnits, boxUnits, counterUnits,
+					allUnits ? (unsigned int)(counterUnits * 100 / allUnits) : 0U);
+		}
+		// MT2009_PLUS_MARKET_V3: the market index beside the decisions - how many
+		// kinds it watches, how many ask over 110 and under 90 percent, what the
+		// balancing held back and fetched from the storekeepers since the last
+		// report, and the kinds furthest from their price ("index:", vnum=index
+		// with its target, the supply and the usual).
+		unsigned int indexKinds = 0, indexUp = 0, indexDown = 0;
+		std::string indexMoved;
+		DescribePlayerBotMarketIndex(indexKinds, indexUp, indexDown, indexMoved);
+		sys_log(0, "PLAYERBOT_MARKET: ledger stalls=%u lines=%u vnums=%u demand_bots=%u wallet=%u junk_weapons=%d/%d decisions list=%u probe=%u no_demand=%u overstock=%u floor=%u index_kinds=%u index_up=%u index_down=%u held_back=%u fetched=%u top:%s index:%s",
+				stalls, lines, (unsigned int)s_mapMarketLedger.size(), demandBots,
+				s_dwMarketMedianWallet, s_iPlayerBotJunkWeaponsOnCounters, PLAYERBOT_JUNK_WEAPON_MARKET_CAP,
+				s_auMarketDecisions[PLAYERBOT_LIST_LIST], s_auMarketDecisions[PLAYERBOT_LIST_PROBE],
+				s_auMarketDecisions[PLAYERBOT_LIST_NO_DEMAND], s_auMarketDecisions[PLAYERBOT_LIST_OVERSTOCK],
+				s_auMarketDecisions[PLAYERBOT_LIST_FLOOR], indexKinds, indexUp, indexDown,
+				s_uPlayerBotMarketHeldBack, s_uPlayerBotMarketFetched, top.c_str(), indexMoved.c_str());
+		s_uPlayerBotMarketHeldBack = s_uPlayerBotMarketFetched = 0;
+		for (int d = 0; d < PLAYERBOT_LIST_DECISIONS; ++d)
+			s_auMarketDecisions[d] = 0;
+		sys_log(0, "PLAYERBOT_MARKET: rare goods bot_shops=%d cor=%d/%d sash=%d/%d cor_price=%u sash_price=%u",
+				s_iPlayerBotRareGoodsBotShops,
+				s_aiPlayerBotShopsWithRareGoods[PLAYERBOT_RARE_GOODS_COR],
+				GetPlayerBotRareGoodsShopQuota(PLAYERBOT_RARE_GOODS_COR),
+				s_aiPlayerBotShopsWithRareGoods[PLAYERBOT_RARE_GOODS_SASH],
+				GetPlayerBotRareGoodsShopQuota(PLAYERBOT_RARE_GOODS_SASH),
+				ScalePlayerBotIwakuraPrice(PLAYERBOT_COR_DRACONIS_PRICE),
+				ScalePlayerBotIwakuraPrice(PLAYERBOT_SASH_PRICE));
+	}
+}
+
+#endif

@@ -1,0 +1,12 @@
+# Pelna paczka klienta 2.0.11. Nie zawiera Target Drop ani wyszukiwarki sklepow.
+metin2client.exe
+Dolacz.bat
+Dolacz.ps1
+pack/root.data
+pack/root.index
+pack/gamedata.data
+pack/gamedata.index
+pack/locale.data
+pack/locale.index
+pack/icon.data
+pack/icon.index

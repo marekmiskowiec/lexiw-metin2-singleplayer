@@ -1,0 +1,71 @@
+MT2009 PLUS
+Copyright (c) 2026 ZAXEP/SIZOWSKI (github.com/zaxerrrr-dot/mt2009-sp-plus)
+
+MT2009 PLUS is a modification of Metin2 Playerbots by Tieru and is shared under
+the same licence, CC BY-NC-SA 4.0. MT2009 PLUS jest przeróbką Metin2 Playerbots
+(Tieru) i jest udostępniany na tej samej licencji, CC BY-NC-SA 4.0. Co zmienia
+MT2009 PLUS: README.md, CHANGELOG.md i NOTICE.md.
+
+  Metin2 Playerbots - Tieru - https://github.com/TieruYT/metin2-playerbots - CC BY-NC-SA 4.0
+
+The licence of the original project follows. / Licencja projektu oryginalnego:
+
+Metin2 Playerbots
+Copyright (c) 2026 Tieru (github.com/TieruYT)
+
+===========================================================================
+POLSKI
+===========================================================================
+
+Od wersji 2.2.17 projekt Metin2 Playerbots jest udostępniany na licencji
+Creative Commons Uznanie autorstwa - Użycie niekomercyjne - Na tych samych
+warunkach 4.0 Międzynarodowa (CC BY-NC-SA 4.0).
+
+  Tekst licencji:  https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.pl
+  Skrót licencji:  https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pl
+
+W skrócie (wiąże tekst licencji): możesz kopiować, udostępniać i zmieniać
+projekt, także publicznie, jeśli:
+  - podasz autora i link do projektu, a w przeróbce zaznaczysz, co
+    zmieniłeś;
+  - nie wykorzystasz go do celów komercyjnych;
+  - przeróbkę udostępnisz na tej samej licencji.
+
+Jak podać autora:
+  Metin2 Playerbots - Tieru - https://github.com/TieruYT/metin2-playerbots - CC BY-NC-SA 4.0
+
+Licencja obejmuje pracę autorów projektu: kod, skrypty, dane, grafiki
+i dokumentację. Nie obejmuje Metin2 (Ymir Interactive, Webzen), paczek plików
+serwerowych, bibliotek stron trzecich ani części, które mają własną licencję.
+Wersje do 2.2.16 włącznie zostały wydane na licencji MIT (LICENSE-MIT.txt)
+i na niej zostają. Szczegóły oraz dodatkowe zezwolenia autora (dobrowolne
+wpłaty na serwer, nagrywanie rozgrywki) są w pliku NOTICE.md.
+
+===========================================================================
+ENGLISH
+===========================================================================
+
+From version 2.2.17 the Metin2 Playerbots project is shared under the
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+licence (CC BY-NC-SA 4.0).
+
+  Licence text:     https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.en
+  Licence summary:  https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en
+
+In short (the licence text is what binds): you may copy, share and modify the
+project, publicly too, provided that:
+  - you credit the author and link to the project, and say what you changed
+    in a modified version;
+  - you do not use it for commercial purposes;
+  - you share a modified version under the same licence.
+
+How to credit:
+  Metin2 Playerbots - Tieru - https://github.com/TieruYT/metin2-playerbots - CC BY-NC-SA 4.0
+
+The licence covers the work of the project's authors: code, scripts, data,
+graphics and documentation. It does not cover Metin2 (Ymir Interactive,
+Webzen), the server-file packages, third-party libraries or parts that carry a
+licence of their own. Versions up to and including 2.2.16 were released under
+the MIT licence (LICENSE-MIT.txt) and stay under it. Details and the author's
+additional permissions (voluntary donations towards a server, recording
+gameplay) are in NOTICE.md.

@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% block title %}Changelog · {{ panel_brand }}{% endblock %}{% block content %}
+<p class="eyebrow">MT2009 PLUS · SEBAN LATINO PANEL v{{ panel_version }}</p><h1>Changelog</h1><p class="muted">Zmiany MT2009 PLUS — serwera i klienta — prosto z repozytorium projektu na GitHubie. Więcej na <a href="{{ website_url }}" target="_blank" rel="noopener noreferrer">metin2sp.pl</a> i na <a href="{{ discord_url }}" target="_blank" rel="noopener noreferrer">Discordzie</a>.</p>
+<section class="changelog-list">{% for entry in entries %}<article class="panel changelog-entry"><header><strong>{{entry.version}}</strong><time>{{entry.timestamp}}</time></header><ul>{% for change in entry.changes %}<li>{{change}}</li>{% endfor %}</ul></article>{% else %}<article class="panel"><p class="muted">Brak wpisów.</p></article>{% endfor %}</section>
+{% endblock %}

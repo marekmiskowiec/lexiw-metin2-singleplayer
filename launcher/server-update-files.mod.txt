@@ -1,0 +1,242 @@
+# Files copied into a server update ZIP of the Metin2 Playerbots Mod
+# (github.com/zaxerrrr-dot/mt2009-sp-plus). Made from
+# server-update-files.mt2009.txt (upstream's list), rewritten for the player's
+# tree: this list is used with -SourceRoot pointing at the mod's full server
+# folder (the one with VERSION, MOD_VERSION and linux-port/ in it), so no
+# -PathMap is needed. See AKTUALIZACJE_MOD.md.
+#
+# Keep .env and the databases out. A line may use a wildcard in its last
+# segment. A file the mod adds or changes that is not listed here does NOT
+# reach players - add it below, under "the mod's own files".
+
+# ---- the mod's own files -----------------------------------------------------
+MOD_VERSION
+MODS_PL.md
+SERWER_PL.md
+AKTUALIZACJE_MOD.md
+linux-port/docker/mariadb/playerbot/mod/*
+linux-port/overlays/playerbot/serverfiles/*
+
+# ---- engine-agnostic, from the r40250 tree (one copy, shared) ---------------
+files/admin_panel.py
+files/items.json
+files/favicon.png
+files/web_admin_schema.sql
+files/web_admin.quest
+files/high_risk.quest
+files/speed_boost.quest
+files/static/*
+linux-port/docker/seban-panel/*
+linux-port/docker/itemshop/*
+linux-port/docker/panel/app/admin_panel.py
+# The panel's Dockerfile COPYs schema/ too, and nothing on a Linux install
+# stages it - a build from the package alone stopped at "/schema: not found"
+# (DUDU's VPS, 18 September). update.sh stages the rest (stage_panel_context).
+linux-port/docker/panel/schema/web_admin_schema.sql
+linux-port/docker/panel/bin/*
+linux-port/docker/panel/Dockerfile
+linux-port/docker/panel/.dockerignore
+linux-port/docker/updater/Dockerfile
+linux-port/docker/updater/bin/*
+# The playerbot sources: the overlay is the source of truth, the staged copy
+# under the engine tree (listed below with the engine files) is what compiles.
+linux-port/overlays/playerbot/src/game/src/playerbot_*
+
+# ---- the mt2009 tree ---------------------------------------------------------
+linux-port/docker/docker-compose.yml
+linux-port/docker/.env.example
+linux-port/docker/ENGINE
+linux-port/docker/mariadb/conf.d/99-metin2.cnf
+linux-port/docker/mariadb/initdb.d/10-import-dumps.sh
+linux-port/docker/mariadb/initdb.d/20-log-schema.sql
+linux-port/docker/mariadb/playerbot/apply.sh
+linux-port/docker/mariadb/playerbot/itemshop_schema.sql
+linux-port/docker/mariadb/playerbot/log_schema.sql
+linux-port/docker/mariadb/playerbot/playerbots_seed.sql
+linux-port/docker/mariadb/playerbot/playerbot_names.sql
+linux-port/docker/mariadb/playerbot/gm_characters.sql
+linux-port/docker/mariadb/playerbot/item_proto.mt2009plus.sql
+linux-port/docker/mariadb/playerbot/mob_proto.mt2009plus.sql
+linux-port/docker/game/Dockerfile
+linux-port/docker/game/.dockerignore
+linux-port/docker/game/build-deps-mt2009.sh
+linux-port/docker/game/bin/*
+# MT2009_CLASSIC_EDITION_V1: the Classic edition (its .env values, image steps and quests).
+linux-port/docker/editions/*
+linux-port/docker/game/classic/*
+linux-port/docker/game/quest/*
+linux-port/docker/game/mob_drop_item.m3.append.txt
+linux-port/docker/game/special_item_group.moonlight.txt
+linux-port/docker/game/special_item_group.starter.txt
+linux-port/docker/game/special_item_group.cors.txt
+linux-port/docker/game/special_item_group.dungeons.txt
+linux-port/docker/game/special_item_group.goblin.txt
+linux-port/docker/game/special_item_group.rumi.txt
+linux-port/docker/game/special_item_group.catchking.txt
+linux-port/docker/game/special_item_group.yutnori.txt
+linux-port/docker/game/special_item_group.flower.txt
+linux-port/docker/game/mob_drop_item.dropedit.append.txt
+linux-port/docker/game/mob_drop_item.metinbeans.append.txt
+linux-port/docker/game/cube.seon_pyeong.txt
+linux-port/docker/game/costume_sets.txt
+linux-port/docker/game/dragon_soul_applys.mt2009plus.txt
+linux-port/docker/game/special_spawns.baroness.txt
+# MT2009_PLUS_OCHAO_V1: Swiatynia Ochao's share files (Dockerfile step "share: Swiatynia Ochao").
+linux-port/docker/game/ochao/*
+linux-port/docker/game/ochao/map/metin2_map_mt_th_dungeon_01/*
+linux-port/docker/game/ochao/data/monster/trent_officer/*
+linux-port/docker/game/dungeons/*
+linux-port/docker/game/dungeons/data/dungeon/nemere_mt/*
+linux-port/docker/game/dungeons/data/dungeon/razador_mt/*
+linux-port/docker/game/dungeons/data/dungeon/bluedragon_mt/*
+linux-port/docker/game/dungeons/map/metin2_map_n_snow_dungeon_01/*
+linux-port/docker/game/dungeons/map/metin2_map_n_flame_dungeon_01/*
+linux-port/docker/game/dungeons/map/metin2_map_skipia_dungeon_boss/*
+# MT2009_PLUS_AREZZO_V1: the Arezzo places' share files (Dockerfile step "share: Arezzo places").
+linux-port/docker/game/arezzo/*
+linux-port/docker/game/treasure_hunt/*
+linux-port/docker/game/treasure_hunt/map/metin2_map_treasure_hunt/*
+linux-port/docker/game/treasure_hunt/monster/treasure_hunt_box/*
+linux-port/docker/game/treasure_hunt/monster/treasure_hunt_goblin/*
+
+# ---- the launcher and the package's own bookkeeping --------------------------
+# The line's own version and package note, published under the root names.
+PACZKA_INFO.txt
+LICENSE
+LICENSE-MIT.txt
+NOTICE.md
+CHANGELOG.md
+VERSION
+start-server.ps1
+start.bat
+stop.bat
+Metin2-Launcher.ps1
+Metin2-Launcher.bat
+Metin2-Launcher-GUI.ps1
+Metin2-Launcher-GUI.bat
+Metin2-Launcher-GUI.Layout.ps1
+Metin2-Launcher-GUI.Background.png
+launcher/Metin2Launcher.psm1
+launcher/Metin2Launcher.Diagnostics.psm1
+launcher/Metin2Launcher.Coop.psm1
+launcher/Metin2Launcher.Report.psm1
+launcher/launcher.config.example.json
+launcher/update-manifest.example.json
+launcher/server-update-files.mod.txt
+launcher/client-update-files.example.txt
+docs/LAUNCHER.md
+tools/New-M2UpdatePackage.ps1
+linux-port/tools/update.sh
+linux-port/tools/support-bundle.sh
+
+# ---- engine files the port changed or added (measured against the package) --
+linux-port/docker/game/src/server/common/CommonDefines.h
+linux-port/docker/game/src/server/common/length.h
+linux-port/docker/game/src/server/common/tables.h
+linux-port/docker/game/src/server/db/src/ClientManager.cpp
+linux-port/docker/game/src/server/db/src/ClientManager.h
+linux-port/docker/game/src/server/db/src/ClientManagerIkarusShop.cpp
+linux-port/docker/game/src/server/db/src/ClientManagerPlayer.cpp
+linux-port/docker/game/src/server/db/src/Makefile
+linux-port/docker/game/src/server/db/src/stdafx.h
+linux-port/docker/game/src/server/game/src/ClientPackageCryptInfo.cpp
+linux-port/docker/game/src/server/game/src/FileMonitor_FreeBSD.cpp
+linux-port/docker/game/src/server/game/src/FileMonitor_FreeBSD.h
+linux-port/docker/game/src/server/game/src/MountSystem.cpp
+linux-port/docker/game/src/server/game/src/BlueDragon.cpp
+linux-port/docker/game/src/server/game/src/BlueDragon.h
+linux-port/docker/game/src/server/game/src/Makefile
+linux-port/docker/game/src/server/game/src/battle.cpp
+linux-port/docker/game/src/server/game/src/char.cpp
+linux-port/docker/game/src/server/game/src/char_affect.cpp
+linux-port/docker/game/src/server/game/src/char.h
+linux-port/docker/game/src/server/game/src/char_battle.cpp
+linux-port/docker/game/src/server/game/src/char_item.cpp
+linux-port/docker/game/src/server/game/src/char_horse.cpp
+linux-port/docker/game/src/server/game/src/PetSystem.cpp
+linux-port/docker/game/src/server/game/src/char_player.cpp
+linux-port/docker/game/src/server/game/src/char_quickslot.cpp
+linux-port/docker/game/src/server/game/src/char_shop.cpp
+linux-port/docker/game/src/server/game/src/char_skill.cpp
+linux-port/docker/game/src/server/game/src/char_state.cpp
+linux-port/docker/game/src/server/game/src/cmd.cpp
+linux-port/docker/game/src/server/game/src/cmd_general.cpp
+linux-port/docker/game/src/server/game/src/cmd_emotion.cpp
+linux-port/docker/game/src/server/game/src/cmd_gm.cpp
+linux-port/docker/game/src/server/game/src/cube.cpp
+linux-port/docker/game/src/server/game/src/config.cpp
+linux-port/docker/game/src/server/game/src/config.h
+linux-port/docker/game/src/server/game/src/constants.cpp
+linux-port/docker/game/src/server/game/src/dragon_soul_table.cpp
+linux-port/docker/game/src/server/game/src/DragonSoul.cpp
+linux-port/docker/game/src/server/game/src/desc.cpp
+linux-port/docker/game/src/server/game/src/desc.h
+linux-port/docker/game/src/server/game/src/desc_client.cpp
+linux-port/docker/game/src/server/game/src/desc_manager.cpp
+linux-port/docker/game/src/server/game/src/desc_manager.h
+linux-port/docker/game/src/server/game/src/event.cpp
+linux-port/docker/game/src/server/game/src/exchange.cpp
+linux-port/docker/game/src/server/game/src/guild.cpp
+linux-port/docker/game/src/server/game/src/ikarus_shop_manager.cpp
+linux-port/docker/game/src/server/game/src/ikarus_shop_manager.h
+linux-port/docker/game/src/server/game/src/input.h
+linux-port/docker/game/src/server/game/src/input.cpp
+linux-port/docker/game/src/server/game/src/input_db.cpp
+linux-port/docker/game/src/server/game/src/input_auth.cpp
+linux-port/docker/game/src/server/game/src/input_login.cpp
+linux-port/docker/game/src/server/game/src/input_main.cpp
+linux-port/docker/game/src/server/game/src/input_p2p.cpp
+linux-port/docker/game/src/server/game/src/packet.h
+linux-port/docker/game/src/server/game/src/packet_info.cpp
+linux-port/docker/game/src/server/game/src/questlua_dungeon.cpp
+linux-port/docker/game/src/server/game/src/questlua_game.cpp
+linux-port/docker/game/src/server/game/src/questlua_global.cpp
+linux-port/docker/game/src/server/game/src/sectree.h
+linux-port/docker/game/src/server/game/src/sectree.cpp
+linux-port/docker/game/src/server/game/src/safebox.cpp
+linux-port/docker/game/src/server/game/src/dungeon.cpp
+linux-port/docker/game/src/server/game/src/item.cpp
+linux-port/docker/game/src/server/game/src/item_attribute.cpp
+linux-port/docker/game/src/server/game/src/item_manager.cpp
+linux-port/docker/game/src/server/game/src/item_manager.h
+linux-port/docker/game/src/server/game/src/questlua_pc.cpp
+linux-port/docker/game/src/server/game/src/main.cpp
+# Not ours to change, and shipped for that reason: a fork's companion system
+# rewrote it to call CPlayerBotManager::GetCompanionOwner, which this manager
+# never had, and an update replaces the manager and leaves this file - so
+# every update from 2.0.74 on failed to build for archonek (18 September).
+# The stock copy puts it back on the next click.
+linux-port/docker/game/src/server/game/src/messenger_manager.cpp
+linux-port/docker/game/src/server/game/src/mob_manager.h
+linux-port/docker/game/src/server/game/src/p2p.cpp
+linux-port/docker/game/src/server/game/src/p2p.h
+# Every Playerbot source has a build-context copy here, discovered like the
+# overlay above rather than listed: the r40250 list did this already (its
+# line 65) and this one enumerated thirty-six names, so the first new file
+# (playerbot_offline_policy.h, 2.0.26) failed the packager's pairing check.
+linux-port/docker/game/src/server/game/src/playerbot_*
+linux-port/docker/game/src/server/game/src/pvp.cpp
+linux-port/docker/game/src/server/game/src/questlua_affect.cpp
+linux-port/docker/game/src/server/game/src/questlua_item.cpp
+linux-port/docker/game/src/server/game/src/questmanager.cpp
+linux-port/docker/game/src/server/game/src/questnpc.cpp
+linux-port/docker/game/src/server/game/src/refine.cpp
+linux-port/docker/game/src/server/game/src/regen.cpp
+linux-port/docker/game/src/server/game/src/shop.cpp
+linux-port/docker/game/src/server/game/src/shop.h
+linux-port/docker/game/src/server/game/src/shop_manager.cpp
+linux-port/docker/game/src/server/game/src/shop_manager.h
+linux-port/docker/game/src/server/game/src/special_spawn.cpp
+linux-port/docker/game/src/server/game/src/stdafx.h
+linux-port/docker/game/src/server/game/src/utils.cpp
+linux-port/docker/game/src/server/game/src/utils.h
+linux-port/docker/game/src/server/libthecore/include/fdwatch.h
+linux-port/docker/game/src/server/libthecore/include/signal.h
+linux-port/docker/game/src/server/libthecore/include/stdafx.h
+linux-port/docker/game/src/server/libthecore/src/fdwatch.c
+linux-port/docker/game/src/server/libthecore/src/main.c
+linux-port/docker/game/src/server/libthecore/src/signal.c
+launcher/Metin2Launcher.Vps.psm1
+linux-port/tools/vps-install.sh
+linux-port/docker/game/src/server/game/src/guild_war.cpp
+linux-port/docker/game/src/server/game/src/guild_manager.cpp

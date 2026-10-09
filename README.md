@@ -1,0 +1,201 @@
+# ⚔️ Metin2 Playerbots — paczka modyfikacji (mt2009 SP+)
+
+**Polski** | [English (README_EN.md)](README_EN.md)
+
+[![Discord](https://img.shields.io/badge/Discord-Dołącz_do_społeczności-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/vGE3T9gpm)
+[![Strona](https://img.shields.io/badge/WWW-metin2sp.pl-C8102E?style=for-the-badge&logo=googlechrome&logoColor=white)](https://metin2sp.pl/)
+[![Wiki](https://img.shields.io/badge/Wiki-metin2sp.pl%2Fwiki-2E7D32?style=for-the-badge&logo=wikipedia&logoColor=white)](https://metin2sp.pl/wiki)
+[![Wesprzyj projekt](https://img.shields.io/badge/Wesprzyj_projekt_–_postaw_kawkę-1E88E5?style=for-the-badge&logo=buymeacoffee&logoColor=white)](https://buycoffee.to/mt2009plus)
+
+Lokalny świat Metin2 singleplayer z autonomicznymi postaciami (Playerbots),
+oparty na oficjalnym wydaniu **Metin2 Playerbots** (pliki
+serwerowe mt2009) — **rozszerzony o systemy, których oficjalne
+wydanie nie ma**: kostiumy, fryzury, nakładki na broń, szarfy, mounty, pety, nowe mapy, dungeonony i alchemię (Smocze Kamienie), razem ponad 3 200 nowych przedmiotów.
+
+Boty zdobywają poziomy, walczą
+solo i w party, zbierają łup, ulepszają ekwipunek u Kowala, polują na Metiny
+i handlują między sobą. Ta paczka dokłada do tego świata nowe przedmioty
+i systemy oraz kilka poprawek botów.
+
+## 💬 Społeczność
+
+- **[Discord](https://discord.com/invite/metin2singleplauer)** — pomoc, zgłoszenia błędów, pomysły i nowości o paczce.
+- **[metin2sp.pl](https://metin2sp.pl/)** — strona projektu.
+- **[Wiki](https://metin2sp.pl/wiki)** — poradniki, FAQ, przedmioty i systemy MT2009 PLUS.
+- **[Wesprzyj projekt – postaw kawkę](https://buycoffee.to/mt2009plus)** — jeśli chcesz wesprzeć rozwój paczki.
+
+> [!IMPORTANT]
+> Do gry potrzebny jest **klient z tej paczki** (z nowymi kostiumami,
+> mountami, petami i przedmiotami). Oficjalny klient Tieru nie pokaże nowych
+> przedmiotów. Repozytorium nie zawiera plików gry — potrzebna jest pełna
+> paczka (klient + serwer) z Discorda projektu: **[metin2sp.pl/discord](https://metin2sp.pl/discord)**, patrz [SERWER_PL.md](SERWER_PL.md). W zakładce
+> **Releases** są tylko paczki aktualizacji (`metin2-*-update-*.zip`): launcher
+> pobiera je sam i nie nadają się do pierwszej instalacji.
+
+---
+
+## ✨ Co dodaje ta paczka
+
+Liczby poniżej pochodzą z ofert ItemShopu dołączonych do paczki
+(`linux-port/docker/mariadb/playerbot/mod/`).
+
+### 👘 Kostiumy i fryzury (Gameforge 26.1.11)
+- **860 kostiumów** (432 męskie i 432 damskie wersje) — m.in. Smocze Rycerki,
+  Walkirie, Pustynni Bojownicy, kostiumy Nosiciela Światła.
+- **848 fryzur** (kategoria „Fryzury +”) — hełmy, maski, turbany, uszy i diademy.
+- Warianty czasowe: 1 dzień, 7 dni, 30 dni.
+
+### 🗡️ Nakładki na broń
+- **109 nakładek** na wszystkie typy broni — miecze, sztylety, łuki, glewie,
+  dzwony, wachlarze (m.in. seria Smoka Północy, Nosiciela Klątwy).
+
+### 🎀 Szarfy
+- Pełny system szarf: **łączenie** dwóch szarf w silniejszą i
+  **przechwytywanie bonusów** z przedmiotu na szarfę — u **Uriela**.
+
+### 🐎 Mounty
+- **Ok. 240 pieczęci wierzchowców** (129 modeli) jako kostium wierzchowca, z
+  poprawioną prędkością ruchu; w ItemShopie 136 różnych mountów.
+- Na deskach, chmurach i łodziach można używać umiejętności.
+
+### 🐾 Pety
+- **190 petów** — jeden naraz, bonusy z przedmiotu, wraca po ponownym
+  zalogowaniu.
+- **11 petów „(łup)”** samo podnosi przedmioty i yang (tylko Twoje).
+
+### 🐉 Alchemia (Smocze Kamienie)
+- System Dusz Smoka od 30 poziomu u **Alchemika**: misja kwalifikacyjna,
+  zbieranie fragmentów, uszlachetnianie (stopień / krok / siła), zmiana
+  właściwości i sklep z materiałami.
+
+### 🎨 Bonusy kostiumów
+- **Transformuj kostium** (70063) — losuje 1–3 bonusy.
+- **Zaczaruj kostium** (70064) — zmienia wartości bonusów.
+- **Transfer bonusów** (70065) — u Kowala przenosi bonusy z jednego kostiumu
+  na drugi tego samego rodzaju (kostium / fryzura / nakładka).
+- Wszystkie do kupienia u Handlarki Różności.
+
+### 🛒 Sklepy i dodatki
+- **Sklep kostiumów u Ah-Yu** — kostiumy, fryzury i nakładki za 1 yang.
+- **ItemShop w grze** i **ItemShop w przeglądarce** z nowymi kategoriami
+  (Fryzury +, Kostiumy, Nakładki na broń, Pety, Mounty) — w przeglądarkowym
+  przedmioty są filtrowane pod klasę i płeć postaci.
+- Zestaw Władcy Śmierci, Diademy, Magma Manni.
+- Kosz na śmieci, podgląd dropu potworów, przełącznik eventu wielkanocnego
+  w panelu.
+
+### 🤖 Zmiany w botach
+- Płynniejsza praca serwera przy wielu botach (budżet czasu na turę).
+- Boty trzymają zapas mikstur 27101/27104 zamiast wystawiać je na straganach.
+- „Emerytura” botów z panelu — wymiana starych botów na nowe.
+
+### ⚙️ Inne
+- Serwer wpuszcza klienta bez względu na jego wersję.
+- Aktualizacje przychodzą z **tego repozytorium**, nigdy z oficjalnego —
+  oficjalna paczka nadpisałaby modyfikacje ([AKTUALIZACJE_MOD.md](AKTUALIZACJE_MOD.md)).
+
+Pełna lista zmian: [MODS_PL.md](MODS_PL.md).
+
+---
+
+## 🌟 Możliwości botów (z oficjalnego wydania)
+
+Boty są **pełnoprawnymi postaciami sterowanymi przez AI wewnątrz silnika
+serwera** — gracz widzi ich naturalny ruch, animacje ataków, skille
+i ekwipunek przez zwykły protokół gry.
+
+- ⚔️ **Walka**: wszystkie klasy (Wojownik, Sura, Ninja, Szaman), kombosy, łuki ze strzałami, buffy i rotacje skilli.
+- 🗺️ **Nawigacja A\***: własna siatka kolizji z atrybutów mapy — boty omijają góry, rzeki i mury.
+- 🚪 **Podróże między mapami**: M1/M2/M3, Loch Małp, Dolina Orków, Pustynia Yongbi, Góra Sohan, Świątynia Hwang, Loch Pająków, Doyyumhwaji.
+- 🏹 **Misje**: polowania z `levelup`, Biolog z Zębem Orka i Kamieniem Duszy, wyprawy po Medale Konne.
+- 💎 **Metiny i bossy**: łowcy Metinów, drużyny na Wodza Orków, Królową Pająków i Ognistego Króla.
+- 🎒 **Gospodarka**: loot, lepszy ekwipunek, mikstury, ulepszanie u Kowala, stragany i handel bot–bot.
+- 👥 **Party i gildie**: drużyny 2–8 osób, wspólne expienie, wojny gildii.
+- 🎣 **Łowienie ryb** i przerzucanie bonusów.
+- 🧠 **Osobowość**: każdy bot ma charakter i ambicję, które decydują, co robi.
+- 🎛️ **Panel na żywo**: mapa botów, profile z ekwipunkiem, suwaki celów i ustawienia bez restartu.
+- 💾 **Trwały zapis**: każdy bot ma własne konto i postać w MariaDB.
+
+Obsługiwane są **wszystkie trzy królestwa** (Shinsoo, Chunjo, Jinno).
+
+---
+
+## 🚀 Instalacja (Windows)
+
+1. Zainstaluj i uruchom **[Docker Desktop](https://www.docker.com/products/docker-desktop/)**.
+2. Pobierz pełną paczkę MT2009 PLUS z Discorda
+   ([metin2sp.pl/discord](https://metin2sp.pl/discord)) (nie `metin2-server-update-*.zip`
+   z Releases – to tylko aktualizacja) i rozpakuj ją, np. do `C:\Metin2Mod\`
+   (najlepiej ścieżka bez polskich znaków i spacji).
+3. Uruchom **`Metin2-Launcher-GUI.bat`**.
+4. Kliknij **1. INSTALUJ / PRZYGOTUJ**, potem **2. GRAJ**.
+   Pierwsze uruchomienie trwa kilkanaście–kilkadziesiąt minut: Docker buduje
+   serwer ze źródeł i tworzy bazę z botami.
+
+Po starcie działają dwa panele w przeglądarce:
+- `http://127.0.0.1:7788` — panel administracyjny i mapa botów,
+- `http://127.0.0.1:7790` — Metin2 Singleplayer Panel (seban latino): mapa na żywo, profile, rankingi, gospodarka.
+
+**Linux / VPS:** instrukcja w [PACZKA_INFO.txt](PACZKA_INFO.txt); aktualizacja
+z folderu serwera: `sh linux-port/tools/update.sh`.
+
+Hasła (baza, panel) są losowane przy pierwszym starcie i zapisywane w
+`linux-port\docker\.env` — tylko na Twoim komputerze. Nie wklejaj ich nigdzie.
+
+## 🗄️ Dostęp do bazy danych
+
+Baza MariaDB jest dostępna tylko lokalnie: `127.0.0.1`, port `3306`.
+W launcherze przycisk **DANE DO BAZY (NAVICAT)** pokazuje host, port i hasła.
+Przy błędzie `1045 - Access denied` użyj **NAPRAW DOSTĘP DO BAZY** — postacie,
+przedmioty i boty zostają nietknięte.
+
+## 🎮 Komendy GM
+
+| Komenda | Opis | Przykład |
+|---|---|---|
+| `/bot_spawn <id> <królestwo 1-3>` | Spawn konkretnego bota (`1` Shinsoo, `2` Chunjo, `3` Jinno). | `/bot_spawn 4 2` |
+| `/bot_despawn <id>` | Wylogowanie bota ze świata. | `/bot_despawn 4` |
+| `/bot_spawn_many <start_id> <ilość> <królestwo>` | Masowy spawn. | `/bot_spawn_many 4 350 2` |
+| `/bot_despawn_many <start_id> <ilość>` | Masowe wylogowanie. | `/bot_despawn_many 4 350` |
+| `/bot_rank` | Ranking poziomów botów (dla wszystkich). | `/bot_rank` |
+| `/acce c` / `/acce a` | Okno łączenia / przechwytywania szarf. | `/acce c` |
+
+## 💾 Kopia świata
+
+Launcher ma przycisk **KOPIA ŚWIATA** — zapisuje cały świat do pliku zip.
+„Zatrzymaj i zapisz” nigdy nie usuwa postaci ani postępu botów.
+
+---
+
+## 📚 Dokumentacja
+
+- [MODS_PL.md](MODS_PL.md) — co zmienia paczka modyfikacji.
+- [AKTUALIZACJE_MOD.md](AKTUALIZACJE_MOD.md) — jak działają i jak wydawać aktualizacje.
+- [docs/INSTALL.md](docs/INSTALL.md) — Docker, WSL2, Linux, `.env`, klient.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — kompilacja, debugowanie i logi AI.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architektura botów.
+- [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) — pochodzenie projektu i licencje.
+
+## 📜 Licencja
+
+MT2009 PLUS jest projektem całkowicie open source, udostępnianym na licencji:
+**CC BY-NC-SA 4.0** (Uznanie autorstwa – Użycie niekomercyjne – Na tych samych
+warunkach), plik [LICENSE](LICENSE). Wolno kopiować, udostępniać i zmieniać
+paczkę, jeśli poda się autorów, nie zarabia się na niej, a przeróbkę udostępnia
+się na tej samej licencji. Starsze części na MIT: [LICENSE-MIT.txt](LICENSE-MIT.txt).
+Kod serwera gry, dane gry i klient nie należą ani do autorów projektu, ani do
+nas – przeczytaj [NOTICE.md](NOTICE.md) przed dalszym udostępnianiem.
+
+---
+
+## 🤝 Podziękowania i oryginalny projekt
+
+Ta paczka jest modyfikacją projektu **Metin2 Playerbots** (licencja MIT),
+który jest rdzeniem (core) MT2009 PLUS. Wszystkie dodatkowe zmiany dodaje
+**ZAXEP/SIZOWSKI**.
+
+Szczególne podziękowania dla współautorów wydania mt2009 plus
+- **Digi Rasta** — Rytuał Przebudzenia u Kowala i bronie przebudzone +0…+9, kamienie duchowe do +9 oraz koń do 30 poziomu z płatnym szkoleniem u Stajennego, Próbą Czarnego Rumaka i jukami do 30 poziomu.
+- **Vekirion** — wikipedia dropu, keybindy, ulepszanie alchemii
+- **blaki** — autor ulepszonego systemu autołowów
+- **Podstawowy projekt PlayerBots (Licencja MIT) (GitHub):** [TieruYT/metin2-playerbots](https://github.com/TieruYT/metin2-playerbots)

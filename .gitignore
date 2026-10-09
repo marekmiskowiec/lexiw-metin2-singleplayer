@@ -1,0 +1,12 @@
+# Lexiw Metin2 Singleplayer: a private repository, so the engine source,
+# libraries, game data, SQL dumps and item icons ARE kept here (the upstream
+# release zips ship them; upstream's own public repository leaves them out).
+# never commit a local install's secrets or state
+/linux-port/docker/.env
+/linux-port/docker/.env.last-good
+/linux-port/docker/docker-compose.override.yml
+/launcher-logs/
+/support-bundles/
+/backups/
+/.m2*
+__pycache__/

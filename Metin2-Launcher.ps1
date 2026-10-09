@@ -1,0 +1,3138 @@
+﻿[CmdletBinding()]
+param(
+    [ValidateSet('Menu', 'Start', 'Stop', 'StartDocker', 'StopAll', 'Check', 'UpdateServer', 'UpdateClient', 'UpdateAll', 'RepairClientExe', 'Diagnose', 'Logs', 'SendLogs', 'Report', 'Configure', 'SetBots', 'SetDifficulty', 'ImportDb', 'BackupDb', 'RestoreDb', 'ResetWorld', 'RepairDb', 'DbAccess', 'PanelPassword', 'FreePorts', 'CoopCheck', 'CoopSecure', 'CoopAddFriend', 'CoopBlockFriend', 'CoopUnblockFriend', 'CoopInvite', 'CoopHost', 'CoopStop', 'CoopRenew', 'CoopJoin', 'VpsConnect', 'VpsCheck', 'VpsInstall', 'VpsUpdate', 'VpsStatus', 'VpsPanel', 'VpsPanelClose', 'VpsLogs', 'VpsPasswords', 'VpsClient', 'VpsInvite', 'DockerRam', 'RestartDockerWsl')]
+    [string]$Action = 'Menu',
+    [string]$Manifest = '',
+    [int]$BotCount = -1,
+    # The spawn plan beside the count (SetBots): -1 leaves .env as it is.
+    [int]$SpawnMinutes = -1,
+    [int]$LateJoiners = -1,
+    [int]$LateHours = -1,
+    # SetBots: the operator's own number per kingdom (1 = on, 0 = off, -1 =
+    # leave it) and the three numbers, and the second channel with its share.
+    [int]$PerKingdom = -1,
+    [int]$ShinsooBots = -1,
+    [int]$ChunjoBots = -1,
+    [int]$JinnoBots = -1,
+    [int]$Channel2 = -1,
+    [int]$Channel2Share = -1,
+    # SetDifficulty: easy | medium | hard | custom, and the hours custom reads.
+    [string]$Difficulty = '',
+    [string]$BiologistHours = '',
+    [string]$HorseHours = '',
+    # And the waits between two skill books, players' and bots' (custom).
+    [string]$BookHours = '',
+    [string]$BotBookHours = '',
+    # And whether the world is played with Auto Lowy and with the companion
+    # (Towarzysz): 1 = on, 0 = off, -1 leaves .env as it is.
+    [int]$AutoHunt = -1,
+    # SetDifficulty: Auto Lowy for everybody (0) or only with the ItemShop's
+    # "Auto Lowy (8h)" (1); -1 keeps what .env says.
+    [int]$AutoHuntItem = -1,
+    [int]$Sidekick = -1,
+    # SetDifficulty: the Dom Towarowy (Uxie [DSO]'s flea market at the
+    # miscellaneous merchant in M1): 1 = on, 0 = off, -1 keeps what .env says.
+    [int]$FleaMarket = -1,
+    # SetDifficulty: the Arezzo module (MT2009_PLUS_AREZZO_MODULE_V1 - the new maps and
+    # dungeons): 1 = on, 0 = off, -1 keeps what .env says (off when .env has nothing).
+    [int]$Arezzo = -1,
+    # SetDifficulty: the health of monsters, bosses and Metin stones - default
+    # (as the game made them), easy (80%) or a percent from 10 to 300; ''
+    # keeps what .env says.
+    [string]$MonsterHp = '',
+    # The rates a fresh world starts on, asked for when one is about to be
+    # made (ResetWorld, and the first start of an install that has no database
+    # yet). -1 leaves .env as it is, which is what every other caller wants.
+    [int]$RateExp = -1,
+    [int]$RateDrop = -1,
+    [int]$RateYang = -1,
+    # And whether that world comes up with the bots held at the door: 1 = held
+    # until the operator lets them in, 0 = they walk in with the world.
+    [int]$HoldBots = -1,
+    # And whether a player's new character there gets the apprentice chest:
+    # 1 = yes, 0 = no, -1 leaves .env as it is.
+    [int]$StarterChest = -1,
+    # And the starter kit its new characters and new bots start in: default,
+    # medium or easy; '' leaves .env as it is.
+    [string]$StarterKit = '',
+    [string]$ImportSource = '',
+    [string]$RestoreSource = '',
+    # COOP (experimental): the friend's name for CoopAddFriend, a friend's
+    # login for CoopBlockFriend/CoopInvite, and the code CoopJoin reads.
+    [string]$FriendName = '',
+    [string]$FriendLogin = '',
+    [string]$Invite = '',
+    # CoopHost: how the world is offered - auto (the Internet where it can
+    # reach this machine, a VPN found here where it cannot), internet, or one
+    # VPN by name (vpn = the first one found).
+    [ValidateSet('auto', 'internet', 'vpn', 'radmin', 'tailscale', 'zerotier', 'hamachi')]
+    [string]$CoopVia = 'auto',
+    # CoopHost from the window: it has asked Windows for the firewall rule
+    # itself (in front, where the question is seen), so the action does not
+    # ask again from a hidden process whose question only blinks on the
+    # taskbar.
+    [switch]$CoopFirewallAsked,
+    # Vps*: the VPS to work on. What is given is saved in .m2vps.json and
+    # what is not is taken from there (the window's VPS dialog saves it
+    # before it starts an action).
+    [string]$VpsHost = '',
+    [string]$VpsUser = '',
+    [int]$VpsPort = -1,
+    [string]$VpsDir = '',
+    # Report (ZGLOS / REPORT, launcher\Metin2Launcher.Report.psm1): the
+    # report's text, its kind (bug / suggestion / other, or blad /
+    # propozycja / inne), a contact to answer, and -NoLogs to send it without
+    # the logs. The window hands its form over as a file (-ReportFile): a
+    # page of text on a command line is quotes Start-Process passes on broken.
+    [string]$Message = '',
+    [string]$Category = '',
+    [string]$Contact = '',
+    [switch]$NoLogs,
+    [string]$ReportFile = '',
+    # ResetWorld only: bring the server up on the fresh world right away, so
+    # "wyzeruj swiat i zacznij od nowa" is one click and not a reset followed
+    # by GRAJ.
+    [switch]$ThenStart,
+    [switch]$Yes
+)
+
+$ErrorActionPreference = 'Stop'
+
+# The GUI runs this script hidden with its stdout redirected into a file and
+# reads that file back as UTF-8. Without this the redirect gets the console's
+# OEM code page instead, and every Polish letter this script prints reaches the
+# log broken - "Serwer dzia?a w wersji", while the GUI's own lines beside them
+# are fine. Both ends speak UTF-8 now.
+try {
+    [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+    $OutputEncoding = [Text.UTF8Encoding]::new($false)
+}
+catch { }
+
+$serverRoot = [IO.Path]::GetFullPath($PSScriptRoot)
+$modulePath = Join-Path $serverRoot 'launcher\Metin2Launcher.psm1'
+$diagnosticsModulePath = Join-Path $serverRoot 'launcher\Metin2Launcher.Diagnostics.psm1'
+$configPath = Join-Path $serverRoot '.m2launcher.json'
+$statePath = Join-Path $serverRoot '.m2launcher-state.json'
+# Written when new files are already on disk but Docker did not finish building
+# them. Until it is gone the installation is not really on the version its
+# VERSION file claims, and starting it would run the previous images.
+$rebuildMarkerPath = Join-Path $serverRoot '.m2launcher-rebuild-pending'
+
+foreach ($requiredModule in @($modulePath, $diagnosticsModulePath)) {
+    if (-not (Test-Path -LiteralPath $requiredModule -PathType Leaf)) {
+        throw "Brakuje modułu launchera: $requiredModule"
+    }
+}
+Import-Module $modulePath -Force
+
+# Where the time goes. Every action prints a "[faza]" line with the seconds
+# since the action began at each point that can be slow - Docker checks, the
+# download, the file swap, the image build, compose up - so a launcher log
+# from a player says which of them took the ten minutes instead of "the
+# update is slow". The GUI stamps every line with the clock as well; this is
+# for the CLI, and for reading a log without doing the subtraction.
+$script:phaseWatch = [Diagnostics.Stopwatch]::StartNew()
+function Write-Phase {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    Write-Host ("[faza] {0} (+{1} s od poczatku akcji)" -f $Name, [int]$script:phaseWatch.Elapsed.TotalSeconds) -ForegroundColor DarkCyan
+}
+Import-Module $diagnosticsModulePath -Force
+# COOP (experimental, the local branch "coop"): an optional module; without
+# it the Coop* actions say so and nothing else changes.
+$coopModulePath = Join-Path $serverRoot 'launcher\Metin2Launcher.Coop.psm1'
+if (Test-Path -LiteralPath $coopModulePath -PathType Leaf) { Import-Module $coopModulePath -Force }
+# The VPS (the 2.x line): optional the same way - without it the Vps* actions
+# say so and the menu does not offer them.
+$vpsModulePath = Join-Path $serverRoot 'launcher\Metin2Launcher.Vps.psm1'
+if (Test-Path -LiteralPath $vpsModulePath -PathType Leaf) { Import-Module $vpsModulePath -Force }
+# ZGLOS / REPORT: optional the same way - without it the Report action says so.
+$reportModulePath = Join-Path $serverRoot 'launcher\Metin2Launcher.Report.psm1'
+if (Test-Path -LiteralPath $reportModulePath -PathType Leaf) { Import-Module $reportModulePath -Force }
+
+function Write-Header {
+    Clear-Host
+    Write-Host '========================================================' -ForegroundColor DarkYellow
+    Write-Host '  Metin2 Singleplayer - Launcher i aktualizacje' -ForegroundColor Yellow
+    Write-Host '========================================================' -ForegroundColor DarkYellow
+    Write-Host ''
+}
+
+function Get-Config {
+    return Get-M2LauncherConfig -ServerRoot $serverRoot -ConfigPath $configPath
+}
+
+function Get-ManifestSource {
+    param($Config)
+    if ($Manifest) { return $Manifest }
+    return [string]$Config.manifestUrl
+}
+
+function Test-RebuildPending {
+    return (Test-Path -LiteralPath $rebuildMarkerPath -PathType Leaf)
+}
+
+function Read-RecordedState {
+    # What the files on disk are, whatever the images are: the versions the
+    # last updates recorded, else VERSION and the client the full package
+    # shipped (New-M2DeployTree.ps1 puts CLIENT_VERSION beside VERSION). A
+    # recorded "unknown" is no record - older launchers wrote one back (see
+    # Read-State) - and a state file that does not parse, which a crash can
+    # leave behind, must not stop every action.
+    $versionFile = Join-Path $serverRoot 'VERSION'
+    $onDisk = if (Test-Path -LiteralPath $versionFile -PathType Leaf) {
+        (Get-Content -LiteralPath $versionFile -Raw).Trim()
+    }
+    else { 'unknown' }
+    $clientMarker = Join-Path $serverRoot 'CLIENT_VERSION'
+    $shippedClient = if (Test-Path -LiteralPath $clientMarker -PathType Leaf) {
+        (Get-Content -LiteralPath $clientMarker -Raw).Trim()
+    }
+    else { 'unknown' }
+    $server = ''
+    $client = ''
+    if (Test-Path -LiteralPath $statePath -PathType Leaf) {
+        try {
+            $saved = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($saved -and $saved.PSObject.Properties['server']) { $server = ([string]$saved.server).Trim() }
+            if ($saved -and $saved.PSObject.Properties['client']) { $client = ([string]$saved.client).Trim() }
+        }
+        catch { }
+    }
+    if (-not $server -or $server -eq 'unknown') { $server = $onDisk }
+    if (-not $client -or $client -eq 'unknown') { $client = $shippedClient }
+    return [pscustomobject]@{ schema = 1; server = $server; client = $client }
+}
+
+function Read-State {
+    # An interrupted update leaves the new VERSION file on disk while the running
+    # containers are still the old ones. Reporting that version would make the
+    # update check answer "already up to date" and never rebuild, which is the
+    # state a player cannot get out of on their own. The server alone: nothing
+    # of the client is built, and hiding its version as well had two costs -
+    # the update offered the client again, and Save-State, which read through
+    # here, wrote "unknown" over the version a client update had just recorded
+    # (pattsito, 23 September, client 2.0.26 recorded and lost two minutes later).
+    $state = Read-RecordedState
+    if (Test-RebuildPending) { $state.server = 'unknown' }
+    return $state
+}
+
+function Save-State {
+    param([string]$ServerVersion, [string]$ClientVersion)
+    $state = Read-RecordedState
+    if ($ServerVersion) { $state.server = $ServerVersion }
+    if ($ClientVersion) { $state.client = $ClientVersion }
+    $state | Select-Object schema, server, client | ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding UTF8
+}
+
+function Get-ManifestComponent {
+    param(
+        [Parameter(Mandatory = $true)]$RemoteManifest,
+        [Parameter(Mandatory = $true)][ValidateSet('server', 'client')][string]$Name
+    )
+    $property = $RemoteManifest.PSObject.Properties[$Name]
+    if ($null -eq $property -or $null -eq $property.Value) { return $null }
+    $component = $property.Value
+    if (-not [string]$component.version -or -not [string]$component.url -or -not [string]$component.sha256) {
+        return $null
+    }
+    return $component
+}
+
+function Test-InstalledVersion {
+    param(
+        [AllowEmptyString()][string]$Installed,
+        [AllowEmptyString()][string]$Available
+    )
+    if (-not $Installed -or -not $Available -or $Installed -eq 'unknown') { return $false }
+    return $Installed.Trim().Equals($Available.Trim(), [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Confirm-Operation {
+    param([Parameter(Mandatory = $true)][string]$Question)
+    if ($Yes) { return $true }
+    $answer = Read-Host "$Question [t/N]"
+    return $answer -match '^(t|tak|y|yes)$'
+}
+
+function Show-DockerDiagnostics {
+    param([switch]$CheckPanelPort)
+
+    $report = Get-M2DockerPreflight -ServerRoot $serverRoot -CheckPanelPort:$CheckPanelPort
+    $text = Format-M2DockerPreflightReport -Report $report
+    Write-Host $text -ForegroundColor $(if ($report.CanStart) { 'Green' } else { 'Yellow' })
+    return $report
+}
+
+function Assert-DockerPrerequisites {
+    param([switch]$CheckPanelPort)
+
+    $report = Show-DockerDiagnostics -CheckPanelPort:$CheckPanelPort
+    if (-not $report.CanStart) {
+        throw (@($report.BlockingIssues) -join [Environment]::NewLine)
+    }
+}
+
+function Assert-DockerDiskWritable {
+    # Before a build, and before an update swaps a single file: a Docker disk
+    # gone read-only fails every build at its first write, and after the
+    # first failure Docker only says "failed to solve: exit code: 255".
+    # pattsito (23 September) downloaded and applied the same update five
+    # times in forty minutes against such a disk. An engine that is not
+    # running cannot be asked; Rebuild-Server starts it and asks again.
+    # -KeepRebuildPending: the files are already the new ones, so a later
+    # GRAJ must still finish the build.
+    param([switch]$KeepRebuildPending, [string]$Before = 'budowanie serwera')
+    if (-not (Test-M2DockerRunning)) { return }
+    $fault = Get-M2DockerDiskFault
+    if (-not $fault) { return }
+    if ($KeepRebuildPending) {
+        Set-Content -LiteralPath $rebuildMarkerPath -Value ([DateTime]::UtcNow.ToString('o')) -Encoding UTF8
+    }
+    throw ("Przerywam $Before - dysk Dockera nie przyjmuje zapisu:" + [Environment]::NewLine +
+           $fault + [Environment]::NewLine + [Environment]::NewLine + (Get-M2DockerDiskRemedy))
+}
+
+function Close-VpsTunnelOnServerPorts {
+    # The VPS window's tunnel to the panels is this launcher's own ssh, and one
+    # opened while this PC's server was stopped took 127.0.0.1:7788, 7790 and
+    # 7791 - an update started meanwhile built its images and could not bind
+    # 7790, and every retry stopped at "port 7788 zajmuje proces ssh" (upstream
+    # fix of 28 September). The tunnel now keeps off those ports; one that an
+    # older launcher opened on them is closed here, before a start or an update
+    # asks about the ports, because the server comes first and the VPS window
+    # opens the tunnel again ten thousand ports higher.
+    if (-not (Get-Command Get-M2VpsTunnelProcess -ErrorAction SilentlyContinue)) { return }
+    try {
+        $process = Get-M2VpsTunnelProcess -State (Get-M2VpsState -ServerRoot $serverRoot)
+        if (-not $process) { return }
+        $held = @(Get-M2ProgramPortConflicts -ServerRoot $serverRoot | Where-Object { [int]$_.Listener.Pid -eq [int]$process.Id })
+        if ($held.Count -eq 0) { return }
+        if (Close-M2VpsPanel -ServerRoot $serverRoot) {
+            Write-Host ('Zamknięto tunel do paneli VPS - trzymał porty tego serwera ({0}). Panele VPS otworzysz znowu przyciskiem OTWÓRZ PANEL w oknie SERWER NA VPS.' -f
+                ((@($held) | ForEach-Object { [string]$_.Port }) -join ', ')) -ForegroundColor Yellow
+        }
+    }
+    catch { Write-Host "Nie udało się sprawdzić tunelu do paneli VPS: $($_.Exception.Message)" -ForegroundColor Yellow }
+}
+
+function Assert-ServerPortsFree {
+    # A program of Windows' own on one of the server's ports - a MySQL on 3306
+    # (Producent Hip Hopu, 27 September) - is what the start's preflight names,
+    # but an update never asked: it downloaded, swapped the files, built for
+    # minutes, and only then did compose fail to bind the port. Asked before
+    # the download now, and again before a build. Another installation's
+    # containers are not this check's: Clear-PortConflicts stops them.
+    # -KeepRebuildPending: the files are already the new ones, so a later GRAJ
+    # must still finish the build.
+    param([switch]$KeepRebuildPending, [string]$Before = 'budowanie serwera')
+    Close-VpsTunnelOnServerPorts
+    $conflicts = @(Get-M2ProgramPortConflicts -ServerRoot $serverRoot)
+    if ($conflicts.Count -eq 0) { return }
+    if ($KeepRebuildPending) {
+        Set-Content -LiteralPath $rebuildMarkerPath -Value ([DateTime]::UtcNow.ToString('o')) -Encoding UTF8
+    }
+    throw ("Przerywam $Before - port serwera zajmuje inny program:" + [Environment]::NewLine +
+           ((@($conflicts) | ForEach-Object { [string]$_.Advice }) -join [Environment]::NewLine) +
+           [Environment]::NewLine + 'Baza, postacie i ustawienia są w porządku.')
+}
+
+function Start-Server {
+    # Before the preflight refuses the start: an old installation takes the
+    # ports back on every engine start, so a check that only names it leaves the
+    # player exactly where they were.
+    Clear-PortConflicts -Quiet | Out-Null
+    Close-VpsTunnelOnServerPorts
+    Assert-DockerPrerequisites -CheckPanelPort
+    Write-Phase 'Docker sprawdzony'
+    # A second-channel wish left in the web panel, before .env is read.
+    try { Sync-ChannelWishFromPanel }
+    catch { Write-Host "Nie udalo sie odczytac ustawienia kanalow z panelu WWW: $($_.Exception.Message)" -ForegroundColor Yellow }
+    # start-server.ps1 brings the stack up from the images that already exist.
+    # After an interrupted update those are the old ones, so finish the build
+    # first - otherwise the player keeps running the previous server and the
+    # website keeps showing the previous panel.
+    if (Test-RebuildPending) {
+        Write-Host 'Poprzednia aktualizacja nie dokonczyla budowania. Dokancczam je teraz...' -ForegroundColor Yellow
+        Rebuild-Server
+        Write-Host 'Budowanie zakonczone.' -ForegroundColor Green
+    }
+    $script = Join-Path $serverRoot 'start-server.ps1'
+    if (-not (Test-Path -LiteralPath $script -PathType Leaf)) { throw 'Brakuje start-server.ps1.' }
+    & $script
+    if ($LASTEXITCODE -ne 0) { throw "Uruchamianie serwera zakończyło się kodem $LASTEXITCODE." }
+    Write-Phase 'Serwer uruchomiony'
+    # COOP: a world hosted before this start is still hosted - .env keeps the
+    # address - so the router's four-hour lease is renewed here.
+    try { Update-CoopHostingLease }
+    catch { Write-Host "COOP: nie udalo sie odnowic przekierowan w routerze: $($_.Exception.Message)" -ForegroundColor Yellow }
+}
+
+function Stop-Server {
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        docker info 1>$null 2>$null
+        $dockerAvailable = $LASTEXITCODE -eq 0
+    }
+    finally { $ErrorActionPreference = $previousPreference }
+    if (-not $dockerAvailable) {
+        Write-Host 'Docker jest już zatrzymany.' -ForegroundColor Yellow
+        return
+    }
+    $composeDir = Join-Path $serverRoot 'linux-port\docker'
+    $composeFile = Join-Path $composeDir 'docker-compose.yml'
+    # `docker compose' writes progress to stderr; under $ErrorActionPreference=
+    # 'Stop' Windows PowerShell 5.1 turns that into a terminating error and the
+    # stop reports failure even when it worked. Decide from the exit code.
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        docker compose --project-directory $composeDir -f $composeFile stop
+        $stopExit = $LASTEXITCODE
+    }
+    finally { $ErrorActionPreference = $previousPreference }
+    if ($stopExit -ne 0) { throw "Zatrzymywanie serwera zakończyło się kodem $stopExit." }
+}
+
+# Another installation of this same server, sitting on the ports this one
+# publishes. Every container ships `restart: unless-stopped`, so Docker Desktop
+# starts the old project again on every engine start and it binds the ports
+# before this installation can - which is why quitting Docker by hand never
+# helped ("nawet jak recznie wylacze calkowicie docker"). `docker stop` is what
+# holds, because its manual-stop flag survives an engine restart. Volumes are
+# never touched: the collision is containers, and a removed volume is the world.
+function Clear-PortConflicts {
+    param([switch]$Quiet)
+
+    if (-not (Test-M2DockerRunning)) { return 0 }
+    $holders = @(Get-M2ForeignPortHolders -ServerRoot $serverRoot)
+    if ($holders.Count -eq 0) {
+        if (-not $Quiet) {
+            Write-Host 'Zadna inna instalacja nie trzyma portow tego serwera.' -ForegroundColor Green
+        }
+        return 0
+    }
+    foreach ($holder in $holders) {
+        $where = if ($holder.WorkingDir) { " (folder: $($holder.WorkingDir))" } else { '' }
+        Write-Host ("Port {0}: trzyma go kontener {1} z instalacji '{2}'{3}." -f
+            ((@($holder.Ports) | ForEach-Object { "$_" }) -join ', '), $holder.Container, $holder.Project, $where) -ForegroundColor Yellow
+    }
+    $stopped = @(Stop-M2ForeignPortHolders -ServerRoot $serverRoot)
+    foreach ($entry in $stopped) {
+        Write-Host ("Zatrzymano instalacje '{0}' ({1} kontenerow). Baza, wolumeny i postep sa nietkniete." -f
+            $entry.Project, $entry.Containers) -ForegroundColor Green
+    }
+    return $stopped.Count
+}
+
+function Clear-PortConflictsAction {
+    $freed = Clear-PortConflicts
+    if ($freed -gt 0) {
+        Write-Host 'Porty zwolnione. Mozesz kliknac GRAJ albo ponowic aktualizacje.' -ForegroundColor Green
+    }
+}
+
+function Start-Docker {
+    Assert-DockerPrerequisites
+    $script = Join-Path $serverRoot 'start-server.ps1'
+    if (-not (Test-Path -LiteralPath $script -PathType Leaf)) { throw 'Brakuje start-server.ps1.' }
+    & $script -DockerOnly
+    if ($LASTEXITCODE -ne 0) { throw "Uruchamianie Docker Desktop zakończyło się kodem $LASTEXITCODE." }
+}
+
+function Stop-DockerAndServer {
+    Stop-Server
+    Stop-DockerDesktop
+    Write-Host 'Serwer i Docker Desktop zatrzymane. Dane pozostają zapisane w wolumenach.' -ForegroundColor Green
+}
+
+function Stop-DockerDesktop {
+    $dockerCli = Join-Path $env:ProgramFiles 'Docker\Docker\DockerCli.exe'
+    if (Test-Path -LiteralPath $dockerCli -PathType Leaf) {
+        $previousPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'SilentlyContinue'
+            & $dockerCli -Shutdown 1>$null 2>$null
+        }
+        finally { $ErrorActionPreference = $previousPreference }
+    }
+    else {
+        Get-Process -Name 'Docker Desktop', 'com.docker.backend' -ErrorAction SilentlyContinue |
+            Stop-Process -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-GameRunning {
+    # Whether this installation's game container runs - the question the
+    # window's "Serwer: DZIALA" asks.
+    if (-not (Test-M2DockerRunning)) { return $false }
+    $composeDir = Join-Path $serverRoot 'linux-port\docker'
+    $composeFile = Join-Path $composeDir 'docker-compose.yml'
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $services = @(docker compose --project-directory $composeDir -f $composeFile ps --services --status running 2>$null)
+        return ($LASTEXITCODE -eq 0 -and @($services | Where-Object { ([string]$_).Trim() -eq 'game' }).Count -gt 0)
+    }
+    catch { return $false }
+    finally { $ErrorActionPreference = $previousPreference }
+}
+
+# MT2009_PLUS_LAUNCHER_LOWMEM_UPDATE_V1: a server update with the world running
+# and Windows short of memory first does what a player did by hand (2 October,
+# "przy zwiekszonej liczbie kanalow i aktualizacji wlaczonego systemu wyskakuje
+# blad z brakiem wolnej pamieci RAM"): the world saved and stopped (as
+# ZATRZYMAJ I ZAPISZ), and Docker Desktop shut down, because its machine keeps
+# the memory its containers took until it stops. The update's build starts
+# Docker again (Rebuild-Server) and its compose up brings the world back. With
+# memory to spare nothing changes: the game goes down only right before
+# compose up, as it always has. Docker stays up when containers of other
+# projects run in it (STOP must not end the player's other projects). Returns
+# what was done, for Restore-WorldAfterUpdate.
+function Stop-WorldForUpdate {
+    $done = [pscustomobject]@{ Stopped = $false; DockerStopped = $false }
+    if (-not (Get-Command Get-M2WindowsMemory -ErrorAction SilentlyContinue)) { return $done }
+    if (-not (Test-GameRunning)) { return $done }
+    $memory = Get-M2WindowsMemory
+    if (-not $memory -or -not (Test-M2UpdateMemoryLow -TotalBytes $memory.TotalBytes -FreeBytes $memory.FreeBytes -CommitFreeBytes $memory.CommitFreeBytes)) { return $done }
+    $freeGb = ([Math]::Round($memory.FreeBytes / 1GB, 1)).ToString([Globalization.CultureInfo]::InvariantCulture)
+    $totalGb = ([Math]::Round($memory.TotalBytes / 1GB, 1)).ToString([Globalization.CultureInfo]::InvariantCulture)
+    Write-Phase 'Mało wolnej pamięci RAM - zapisuję i zatrzymuję świat przed aktualizacją'
+    Write-Host ('Wolne {0} GB RAM z {1} GB, a świat działa. Zapisuję i zatrzymuję serwer (jak ZATRZYMAJ I ZAPISZ); po aktualizacji wystartuje sam.' -f $freeGb, $totalGb) -ForegroundColor Yellow
+    Stop-Server
+    $done.Stopped = $true
+    $others = @()
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $others = @(docker ps --format '{{.Names}}' 2>$null | Where-Object { ([string]$_).Trim() })
+    }
+    catch { $others = @('?') }
+    finally { $ErrorActionPreference = $previousPreference }
+    if ($others.Count -gt 0) {
+        Write-Host ('Docker Desktop zostaje włączony - działają w nim inne kontenery ({0}).' -f ((@($others) | Select-Object -First 5) -join ', ')) -ForegroundColor Yellow
+        return $done
+    }
+    Write-Host 'Zamykam Docker Desktop, żeby oddał pamięć Windowsowi; aktualizacja uruchomi go znowu.' -ForegroundColor Yellow
+    Stop-DockerDesktop
+    # The build asks whether the engine runs and starts it if not: an engine
+    # still going down at that moment would die under the build.
+    $deadline = (Get-Date).AddSeconds(90)
+    while ((Get-Date) -lt $deadline -and (Test-M2DockerRunning)) { Start-Sleep -Seconds 3 }
+    $done.DockerStopped = $true
+    return $done
+}
+
+function Restore-WorldAfterUpdate {
+    # An update that stopped the world (Stop-WorldForUpdate) and then failed
+    # before its build - the download, the check, the files - starts it again
+    # as GRAJ would. A build that fails after the files were swapped leaves
+    # it stopped, as it always did: GRAJ finishes the build.
+    param($Suspended)
+    if (-not $Suspended -or -not $Suspended.Stopped) { return }
+    Write-Host 'Aktualizacja się nie udała - uruchamiam świat z powrotem.' -ForegroundColor Yellow
+    try { Start-Server }
+    catch { Write-Host ('Świata nie udało się uruchomić ({0}) - kliknij GRAJ.' -f $_.Exception.Message) -ForegroundColor Yellow }
+}
+
+# MT2009_PLUS_LAUNCHER_DOCKER_RAM_V1: Docker's machine short of memory for the
+# build (3 October: 3.7 GB in all, the game core's compile killed, and GRAJ
+# failed the same way) is said before the build - before an update downloads
+# anything, and before the build GRAJ finishes - with the .wslconfig that
+# fixes it, which the launcher writes itself when asked. The player may still
+# go on. The window (Metin2-Launcher-GUI.ps1) asks in its own dialog and runs
+# this script with -Yes, so here -Yes only prints the warning into the log.
+# Asked once per action (Update-Server asks before the download, Rebuild-Server
+# would ask again after it).
+$script:dockerMemoryChecked = $false
+
+function Get-DockerMemoryAdviceSafe {
+    if (-not (Get-Command Get-M2DockerMemoryAdvice -ErrorAction SilentlyContinue)) { return $null }
+    try { return Get-M2DockerMemoryAdvice }
+    catch {
+        Write-Host "Nie udało się sprawdzić pamięci Dockera: $($_.Exception.Message)" -ForegroundColor DarkGray
+        return $null
+    }
+}
+
+function Write-DockerMemoryAdvice {
+    param([Parameter(Mandatory = $true)]$Advice)
+    Write-Host ('UWAGA: ' + $Advice.Summary) -ForegroundColor Yellow
+    Write-Host $Advice.Instructions -ForegroundColor Yellow
+}
+
+function Restart-DockerWsl {
+    # Docker's WSL machine takes a new .wslconfig only when WSL starts again:
+    # the world saved and stopped (as STOP), Docker Desktop shut down, every
+    # WSL machine stopped, Docker Desktop started again.
+    Write-Phase 'Restart WSL i Docker Desktop (nowa pamięć z .wslconfig)'
+    Stop-Server
+    Write-Host 'Zamykam Docker Desktop...' -ForegroundColor Yellow
+    Stop-DockerDesktop
+    $deadline = (Get-Date).AddSeconds(90)
+    while ((Get-Date) -lt $deadline -and (Test-M2DockerRunning)) { Start-Sleep -Seconds 3 }
+    Write-Host 'Wykonuję: wsl --shutdown' -ForegroundColor Yellow
+    $wslExit = -1
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & wsl.exe --shutdown 2>&1 | Out-Null
+        $wslExit = $LASTEXITCODE
+    }
+    catch { $wslExit = -1 }
+    finally { $ErrorActionPreference = $previousPreference }
+    if ($wslExit -ne 0) {
+        Write-Host ('Polecenie wsl --shutdown nie zadziałało (kod {0}). Jeśli Docker dalej pokaże starą ilość pamięci, zrestartuj Windows.' -f $wslExit) -ForegroundColor Yellow
+    }
+    Start-Sleep -Seconds 5
+    Start-Docker
+    $after = Get-DockerMemoryAdviceSafe
+    if ($after -and $after.Known -and -not $after.Estimated) {
+        Write-Host ('Docker ma teraz {0} GB pamięci RAM.' -f $after.MemText) -ForegroundColor $(if ($after.Low) { 'Yellow' } else { 'Green' })
+        if ($after.Low) {
+            Write-Host ('To dalej mniej niż trzeba. Sprawdź plik {0} (sekcja [wsl2], wiersz memory=) albo zrestartuj Windows.' -f $after.WslConfigPath) -ForegroundColor Yellow
+        }
+    }
+}
+
+function Invoke-DockerMemoryFix {
+    # Console only, and only after asking: memory= under [wsl2] in
+    # %USERPROFILE%\.wslconfig (Set-M2WslConfigMemory: the file's other
+    # settings stay, the old one is kept as .wslconfig.bak), then the restart
+    # it needs, asked again because it stops Docker. 'restarted', 'written',
+    # or '' when nothing was written.
+    param([Parameter(Mandatory = $true)]$Advice)
+    if ($Yes -or -not $Advice.CanAutoFix) { return '' }
+    if (-not (Confirm-Operation ('Ustawić automatycznie memory={0}GB w pliku {1}? Inne ustawienia w pliku zostaną, a stary plik trafi do .wslconfig.bak.' -f $Advice.RecommendedGb, $Advice.WslConfigPath))) {
+        return ''
+    }
+    $written = Set-M2WslConfigMemory -MemoryGb $Advice.RecommendedGb -Path $Advice.WslConfigPath
+    if ($written.Changed) {
+        $backupNote = if ($written.Backup) { ' Poprzedni plik: ' + $written.Backup + '.' } else { '' }
+        Write-Host ('Zapisano memory={0} w {1}.{2}' -f $written.Value, $written.Path, $backupNote) -ForegroundColor Green
+    }
+    else {
+        Write-Host ('{0} ma już memory={1} - niczego nie zmieniam.' -f $written.Path, $written.Value) -ForegroundColor Green
+    }
+    Write-Host 'Docker zobaczy nową pamięć dopiero po restarcie WSL (wsl --shutdown) i Docker Desktop.' -ForegroundColor Yellow
+    if (Confirm-Operation 'Zrestartować to teraz? Launcher zapisze i zatrzyma serwer, zamknie Docker Desktop (także inne działające w nim kontenery), wykona wsl --shutdown i uruchomi Dockera ponownie. Najpierw zamknij grę.') {
+        Restart-DockerWsl
+        return 'restarted'
+    }
+    Write-Host 'Zrób to sam: zamknij grę i Docker Desktop, w PowerShell wpisz: wsl --shutdown, potem uruchom Docker Desktop i kliknij GRAJ.' -ForegroundColor Yellow
+    return 'written'
+}
+
+function Confirm-DockerMemoryForBuild {
+    # Before a build: warns when Docker's machine is short of memory and,
+    # interactively, offers the fix and asks whether to go on anyway.
+    # -KeepRebuildPending: the files are already the new ones, so a later
+    # GRAJ must still finish the build.
+    param([switch]$KeepRebuildPending, [string]$Before = 'budowanie serwera')
+    if ($script:dockerMemoryChecked) { return }
+    $advice = Get-DockerMemoryAdviceSafe
+    if (-not $advice -or -not $advice.Known) { return }
+    # An estimate (the engine was down) is checked again once it runs.
+    if (-not $advice.Estimated) { $script:dockerMemoryChecked = $true }
+    if (-not $advice.Low) { return }
+    $script:dockerMemoryChecked = $true
+    Write-Phase 'Za mało pamięci RAM w Dockerze'
+    Write-DockerMemoryAdvice -Advice $advice
+    if ($Yes) {
+        Write-Host 'Kontynuuję mimo to (wybrane w oknie launchera albo -Yes).' -ForegroundColor Yellow
+        return
+    }
+    $fixed = Invoke-DockerMemoryFix -Advice $advice
+    if ($fixed -eq 'restarted') {
+        $after = Get-DockerMemoryAdviceSafe
+        if ($after -and $after.Known -and -not $after.Low) {
+            Write-Host 'Pamięć Dockera jest teraz w porządku - kontynuuję.' -ForegroundColor Green
+            return
+        }
+    }
+    $question = if ($fixed) { 'Kontynuować mimo to, zanim Docker ma nową pamięć (budowa może się nie udać)?' }
+        else { 'Kontynuować mimo to (budowa może się nie udać z braku pamięci)?' }
+    if (Confirm-Operation $question) { return }
+    if ($KeepRebuildPending) {
+        Set-Content -LiteralPath $rebuildMarkerPath -Value ([DateTime]::UtcNow.ToString('o')) -Encoding UTF8
+        throw "Przerwano $Before - Docker ma za mało pamięci RAM. Nowe pliki są już na dysku: gdy Docker dostanie więcej pamięci, kliknij GRAJ, a launcher dokończy budowanie."
+    }
+    throw "Przerwano $Before - Docker ma za mało pamięci RAM. Gdy Docker dostanie więcej pamięci, ponów aktualizację."
+}
+
+function Show-DockerMemoryAction {
+    # Menu 42 / -Action DockerRam: how much memory Docker's machine has, the
+    # instructions when it is short, and the automatic fix after asking.
+    $advice = Get-DockerMemoryAdviceSafe
+    if (-not $advice) {
+        Write-Host 'Ta wersja launchera nie umie sprawdzić pamięci Dockera.' -ForegroundColor Yellow
+        return
+    }
+    if (-not $advice.Known) {
+        Write-Host 'Nie udało się odczytać pamięci Dockera - uruchom Docker Desktop i spróbuj jeszcze raz.' -ForegroundColor Yellow
+        Write-Host $advice.Instructions -ForegroundColor Gray
+        return
+    }
+    if (-not $advice.Low) {
+        $estimate = if ($advice.Estimated) { ' (szacunek - silnik Dockera jest zatrzymany)' } else { '' }
+        Write-Host ('Docker ma {0} GB pamięci RAM{1} - to wystarczy do budowy serwera.' -f $advice.MemText, $estimate) -ForegroundColor Green
+        return
+    }
+    Write-DockerMemoryAdvice -Advice $advice
+    if (-not $Yes) { [void](Invoke-DockerMemoryFix -Advice $advice) }
+}
+
+function Rebuild-Server {
+    $composeDir = Join-Path $serverRoot 'linux-port\docker'
+    $composeFile = Join-Path $composeDir 'docker-compose.yml'
+    # Stopping the server also stops Docker Desktop (see Stop-DockerAndServer),
+    # so the sensible order - stop the server, then update it - always arrived
+    # here with a dead engine and failed on a raw npipe error, after the files
+    # had already been swapped. Start-Server has the same hole: it finishes a
+    # pending build before start-server.ps1 gets a chance to bring the engine
+    # up, so "click GRAJ" only ever worked when Docker happened to be running.
+    # Both paths go through here, so the engine is ensured here as well.
+    if (-not (Test-M2DockerRunning)) {
+        Write-Host 'Silnik Dockera jest zatrzymany - uruchamiam go przed budowaniem.' -ForegroundColor Yellow
+        Start-Docker
+    }
+    Assert-DockerDiskWritable -KeepRebuildPending
+    # MT2009_PLUS_LAUNCHER_DOCKER_RAM_V1: the engine runs now, so its memory
+    # is what it is and not an estimate.
+    Confirm-DockerMemoryForBuild -KeepRebuildPending
+    # Compose needs the .env before it can build anything - the database
+    # passwords are required variables. A copy unpacked by hand has no .env
+    # until start-server.ps1 writes one, and that used to run only after this
+    # build, so the update failed and "click GRAJ" failed the same way.
+    $identityScript = Join-Path $serverRoot 'start-server.ps1'
+    if (Test-Path -LiteralPath $identityScript -PathType Leaf) {
+        & $identityScript -IdentityOnly
+        if ($LASTEXITCODE -ne 0) { throw "Przygotowanie pliku .env zakonczylo sie kodem $LASTEXITCODE." }
+    }
+    # The overlay is the source of truth; the build context is only a copy of
+    # it. Refresh the copy before Docker reads it, or an update that added a
+    # source file compiles against the previous one - or, as in 1.23.2, against
+    # a header that is not there at all.
+    $synced = Sync-M2PlayerbotOverlay -ServerRoot $serverRoot
+    if ($synced -gt 0) {
+        Write-Host "Zsynchronizowano $synced plik(ow) zrodlowych bota do kontekstu budowania." -ForegroundColor DarkGray
+    }
+    Write-Phase 'Kontekst budowania przygotowany (.env, nakladka)'
+    # The engine patches are part of the overlay too, and until now nothing on a
+    # player's machine ever applied them.
+    $patched = Invoke-M2EnginePatches -ServerRoot $serverRoot
+    if ($patched -gt 0) {
+        Write-Host "Nalozono $patched latek silnika." -ForegroundColor DarkGray
+    }
+    # And the sources the image is actually built from.
+    #
+    # This check exists in start-server.ps1 too, and that was not enough: this
+    # path calls start-server.ps1 with -IdentityOnly, which returns after
+    # writing the .env and never reaches it, then builds here. So a player
+    # clicking GRAJ went straight to `docker compose --build' with an
+    # incomplete context and got fifteen "failed to calculate checksum ... not
+    # found" lines. Reported from the Discord twice, the second time against a
+    # version that was supposed to have fixed it - because the fix was in the
+    # half of the code that click does not run.
+    #
+    # linux-port/docker/game/src holds the r40250 tree, put there once by
+    # fetch-sources.sh during installation. It is the operator's own package and
+    # never travels in an update; what an update does put there is
+    # src/server/game, because that is where the bot sources belong - which is
+    # why a broken install still shows a plausible src/server/game and a build
+    # context of about 1.6 MB where a complete one is hundreds of megabytes.
+    $gameContext = Join-Path $serverRoot 'linux-port\docker\game\src'
+    [void](Restore-M2EmptyGameContextDirs -ServerRoot $serverRoot)
+    $requiredContext = @(Get-M2RequiredGameContext -ServerRoot $serverRoot)
+    $missingContext = @()
+    foreach ($entry in $requiredContext) {
+        if (-not (Test-Path -LiteralPath (Join-Path $gameContext $entry))) {
+            $missingContext += $entry
+        }
+    }
+    # The dumps, the same way (see start-server.ps1 for why an initialised
+    # database is exempt): this is the half of the code that click runs.
+    $missingDumps = @(Get-M2MissingSqlDumps -ServerRoot $serverRoot)
+    if ($missingDumps.Count -gt 0) {
+        $dbVolume = Get-CurrentInstallTargetVolume
+        $dbReady = $false
+        if ($dbVolume) { $dbReady = Test-M2VolumeInitialized -Volume $dbVolume }
+        if (-not $dbReady) {
+            # An update package unpacked on its own (a player took the zip from a
+            # GitHub release for the full server, 27 September): no dumps folder at
+            # all (the .env is made before this check). Say so first, plainly.
+            $updatePackageNote = ''
+            if (-not (Test-Path -LiteralPath (Join-Path $serverRoot 'linux-port\docker\mariadb\initdb.d\dumps') -PathType Container)) {
+                $updatePackageNote = ("To wyglada na rozpakowana PACZKE AKTUALIZACJI (metin2-server-update-*.zip), " +
+                    "a nie na pelna instalacje serwera. Paczka aktualizacji zawiera tylko pliki zmienione " +
+                    "od poprzedniej wersji - bez bazy danych i plikow gry - i launcher pobiera ja sam " +
+                    "(SPRAWDZ AKTUALIZACJE). Do pierwszej instalacji pobierz PELNA paczke MT2009 PLUS " +
+                    "z Discorda projektu (metin2sp.pl/discord) " +
+                    "(instrukcja: README, sekcja Instalacja), rozpakuj ja do osobnego folderu i kliknij GRAJ. " +
+                    "Ten folder mozesz usunac - nic w nim nie powstalo.`n`n")
+            }
+            throw ($updatePackageNote + "Brakuje zrzutow bazy danych, wiec pierwsza baza powstalaby pusta.`n`n" +
+                   "Katalog: " + (Join-Path $serverRoot 'linux-port\docker\mariadb\initdb.d\dumps') + "`n" +
+                   "Brakuje: " + ($missingDumps -join ', ') + "`n`n" +
+                   "MariaDB wystartowalaby bez schematu gry (i zglosila 'healthy'), a playerbot-migrate " +
+                   "czekalby 30 minut na tabele, ktore nigdy nie powstana. Zrzuty pochodza z Twojej " +
+                   "paczki serwera r40250 (Server\metin2_mysql_dump.zip) i wystawia je wylacznie " +
+                   "instalator - zadna aktualizacja ich nie przywroci.`n`n" +
+                   "Uruchom ponownie instalator (installer\install.ps1) ze wskazana paczka " +
+                   "(`$env:M2_SRC_ARCHIVE), albo rozpakuj metin2_mysql_dump.zip do tego katalogu " +
+                   "i kliknij GRAJ jeszcze raz.")
+        }
+    }
+    if ($missingContext.Count -gt 0) {
+        throw ("Brakuje zrodel gry, wiec nie ma z czego zbudowac serwera.`n`n" +
+               "Katalog: " + $gameContext + "`n" +
+               "Brakuje: " + ($missingContext -join ', ') + "`n`n" +
+               "To nie jest blad Dockera, WSL ani tej aktualizacji. Te pliki pochodza " +
+               "z Twojej wlasnej paczki serwera r40250 i sa rozpakowywane raz, podczas " +
+               "instalacji - zadna aktualizacja ich nie przywroci, bo nie wolno nam ich " +
+               "rozpowszechniac.`n`n" +
+               "Uruchom ponownie instalator (installer\install.ps1). Pobierze zrodla i " +
+               "odtworzy kontekst budowania. Baza, postacie i ustawienia zostaja nietkniete.")
+    }
+
+    # The update is where a port collision hurts most: the images build for
+    # minutes and compose then cannot bind a port another installation took back
+    # while they were building ("Bind for 127.0.0.1:7790 failed"), so the whole
+    # update is lost at its last step and the player is told to free a port they
+    # cannot find.
+    Clear-PortConflicts -Quiet | Out-Null
+    # And a port a program of Windows' own holds, which nothing here can stop:
+    # said before the minutes of building, not after them.
+    Assert-ServerPortsFree -KeepRebuildPending
+
+    # See Stop-Server: compose progress on stderr must not be treated as failure
+    # under $ErrorActionPreference='Stop' in Windows PowerShell 5.1.
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        # `up --build` on a fresh engine has raced its own pull: the images
+        # were built, then "No such image: mariadb:10.11" while creating the
+        # database container, and the update was reported as failed although
+        # the second click succeeded. Pull what is not built first; a failure
+        # here is not final, `up` tries again.
+        docker compose --project-directory $composeDir -f $composeFile pull --ignore-buildable 2>&1 | Out-Null
+        Write-Phase 'Obrazy bazowe pobrane, zaczynam docker compose up --build'
+        Set-M2PlayerbotsVersionEnvironment -ServerRoot $serverRoot
+        # MT2009_PLUS_LAUNCHER_DOCKER_RAM_V1: every line is printed as before
+        # and read on the way, so a compile killed for want of memory is
+        # named in the failure below instead of "click GRAJ", which fails
+        # the same way.
+        $buildOutOfMemory = $false
+        $canReadMemory = [bool](Get-Command Test-M2BuildOutOfMemory -ErrorAction SilentlyContinue)
+        docker compose --project-directory $composeDir -f $composeFile up -d --build 2>&1 | ForEach-Object {
+            $buildLine = [string]$_
+            if ($canReadMemory -and -not $buildOutOfMemory -and (Test-M2BuildOutOfMemory -Text $buildLine)) { $buildOutOfMemory = $true }
+            Write-Host $buildLine
+        }
+        $buildExit = $LASTEXITCODE
+        Write-Phase "docker compose up --build zakonczone (kod $buildExit)"
+    }
+    finally { $ErrorActionPreference = $previousPreference }
+    if ($buildExit -ne 0) {
+        Set-Content -LiteralPath $rebuildMarkerPath -Value ([DateTime]::UtcNow.ToString('o')) -Encoding UTF8
+        if ($buildOutOfMemory) {
+            $advice = Get-DockerMemoryAdviceSafe
+            $steps = if ($advice) { [string]$advice.Instructions } else { 'Daj maszynie Dockera co najmniej 6 GB pamięci (plik %USERPROFILE%\.wslconfig: [wsl2] i memory=8GB), zamknij Docker Desktop, w PowerShell wpisz: wsl --shutdown, uruchom Docker Desktop i kliknij GRAJ.' }
+            $fixed = ''
+            # Said already on the screen when the console asked about the fix.
+            $stepsTail = [Environment]::NewLine + $steps
+            if ($advice -and -not $Yes) {
+                $stepsTail = ''
+                Write-Host ('Maszyna Dockera ma {0} GB pamięci RAM - za mało, żeby skompilować rdzeń gry.' -f $advice.MemText) -ForegroundColor Yellow
+                Write-Host $steps -ForegroundColor Yellow
+                $fixed = Invoke-DockerMemoryFix -Advice $advice
+            }
+            if ($fixed -eq 'restarted') {
+                throw 'Nowa wersja plików została zapisana, ale Docker nie zbudował serwera: maszynie Dockera zabrakło pamięci RAM. Pamięć jest już zwiększona i Docker uruchomiony ponownie - kliknij GRAJ, launcher dokończy budowanie bez ponownego pobierania.'
+            }
+            throw ('Nowa wersja plików została zapisana, ale Docker nie zbudował serwera: maszynie Dockera zabrakło pamięci RAM i kompilacja rdzenia gry została przerwana (to nie jest miejsce na dysku). Samo kliknięcie GRAJ skończy się tak samo - najpierw daj Dockerowi więcej pamięci.' + $stepsTail)
+        }
+        throw 'Nowa wersja plików została zapisana, ale Docker nie zbudował serwera. Kliknij GRAJ — launcher dokończy budowanie. Kopia plików jest w katalogu backups.'
+    }
+    if (Test-RebuildPending) { Remove-Item -LiteralPath $rebuildMarkerPath -Force -ErrorAction SilentlyContinue }
+}
+
+function Sync-ClientVersionFromFolder {
+    # MT2009_PLUS_CLIENT_VERSION_FROM_FOLDER_V1: MT2009-Patcher.exe updates
+    # the client folder alone, so the version is read from there too - its
+    # CLIENT_VERSION, else its files against client-files.json - and recorded
+    # in the state file before anything compares it with the manifest.
+    param($RemoteManifest)
+    try {
+        $clientComponent = Get-ManifestComponent -RemoteManifest $RemoteManifest -Name 'client'
+        $latest = if ($clientComponent) { ([string]$clientComponent.version).Trim() } else { '' }
+        $config = Get-Config
+        $folder = Get-M2ClientFolder -Config $config
+        if (-not $latest -or -not $folder) { return }
+        $known = [string](Resolve-M2InstalledClientVersion -ServerRoot $serverRoot -ClientFolder $folder -LatestVersion $latest -Record)
+        if ($known.Equals($latest, [StringComparison]::OrdinalIgnoreCase)) { return }
+        $fileList = Get-M2ClientFileList -ManifestSource (Get-ManifestSource $config) -TimeoutSec 15
+        if ($fileList) {
+            $null = Resolve-M2InstalledClientVersion -ServerRoot $serverRoot -ClientFolder $folder -LatestVersion $latest -FileList $fileList -Record
+        }
+    }
+    catch { }
+}
+
+function Show-UpdateStatus {
+    param($RemoteManifest)
+    Sync-ClientVersionFromFolder -RemoteManifest $RemoteManifest
+    $state = Read-State
+    $serverComponent = Get-ManifestComponent -RemoteManifest $RemoteManifest -Name 'server'
+    $clientComponent = Get-ManifestComponent -RemoteManifest $RemoteManifest -Name 'client'
+    $messageProperty = $RemoteManifest.PSObject.Properties['statusMessage']
+    if ($null -ne $messageProperty -and [string]$messageProperty.Value) {
+        Write-Host ([string]$messageProperty.Value) -ForegroundColor Yellow
+    }
+    Write-Host "Zainstalowany serwer: $($state.server)" -ForegroundColor Gray
+    Write-Host "Dostępny serwer:     $(if ($serverComponent) { $serverComponent.version } else { 'brak w tym kanale' })" -ForegroundColor Cyan
+    Write-Host "Zainstalowany klient: $($state.client)" -ForegroundColor Gray
+    Write-Host "Dostępny klient:      $(if ($clientComponent) { $clientComponent.version } else { 'brak w tym kanale' })" -ForegroundColor Cyan
+}
+
+function Update-Server {
+    param($RemoteManifest)
+    $component = Get-ManifestComponent -RemoteManifest $RemoteManifest -Name 'server'
+    if (-not $component) {
+        Write-Host 'Manifest nie zawiera aktualizacji serwera. Pomijam.' -ForegroundColor Yellow
+        return
+    }
+    $state = Read-State
+    if (Test-InstalledVersion -Installed ([string]$state.server) -Available ([string]$component.version)) {
+        Write-Host "Serwer jest już aktualny (wersja $($component.version))." -ForegroundColor Green
+        return
+    }
+    # A build that failed after the files were swapped leaves them at the new
+    # version with only the images missing, and applying the same package
+    # again changes nothing but the backups folder: pattsito's five attempts
+    # were five downloads of 47.8 MB and five copies of 7042 files, on the
+    # drive whose room was the likeliest cause of the failure. Finish the build.
+    if ((Test-RebuildPending) -and (Test-InstalledVersion -Installed ([string](Read-RecordedState).server) -Available ([string]$component.version))) {
+        Write-Host "Pliki serwera w wersji $($component.version) są już na dysku - dokańczam budowanie bez ponownego pobierania." -ForegroundColor Yellow
+        # MT2009_PLUS_LAUNCHER_LOWMEM_UPDATE_V1
+        [void](Stop-WorldForUpdate)
+        Rebuild-Server
+        Write-Host "Serwer działa w wersji $($component.version)." -ForegroundColor Green
+        return
+    }
+    Assert-DockerDiskWritable -Before 'aktualizację (niczego nie pobrano ani nie podmieniono)'
+    Assert-ServerPortsFree -Before 'aktualizację (niczego nie pobrano ani nie podmieniono)'
+    # MT2009_PLUS_LAUNCHER_DOCKER_RAM_V1: before anything is downloaded.
+    Confirm-DockerMemoryForBuild -Before 'aktualizację (niczego nie pobrano ani nie podmieniono)'
+    if (-not (Confirm-Operation 'Zaktualizować pliki serwera i przebudować kontenery? Baza postaci pozostanie bez zmian.')) {
+        Write-Host 'Anulowano.' -ForegroundColor Yellow
+        return
+    }
+    # MT2009_PLUS_LAUNCHER_LOWMEM_UPDATE_V1: a running world on a PC short of
+    # memory is saved and stopped first (Stop-WorldForUpdate), and started
+    # again if the update fails before its build.
+    $suspended = Stop-WorldForUpdate
+    try { $result = Invoke-M2PackageUpdate -Component $component -TargetRoot $serverRoot -BackupRoot (Join-Path $serverRoot 'backups') }
+    catch {
+        $failure = $_
+        Restore-WorldAfterUpdate -Suspended $suspended
+        throw $failure
+    }
+    Write-Host "Podmieniono $($result.Files) plików. Kopia: $($result.Backup)" -ForegroundColor Green
+    Write-Phase 'Pliki aktualizacji pobrane i podmienione'
+    # From here the files on disk are the new version whatever happens to the
+    # build, and VERSION on disk already says so. Recording it only after a
+    # successful rebuild meant a deferred build left the launcher reporting the
+    # previous version for ever - it kept offering the same update and kept
+    # re-downloading and re-applying it, one backup directory per attempt. What
+    # tracks the build is the rebuild marker, not the version number.
+    Save-State -ServerVersion $result.Version -ClientVersion ''
+    # So the marker is down before anything in Rebuild-Server can throw, not
+    # only on the failures it knows about: Docker Desktop that would not start
+    # (a port in the Windows-reserved range, 26 September) threw from
+    # Start-Docker with no marker written, the state already said 2.7.0, and
+    # every later GRAJ ran the 2.5.1 engine - its companion answered the
+    # 2.0.17 client's bag window in the chat. Rebuild-Server removes it on
+    # success.
+    Set-Content -LiteralPath $rebuildMarkerPath -Value ([DateTime]::UtcNow.ToString('o')) -Encoding UTF8
+    Rebuild-Server
+    Write-Host "Serwer działa w wersji $($result.Version)." -ForegroundColor Green
+}
+
+function Assert-ClientNotRunning {
+    # The client's exe cannot be replaced while the game runs, and Windows
+    # says so only when the file is copied - after the whole download.
+    # Ratorex (18 September) tried five times in a quarter of an hour, each
+    # time 65 MB and the same "used by another process". Asked first now,
+    # and before the server as well, so an "update everything" does not
+    # leave a new server beside a client that cannot log in to it.
+    param($Config)
+    $clientRoot = [string]$Config.clientRoot
+    if (-not $clientRoot -or -not (Test-Path -LiteralPath $clientRoot -PathType Container)) { return }
+    $running = @(Get-M2FolderProcesses -Root $clientRoot)
+    if ($running.Count -gt 0) {
+        throw ("Klient gry jest uruchomiony ({0}). Zamknij gre - sprawdz tez Menedzer zadan, czy metin2client.exe nie zostal w tle - i kliknij ZAINSTALUJ AKTUALIZACJE jeszcze raz." -f ($running -join ', '))
+    }
+}
+
+function Start-ClientPatcherUpdate {
+    # A client folder with MT2009-Patcher.exe is updated by the patcher, not by
+    # the GitHub client package: it is started here and does the rest itself
+    # (it compares every file with its patch list and starts the game from its
+    # own GRAJ). True when it was started, false when the folder has none.
+    param($Config)
+    $patcher = Get-M2ClientPatcher -ClientFolder (Get-M2ClientFolder -Config $Config)
+    if (-not $patcher) { return $false }
+    Write-Host 'Aktualizacja przez patcher...' -ForegroundColor Cyan
+    try {
+        $null = Start-M2ClientPatcher -Patcher $patcher
+        Write-Host "Uruchomiono $([IO.Path]::GetFileName($patcher)) w folderze klienta - patcher sprawdzi i pobierze pliki klienta, a gre uruchomisz jego przyciskiem GRAJ." -ForegroundColor Green
+    }
+    catch {
+        throw "Nie udalo sie uruchomic patchera ($patcher): $($_.Exception.Message)"
+    }
+    return $true
+}
+
+function Update-Client {
+    param($RemoteManifest, $Config)
+    if (Start-ClientPatcherUpdate -Config $Config) { return }
+    $component = Get-ManifestComponent -RemoteManifest $RemoteManifest -Name 'client'
+    if (-not $component) {
+        Write-Host 'Manifest nie zawiera aktualizacji klienta. Pomijam.' -ForegroundColor Yellow
+        return
+    }
+    $state = Read-State
+    if (Test-InstalledVersion -Installed ([string]$state.client) -Available ([string]$component.version)) {
+        Write-Host "Klient jest już aktualny (wersja $($component.version))." -ForegroundColor Green
+        Repair-ClientExe -RemoteManifest $RemoteManifest -Config $Config
+        return
+    }
+    $clientRoot = [string]$Config.clientRoot
+    # A folder that was moved or renamed since it was chosen is asked for
+    # again rather than ending the update (the GUI asks before it gets here).
+    if (-not $clientRoot -or -not (Test-Path -LiteralPath $clientRoot -PathType Container)) {
+        if (-not (Request-ClientExecutable -Missing $clientRoot)) {
+            if (-not $clientRoot) {
+                throw 'Nie ustawiono folderu klienta. Wskaż klienta przyciskiem WYBIERZ KLIENTA w launcherze albo akcją Configure.'
+            }
+            throw "Nie znaleziono folderu klienta: $clientRoot. Wskaż klienta przyciskiem WYBIERZ KLIENTA w launcherze albo akcją Configure."
+        }
+        $Config = Get-Config
+        $clientRoot = [string]$Config.clientRoot
+    }
+    Assert-ClientNotRunning -Config $Config
+    if (-not (Confirm-Operation "Zaktualizować klienta w $clientRoot?")) {
+        Write-Host 'Anulowano.' -ForegroundColor Yellow
+        return
+    }
+    $result = Invoke-M2PackageUpdate -Component $component -TargetRoot $clientRoot -BackupRoot (Join-Path $serverRoot 'backups\client')
+    Save-State -ServerVersion '' -ClientVersion $result.Version
+    Write-Host "Klient został zaktualizowany. Plików: $($result.Files), kopia: $($result.Backup)" -ForegroundColor Green
+    Repair-ClientExe -RemoteManifest $RemoteManifest -Config $Config
+}
+
+function Repair-ClientExe {
+    # The client folder's executables after a client update, and whenever the
+    # GUI finds an old metin2client.exe (Repair-M2ClientExecutables): the exe
+    # of an old full package replaced by the manifest's "clientExe", the two
+    # strays those packages carried deleted, and a launcher that started one of
+    # them pointed back at metin2client.exe. A refusal is said, never thrown:
+    # the client package has been applied by then and stays applied.
+    param($RemoteManifest, $Config)
+    $clientRoot = [string]$Config.clientRoot
+    if (-not $clientRoot -and [string]$Config.clientExecutable) {
+        $clientRoot = Split-Path -Parent ([string]$Config.clientExecutable)
+    }
+    if (-not $clientRoot -or -not (Test-Path -LiteralPath $clientRoot -PathType Container)) { return }
+    $component = Get-M2ClientExeComponent -Manifest $RemoteManifest
+    $notes = @(Repair-M2ClientExecutables -ClientFolder $clientRoot -ExeComponent $component `
+        -BackupRoot (Join-Path $serverRoot 'backups\client') -ServerRoot $serverRoot -ConfigPath $configPath)
+    foreach ($note in $notes) { Write-Host $note -ForegroundColor Yellow }
+    if (Test-M2ClientExeOld -ClientFolder $clientRoot) {
+        Write-Host 'metin2client.exe w folderze klienta jest nadal stary (sprzed czterech stron ekwipunku) - gra nie wpuści go do logowania, dopóki nie zostanie podmieniony.' -ForegroundColor Yellow
+    }
+}
+
+function Request-ClientExecutable {
+    # Asks in the console where metin2client.exe is now, saves it and says
+    # whether a client folder is set. Never with -Yes: nobody is there to
+    # answer, and the GUI asks with a file dialog before it starts the action.
+    param([AllowEmptyString()][string]$Missing = '')
+    if ($Yes) { return $false }
+    if ($Missing) {
+        Write-Host "Nie znaleziono folderu klienta: $Missing" -ForegroundColor Yellow
+    }
+    else {
+        Write-Host 'Nie wskazano jeszcze klienta gry.' -ForegroundColor Yellow
+    }
+    while ($true) {
+        $answer = (Read-Host 'Podaj pełną ścieżkę do metin2client.exe albo jego folderu (Enter = anuluj)').Trim().Trim('"')
+        if (-not $answer) { return $false }
+        $candidate = $answer
+        if (Test-Path -LiteralPath $candidate -PathType Container) {
+            $candidate = Join-Path $candidate 'metin2client.exe'
+        }
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            Write-Host "Nie ma takiego pliku: $candidate" -ForegroundColor Yellow
+            continue
+        }
+        $config = Get-Config
+        $config.clientExecutable = [IO.Path]::GetFullPath($candidate)
+        $config.clientRoot = [IO.Path]::GetFullPath((Split-Path -Parent $candidate))
+        Save-M2LauncherConfig -Config $config -ConfigPath $configPath
+        Write-Host "Zapisano klienta: $($config.clientExecutable)" -ForegroundColor Green
+        return $true
+    }
+}
+
+function Configure-Launcher {
+    $config = Get-Config
+    Write-Host 'Pozostaw puste pole, aby zachować dotychczasową wartość.' -ForegroundColor Gray
+    $manifestValue = Read-Host "Manifest aktualizacji [$($config.manifestUrl)]"
+    if ($manifestValue) { $config.manifestUrl = $manifestValue }
+    $clientValue = Read-Host "Folder klienta [$($config.clientRoot)]"
+    if ($clientValue) { $config.clientRoot = [IO.Path]::GetFullPath($clientValue) }
+    $clientExeValue = Read-Host "Plik EXE klienta [$($config.clientExecutable)]"
+    if ($clientExeValue -eq '-') { $config.clientExecutable = '' }
+    elseif ($clientExeValue) { $config.clientExecutable = [IO.Path]::GetFullPath($clientExeValue) }
+    $supportState = if ($config.supportUploadUrl) { 'ustawiony' } else { 'nieustawiony' }
+    $supportValue = Read-Host "Prywatny webhook Discord lub adres HTTPS pomocy [$supportState] (wpisz - aby usunąć)"
+    if ($supportValue -eq '-') { $config.supportUploadUrl = '' }
+    elseif ($supportValue) { $config.supportUploadUrl = $supportValue }
+    Save-M2LauncherConfig -Config $config -ConfigPath $configPath
+    Write-Host "Zapisano konfigurację: $configPath" -ForegroundColor Green
+}
+
+function Get-PlayerbotEnvPath {
+    return Join-Path $serverRoot 'linux-port\docker\.env'
+}
+
+function Get-PlayerbotCount {
+    $envPath = Get-PlayerbotEnvPath
+    if (-not (Test-Path -LiteralPath $envPath -PathType Leaf)) { return 350 }
+    $match = [Regex]::Match([IO.File]::ReadAllText($envPath), '(?m)^PLAYERBOT_AUTOSPAWN_COUNT=(\d+)\s*$')
+    if ($match.Success) { return [int]$match.Groups[1].Value }
+    return 350
+}
+
+function Set-PlayerbotCount {
+    # Writes PLAYERBOT_AUTOSPAWN_COUNT to .env. The core reads it once at startup
+    # and spawns at most this many of the bots it will accept, which is a
+    # different and usually smaller number: only characters the canonical seed
+    # created are in the registry. A world carrying bots from an older bootstrap
+    # keeps them, but they never spawn, so asking for more than the registry
+    # holds simply gets the registry. The core says both numbers at startup:
+    #   PLAYERBOT_AUTH: loaded <n> registered bot identities
+    #   PLAYERBOT: autospawn requested=<x> registered_started=<n>
+    #
+    # The ceiling is the core's own (2500, input_db.cpp); the seed's canonical
+    # cohort holds 1500 a kingdom since 2.2.1, so the number is split equally
+    # and never runs short of identities. This clamp is the one that decides -
+    # the slider in the GUI only proposes a number, and raising that alone
+    # would have written 1500 into .env while showing the player 2500.
+    param([Parameter(Mandatory = $true)][int]$Count)
+    if ($Count -lt 0) { $Count = 0 }
+    if ($Count -gt 2500) { $Count = 2500 }
+    $envPath = Get-PlayerbotEnvPath
+    if (-not (Test-Path -LiteralPath $envPath -PathType Leaf)) {
+        throw "Brak pliku .env: $envPath. Uruchom najpierw serwer (GRAJ), aby go utworzyć."
+    }
+    $content = [IO.File]::ReadAllText($envPath)
+    $pattern = '(?m)^PLAYERBOT_AUTOSPAWN_COUNT=.*$'
+    if ([Regex]::IsMatch($content, $pattern)) {
+        $content = [Regex]::Replace($content, $pattern, "PLAYERBOT_AUTOSPAWN_COUNT=$Count")
+    }
+    else {
+        if ($content -and -not $content.EndsWith("`n")) { $content += [Environment]::NewLine }
+        $content += "PLAYERBOT_AUTOSPAWN_COUNT=$Count" + [Environment]::NewLine
+    }
+    [IO.File]::WriteAllText($envPath, $content, [Text.UTF8Encoding]::new($false))
+    return $Count
+}
+
+function Get-SpawnPlanFromEnv {
+    # PLAYERBOT_SPAWN_WINDOW_MINUTES / PLAYERBOT_LATE_JOINERS / PLAYERBOT_LATE_JOIN_HOURS
+    # as .env has them; 1 / 0 / 24 when the keys are not there yet.
+    return @{
+        Minutes = Get-DotEnvValue -Key 'PLAYERBOT_SPAWN_WINDOW_MINUTES' -Default '1'
+        Late    = Get-DotEnvValue -Key 'PLAYERBOT_LATE_JOINERS' -Default '0'
+        Hours   = Get-DotEnvValue -Key 'PLAYERBOT_LATE_JOIN_HOURS' -Default '24'
+    }
+}
+
+function Set-SpawnPlan {
+    # The core reads the three at startup (input_db.cpp): the window the
+    # cohort arrives over, the second cohort and its hours. Clamped to what
+    # the core accepts, so .env never carries a number it would refuse.
+    param([int]$Minutes, [int]$Late, [int]$Hours)
+    if ($Minutes -lt 1) { $Minutes = 1 }
+    if ($Minutes -gt 180) { $Minutes = 180 }
+    if ($Late -lt 0) { $Late = 0 }
+    if ($Late -gt 2500) { $Late = 2500 }
+    if ($Hours -lt 1) { $Hours = 1 }
+    if ($Hours -gt 168) { $Hours = 168 }
+    Set-DotEnvValue -Key 'PLAYERBOT_SPAWN_WINDOW_MINUTES' -Value "$Minutes"
+    Set-DotEnvValue -Key 'PLAYERBOT_LATE_JOINERS' -Value "$Late"
+    Set-DotEnvValue -Key 'PLAYERBOT_LATE_JOIN_HOURS' -Value "$Hours"
+    return @{ Minutes = $Minutes; Late = $Late; Hours = $Hours }
+}
+
+function Get-KingdomCountsFromEnv {
+    # PLAYERBOT_AUTOSPAWN_PER_KINGDOM and the three numbers.
+    #
+    # A kingdom whose key is not in .env yet defaults to the equal share of
+    # PLAYERBOT_AUTOSPAWN_COUNT, which is what the world runs on right now -
+    # never to zero. Zero is a real setting that means "this kingdom starts
+    # nobody", and offering it as the opening value of a dialog is how a world
+    # ends up with bots in one kingdom: the three keys are absent on every
+    # install made before 2.0.83, so the box showed 0 for all three, and
+    # ticking "Indywidualne wartosci" with one of them filled left the other
+    # two empty for good ("nowe postacie tworza sie tylko w Chunjo",
+    # NerrVoVy, 19 September - his world had just turned the second channel on
+    # and the two were read together).
+    $total = 0
+    [int]::TryParse((Get-DotEnvValue -Key 'PLAYERBOT_AUTOSPAWN_COUNT' -Default '0'), [ref]$total) | Out-Null
+    $even = [int][Math]::Floor($total / 3)
+    $enabled = (Get-DotEnvValue -Key 'PLAYERBOT_AUTOSPAWN_PER_KINGDOM' -Default '0') -eq '1'
+    $read = {
+        param($key)
+        # Only numbers in use are offered back: .env.example ships the three at
+        # 0 and start-server.ps1 adds them to every .env, so "not there yet" was
+        # never true and the dialog opened on zeros after all.
+        if (-not $enabled) { return $even }
+        $raw = Get-DotEnvValue -Key $key -Default ''
+        if ([string]::IsNullOrWhiteSpace([string]$raw)) { return $even }
+        $n = 0
+        if ([int]::TryParse($raw, [ref]$n)) { return $n }
+        return $even
+    }
+    return @{
+        Enabled = $enabled
+        Shinsoo = & $read 'PLAYERBOT_AUTOSPAWN_SHINSOO'
+        Chunjo  = & $read 'PLAYERBOT_AUTOSPAWN_CHUNJO'
+        Jinno   = & $read 'PLAYERBOT_AUTOSPAWN_JINNO'
+    }
+}
+
+function Set-KingdomCounts {
+    # The operator's own number per kingdom (Greess): with it on, each kingdom
+    # starts its own count instead of a share of PLAYERBOT_AUTOSPAWN_COUNT, cut
+    # by the core to the identities the kingdom has - 1500 since 2.2.1, so a
+    # number is clamped there rather than written and quietly cut (kavvaski's
+    # 729 Shinsoo came out as the 500 the kingdom held). Read at the next start.
+    param([bool]$Enabled, [int]$Shinsoo = 0, [int]$Chunjo = 0, [int]$Jinno = 0)
+    $clamp = { param($n) if ($n -lt 0) { 0 } elseif ($n -gt 1500) { 1500 } else { $n } }
+    $Shinsoo = & $clamp $Shinsoo
+    $Chunjo = & $clamp $Chunjo
+    $Jinno = & $clamp $Jinno
+    Set-DotEnvValue -Key 'PLAYERBOT_AUTOSPAWN_PER_KINGDOM' -Value $(if ($Enabled) { '1' } else { '0' })
+    Set-DotEnvValue -Key 'PLAYERBOT_AUTOSPAWN_SHINSOO' -Value "$Shinsoo"
+    Set-DotEnvValue -Key 'PLAYERBOT_AUTOSPAWN_CHUNJO' -Value "$Chunjo"
+    Set-DotEnvValue -Key 'PLAYERBOT_AUTOSPAWN_JINNO' -Value "$Jinno"
+    return @{ Enabled = $Enabled; Shinsoo = $Shinsoo; Chunjo = $Chunjo; Jinno = $Jinno }
+}
+
+function Get-SecondChannelFromEnv {
+    $share = 40
+    [int]::TryParse((Get-DotEnvValue -Key 'PLAYERBOT_CH2_SHARE' -Default '40'), [ref]$share) | Out-Null
+    return @{ Enabled = (Get-DotEnvValue -Key 'M2_PLAYERBOT_CH2' -Default '0') -eq '1'; Share = $share }
+}
+
+function Set-SecondChannel {
+    # The second channel (M2_PLAYERBOT_CH2): the switch, the share of the bots
+    # that play on it, and the two port ranges compose publishes - base..base+12
+    # while it is on (its cores listen on base+10..base+12), the first channel's
+    # three otherwise, where base is M2_GAME_PORT_BASE (13000 unless a second
+    # stack on the host moved it; the cores listen there, m2-render-config).
+    # A world with M2_CHANNELS=3 or 4 keeps every channel's ports. The host
+    # side keeps its distance from the container side, so a player who moved
+    # the published ports keeps them. SetAt is when the choice was made: the
+    # game container compares it with the web panel's wish, and the newer of
+    # the two wins.
+    param([bool]$Enabled, [int]$Share = 40, [long]$SetAt = 0)
+    if ($Share -lt 10) { $Share = 10 }
+    if ($Share -gt 90) { $Share = 90 }
+    if ($SetAt -le 0) { $SetAt = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() }
+    $base = 13000
+    if ((Get-DotEnvValue -Key 'M2_GAME_PORT_BASE' -Default '13000') -match '^\s*(\d+)\s*$' -and [int]$Matches[1] -gt 0 -and [int]$Matches[1] -lt 65500) { $base = [int]$Matches[1] }
+    $hostFirst = $base
+    $containerFirst = $base
+    $range = Get-DotEnvValue -Key 'M2_GAME_PORT_RANGE' -Default ''
+    $containerRange = Get-DotEnvValue -Key 'M2_GAME_CONTAINER_PORT_RANGE' -Default ''
+    if ($containerRange -match '^\s*(\d+)') { $containerFirst = [int]$Matches[1] }
+    if ($range -match '^\s*(\d+)') { $hostFirst = [int]$Matches[1] - $containerFirst + $base }
+    if ($hostFirst -le 0 -or $hostFirst -gt 65500) { $hostFirst = $base }
+    $channels = 1
+    if ((Get-DotEnvValue -Key 'M2_CHANNELS' -Default '1') -match '^\s*([1-4])\s*$') { $channels = [int]$Matches[1] }
+    if ($Enabled -and $channels -lt 2) { $channels = 2 }
+    $span = 10 * ($channels - 1) + 2
+    Set-DotEnvValue -Key 'M2_PLAYERBOT_CH2' -Value $(if ($Enabled) { '1' } else { '0' })
+    Set-DotEnvValue -Key 'PLAYERBOT_CH2_SHARE' -Value "$Share"
+    Set-DotEnvValue -Key 'M2_PLAYERBOT_CH2_SET_AT' -Value "$SetAt"
+    Set-DotEnvValue -Key 'M2_GAME_PORT_RANGE' -Value ('{0}-{1}' -f $hostFirst, ($hostFirst + $span))
+    Set-DotEnvValue -Key 'M2_GAME_CONTAINER_PORT_RANGE' -Value ('{0}-{1}' -f $base, ($base + $span))
+    return @{ Enabled = $Enabled; Share = $Share }
+}
+
+function Sync-ChannelWishFromPanel {
+    # The web panel cannot write .env; it leaves its second-channel wish in the
+    # spool the game container reads (channels.wanted, with SET_AT). The
+    # container honours it for the bots at its next start whatever happens
+    # here, but only .env can publish the second channel's ports - so a wish
+    # newer than .env's own is copied into .env before the stack comes up.
+    # Only while the game container runs: its spool cannot be read otherwise.
+    $envPath = Get-PlayerbotEnvPath
+    if (-not (Test-Path -LiteralPath $envPath -PathType Leaf)) { return }
+    $composeDir = Join-Path $serverRoot 'linux-port\docker'
+    $composeFile = Join-Path $composeDir 'docker-compose.yml'
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $text = @(docker compose --project-directory $composeDir -f $composeFile exec -T game cat /opt/m2spool/channels.wanted 2>$null)
+        $exit = $LASTEXITCODE
+    }
+    catch { return }
+    finally { $ErrorActionPreference = $previousPreference }
+    if ($exit -ne 0 -or $text.Count -eq 0) { return }
+    $wish = @{}
+    foreach ($line in $text) {
+        if ("$line" -match '^\s*([A-Z0-9_]+)=(\d+)\s*$') { $wish[$Matches[1]] = [long]$Matches[2] }
+    }
+    if (-not $wish.ContainsKey('CH2') -or -not $wish.ContainsKey('SET_AT')) { return }
+    $envAt = 0L
+    [long]::TryParse((Get-DotEnvValue -Key 'M2_PLAYERBOT_CH2_SET_AT' -Default '0'), [ref]$envAt) | Out-Null
+    if ($wish['SET_AT'] -le $envAt) { return }
+    $share = if ($wish.ContainsKey('SHARE')) { [int]$wish['SHARE'] } else { 40 }
+    $applied = Set-SecondChannel -Enabled ($wish['CH2'] -eq 1) -Share $share -SetAt $wish['SET_AT']
+    $what = if ($applied.Enabled) { "wlaczony, $($applied.Share)% botow na CH2" } else { 'wylaczony' }
+    Write-Host "Drugi kanal ustawiony w panelu WWW: $what." -ForegroundColor Green
+}
+
+function Set-BotCountAction {
+    $current = Get-PlayerbotCount
+    $plan = Get-SpawnPlanFromEnv
+    Write-Host "Aktualnie gra: $current botów (efektywny limit = liczba botów w Twoim świecie; kanoniczna paczka ma 350)." -ForegroundColor Gray
+    Write-Host "Wchodzą w ciągu $($plan.Minutes) min od startu; dodatkowych botów dołączających stopniowo: $($plan.Late) w ciągu $($plan.Hours) h." -ForegroundColor Gray
+
+    # -BotCount passed (from the GUI or scripting) is non-interactive: never call
+    # Read-Host, because the GUI runs this in a hidden, non-interactive console.
+    # Restart only when -Yes is also given. Without -BotCount we are in the text
+    # menu and can prompt for the numbers and the restart.
+    if ($BotCount -ge 0) {
+        $applied = Set-PlayerbotCount -Count $BotCount
+        Write-Host "Zapisano: $applied grających botów." -ForegroundColor Green
+        if ($SpawnMinutes -ge 0 -or $LateJoiners -ge 0 -or $LateHours -ge 0) {
+            $m = if ($SpawnMinutes -ge 0) { $SpawnMinutes } else { [int]$plan.Minutes }
+            $l = if ($LateJoiners -ge 0) { $LateJoiners } else { [int]$plan.Late }
+            $h = if ($LateHours -ge 0) { $LateHours } else { [int]$plan.Hours }
+            $p = Set-SpawnPlan -Minutes $m -Late $l -Hours $h
+            Write-Host "Zapisano: wejście w $($p.Minutes) min, $($p.Late) dodatkowych botów w ciągu $($p.Hours) h." -ForegroundColor Green
+        }
+        if ($PerKingdom -ge 0) {
+            $k = Get-KingdomCountsFromEnv
+            $s = if ($ShinsooBots -ge 0) { $ShinsooBots } else { $k.Shinsoo }
+            $c = if ($ChunjoBots -ge 0) { $ChunjoBots } else { $k.Chunjo }
+            $j = if ($JinnoBots -ge 0) { $JinnoBots } else { $k.Jinno }
+            $kk = Set-KingdomCounts -Enabled ($PerKingdom -eq 1) -Shinsoo $s -Chunjo $c -Jinno $j
+            if ($kk.Enabled) {
+                Write-Host "Zapisano: osobno dla królestw - Shinsoo $($kk.Shinsoo), Chunjo $($kk.Chunjo), Jinno $($kk.Jinno)." -ForegroundColor Green
+                # A kingdom at zero starts nobody, and nothing in the game says
+                # so afterwards - the world simply has no bots there. It is a
+                # legitimate setting, so it is said out loud rather than
+                # refused.
+                $empty = @()
+                if ($kk.Shinsoo -le 0) { $empty += 'Shinsoo' }
+                if ($kk.Chunjo -le 0) { $empty += 'Chunjo' }
+                if ($kk.Jinno -le 0) { $empty += 'Jinno' }
+                if (@($empty).Count -gt 0) {
+                    Write-Host ("UWAGA: " + ($empty -join ' i ') + " nie wystartuje zadnego bota. Wpisz tam liczbe wieksza od zera albo wylacz indywidualne wartosci.") -ForegroundColor Yellow
+                }
+            }
+            else { Write-Host 'Zapisano: jedna liczba botów dzielona po równo na królestwa.' -ForegroundColor Green }
+        }
+        if ($Channel2 -ge 0) {
+            # Written only when it changes, so the moment of the choice stays the
+            # one it was made at and a wish from the web panel made after it is
+            # not overwritten by a dialog that only changed the bot count.
+            $cur = Get-SecondChannelFromEnv
+            $share = if ($Channel2Share -ge 0) { $Channel2Share } else { $cur.Share }
+            if (($Channel2 -eq 1) -ne $cur.Enabled -or (($Channel2 -eq 1) -and $share -ne $cur.Share)) {
+                $ch = Set-SecondChannel -Enabled ($Channel2 -eq 1) -Share $share
+                if ($ch.Enabled) { Write-Host "Zapisano: drugi kanał (CH2) włączony, $($ch.Share)% botów na CH2." -ForegroundColor Green }
+                else { Write-Host 'Zapisano: drugi kanał (CH2) wyłączony.' -ForegroundColor Green }
+                # Each channel is about 2.5 GB of Docker's memory (upstream's
+                # measurement): a warning, never a refusal.
+                if ($ch.Enabled) {
+                    $memory = Get-M2ChannelMemoryWarning -Channels 2
+                    if ($memory) { Write-Host $memory -ForegroundColor Yellow }
+                }
+            }
+        }
+        if ($Yes) {
+            Start-Server
+            Write-Host "Serwer zrestartowany z liczbą botów: $applied." -ForegroundColor Green
+        }
+        else {
+            Write-Host 'Zmiana zostanie zastosowana przy następnym starcie serwera.' -ForegroundColor Yellow
+        }
+        return
+    }
+
+    $answer = Read-Host 'Ilu botów ma grać (0-2500)'
+    if ($answer -notmatch '^\d+$') { Write-Host 'Anulowano: to nie jest liczba.' -ForegroundColor Yellow; return }
+    $applied = Set-PlayerbotCount -Count ([int]$answer)
+    Write-Host "Zapisano: $applied grających botów." -ForegroundColor Green
+    # The same words as the "?" of the window's bot dialog, shorter.
+    Write-Host 'Wejście: w ile minut od startu serwera wchodzą boty podane wyżej (1 = prawie od razu, 15 = stopniowo przez kwadrans).' -ForegroundColor Gray
+    Write-Host 'Dodatkowe boty: dołączają później pojedynczo, ponad liczbę wyżej, równo rozłożone na podane godziny (0 = bez dodatkowych).' -ForegroundColor Gray
+    $m = Read-Host "W ciągu ilu minut od startu mają wejść (1-180, Enter = $($plan.Minutes))"
+    $l = Read-Host "Ilu dodatkowych botów ma dołączać stopniowo później (0-2500, Enter = $($plan.Late))"
+    $h = Read-Host "W ciągu ilu godzin mają dołączać (1-168, Enter = $($plan.Hours))"
+    if (-not "$m".Trim()) { $m = $plan.Minutes }
+    if (-not "$l".Trim()) { $l = $plan.Late }
+    if (-not "$h".Trim()) { $h = $plan.Hours }
+    if ("$m" -notmatch '^\d+$' -or "$l" -notmatch '^\d+$' -or "$h" -notmatch '^\d+$') {
+        Write-Host 'Plan wejścia bez zmian: to nie są liczby.' -ForegroundColor Yellow
+    }
+    else {
+        $p = Set-SpawnPlan -Minutes ([int]$m) -Late ([int]$l) -Hours ([int]$h)
+        Write-Host "Zapisano: wejście w $($p.Minutes) min, $($p.Late) dodatkowych botów w ciągu $($p.Hours) h." -ForegroundColor Green
+    }
+    $k = Get-KingdomCountsFromEnv
+    $kAnswer = Read-Host "Osobna liczba botów dla każdego królestwa? (t/n, Enter = $(if ($k.Enabled) { 't' } else { 'n' }))"
+    if ("$kAnswer".Trim() -match '^[tTyY]') {
+        $sAnswer = Read-Host "Shinsoo, czerwone (0-1500, Enter = $($k.Shinsoo))"
+        $cAnswer = Read-Host "Chunjo, żółte (0-1500, Enter = $($k.Chunjo))"
+        $jAnswer = Read-Host "Jinno, niebieskie (0-1500, Enter = $($k.Jinno))"
+        $s = if ("$sAnswer".Trim() -match '^\d+$') { [int]$sAnswer } else { $k.Shinsoo }
+        $c = if ("$cAnswer".Trim() -match '^\d+$') { [int]$cAnswer } else { $k.Chunjo }
+        $j = if ("$jAnswer".Trim() -match '^\d+$') { [int]$jAnswer } else { $k.Jinno }
+        $kk = Set-KingdomCounts -Enabled $true -Shinsoo $s -Chunjo $c -Jinno $j
+        Write-Host "Zapisano: Shinsoo $($kk.Shinsoo), Chunjo $($kk.Chunjo), Jinno $($kk.Jinno)." -ForegroundColor Green
+    }
+    elseif ("$kAnswer".Trim() -match '^[nN]') {
+        Set-KingdomCounts -Enabled $false -Shinsoo $k.Shinsoo -Chunjo $k.Chunjo -Jinno $k.Jinno | Out-Null
+        Write-Host 'Zapisano: jedna liczba botów dzielona po równo na królestwa.' -ForegroundColor Green
+    }
+    $ch2 = Get-SecondChannelFromEnv
+    $chAnswer = Read-Host "Drugi kanał (CH2) dla botów i graczy? Sklepy zostają na CH1 (t/n, Enter = $(if ($ch2.Enabled) { 't' } else { 'n' }))"
+    if ("$chAnswer".Trim() -match '^[tTyY]') {
+        $shAnswer = Read-Host "Ile procent botów na CH2 (10-90, Enter = $($ch2.Share))"
+        $share = if ("$shAnswer".Trim() -match '^\d+$') { [int]$shAnswer } else { $ch2.Share }
+        $applied2 = Set-SecondChannel -Enabled $true -Share $share
+        Write-Host "Zapisano: drugi kanał włączony, $($applied2.Share)% botów na CH2." -ForegroundColor Green
+        $memory = Get-M2ChannelMemoryWarning -Channels 2
+        if ($memory) { Write-Host $memory -ForegroundColor Yellow }
+    }
+    elseif ("$chAnswer".Trim() -match '^[nN]' -and $ch2.Enabled) {
+        Set-SecondChannel -Enabled $false -Share $ch2.Share | Out-Null
+        Write-Host 'Zapisano: drugi kanał wyłączony.' -ForegroundColor Green
+    }
+    if (Confirm-Operation 'Zrestartować serwer teraz, aby zastosować zmianę? Baza i postęp botów pozostają bez zmian') {
+        Start-Server
+        Write-Host "Serwer zrestartowany z liczbą botów: $applied." -ForegroundColor Green
+    }
+    else {
+        Write-Host 'Zmiana zostanie zastosowana przy następnym starcie serwera.' -ForegroundColor Yellow
+    }
+}
+
+# The world's difficulty: how long a player waits at the Biologist between two
+# hand-ins and at the stable keeper (the pony, each Horse Book, the medal
+# trainings). M2_DIFFICULTY in .env - easy, medium, hard or custom with the two
+# hour counts - is turned into event flags by the migrate service at every
+# start and read by the quests (linux-port-mt2009/docker/game/quest/
+# m2_difficulty.lua), so a change needs a restart. The bots never waited.
+# The skill books' waits are the package's twenty-one hours on hard and a
+# third of them on medium, for the players and the bots alike; the migrator's
+# presets (apply.sh) carry the same numbers in seconds.
+$script:DifficultyPresets = @{
+    easy   = @{ Biologist = '0';  Horse = '0';  Book = '0';  BotBook = '0' }
+    medium = @{ Biologist = '8';  Horse = '4';  Book = '7';  BotBook = '7' }
+    hard   = @{ Biologist = '24'; Horse = '12'; Book = '21'; BotBook = '21' }
+}
+
+# MT2009_PLUS_EXCHANGE_CHANCE_V1: the level also sets the NPC exchanges'
+# chances, percent - soul stones to Magiczny Pyl, skill books to Pergamin,
+# upgrade items to Materialy Rzemieslnicze - for the players and the bots'
+# dust alike. The presets are the ones quest/m2_difficulty.lua,
+# playerbot_config.h and the classic panel carry; custom takes .env's
+# M2_EXCHANGE_*_CHANCE, where 0 is the package's (easy's) number. The
+# migrator writes those three at every start; they are edited in .env.
+$script:ExchangeChanceKeys = @('M2_EXCHANGE_DUST_CHANCE', 'M2_EXCHANGE_PARCHMENT_CHANCE', 'M2_EXCHANGE_MATERIAL_CHANCE')
+$script:ExchangeChancePresets = @{ easy = @(100, 100, 55); medium = @(90, 45, 55); hard = @(55, 40, 55) }
+
+function Get-ExchangeChances {
+    param([string]$Level)
+    if ($Level -ne 'custom' -and $script:ExchangeChancePresets.ContainsKey($Level)) { return , $script:ExchangeChancePresets[$Level] }
+    $out = @(0, 0, 0)
+    for ($i = 0; $i -lt 3; $i++) {
+        $n = 0.0
+        $text = "$(Get-DotEnvValue -Key $script:ExchangeChanceKeys[$i] -Default '0')".Trim().TrimEnd('%').Replace(',', '.')
+        [void][double]::TryParse($text, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$n)
+        $p = [int][Math]::Floor($n)
+        if ($p -le 0) { $p = $script:ExchangeChancePresets.easy[$i] } elseif ($p -gt 100) { $p = 100 }
+        $out[$i] = $p
+    }
+    return , $out
+}
+
+function Get-DotEnvValue {
+    param([Parameter(Mandatory = $true)][string]$Key, [string]$Default = '')
+    $envPath = Get-PlayerbotEnvPath
+    if (-not (Test-Path -LiteralPath $envPath -PathType Leaf)) { return $Default }
+    $match = [Regex]::Match([IO.File]::ReadAllText($envPath), '(?m)^' + [Regex]::Escape($Key) + '=(.*?)\s*$')
+    if ($match.Success) { return $match.Groups[1].Value.Trim() }
+    return $Default
+}
+
+function Set-DotEnvValue {
+    # One key of .env replaced in place or appended; nothing else in the file -
+    # the player's own passwords included - is touched. Same shape as
+    # Set-PlayerbotCount. The value is a literal: a $ in it must not become a
+    # group reference for Regex.Replace.
+    param([Parameter(Mandatory = $true)][string]$Key, [Parameter(Mandatory = $true)][string]$Value)
+    $envPath = Get-PlayerbotEnvPath
+    if (-not (Test-Path -LiteralPath $envPath -PathType Leaf)) {
+        throw "Brak pliku .env: $envPath. Uruchom najpierw serwer (GRAJ), aby go utworzyć."
+    }
+    $content = [IO.File]::ReadAllText($envPath)
+    $pattern = '(?m)^' + [Regex]::Escape($Key) + '=.*$'
+    $line = "$Key=$Value"
+    if ([Regex]::IsMatch($content, $pattern)) {
+        $content = [Regex]::Replace($content, $pattern, $line.Replace('$', '$$'))
+    }
+    else {
+        if ($content -and -not $content.EndsWith("`n")) { $content += [Environment]::NewLine }
+        $content += $line + [Environment]::NewLine
+    }
+    [IO.File]::WriteAllText($envPath, $content, [Text.UTF8Encoding]::new($false))
+}
+
+function Test-DifficultyHours {
+    param([string]$Text)
+    $n = 0.0
+    $ok = [double]::TryParse("$Text".Trim().Replace(',', '.'), [Globalization.NumberStyles]::Float,
+        [Globalization.CultureInfo]::InvariantCulture, [ref]$n)
+    return ($ok -and $n -ge 0 -and $n -le 720)
+}
+
+function ConvertTo-MonsterHpSetting {
+    # M2_MONSTER_HP as the migrator reads it: default (100%, the game's own),
+    # easy (80%) or a whole percent from 10 to 300 - three times the strongest
+    # boss of this world is what the engine's own health arithmetic holds.
+    # 100 and 80 are written by their names.
+    param([string]$Text)
+    $value = "$Text".Trim().TrimEnd('%').Trim().ToLowerInvariant()
+    if ($value -in @('', 'default', 'normal', '100')) { return 'default' }
+    if ($value -in @('easy', '80')) { return 'easy' }
+    $n = 0
+    if ([int]::TryParse($value, [ref]$n) -and $n -ge 10 -and $n -le 300) { return "$n" }
+    throw "Życie potworów: podaj default, easy albo procent od 10 do 300, nie '$Text'."
+}
+
+function Set-DifficultyAction {
+    $current = Get-DotEnvValue -Key 'M2_DIFFICULTY' -Default 'easy'
+    $currentBio = Get-DotEnvValue -Key 'M2_BIOLOGIST_WAIT_HOURS' -Default '0'
+    $currentHorse = Get-DotEnvValue -Key 'M2_HORSE_WAIT_HOURS' -Default '0'
+    $currentBook = Get-DotEnvValue -Key 'M2_BOOK_WAIT_HOURS' -Default '0'
+    $currentBotBook = Get-DotEnvValue -Key 'M2_BOT_BOOK_WAIT_HOURS' -Default '0'
+    $currentAutoHunt = (Get-DotEnvValue -Key 'M2_AUTOHUNT' -Default '1') -ne '0'
+    $currentAutoHuntItem = (Get-DotEnvValue -Key 'M2_AUTOHUNT_ITEM' -Default '0') -eq '1'
+    $currentSidekick = (Get-DotEnvValue -Key 'M2_SIDEKICK' -Default '1') -ne '0'
+    $currentStarter = (Get-DotEnvValue -Key 'M2_STARTER_CHEST' -Default '1') -ne '0'
+    $currentFlea = (Get-DotEnvValue -Key 'M2_FLEA_MARKET' -Default '1') -ne '0'
+    $currentArezzo = (Get-DotEnvValue -Key 'M2_AREZZO' -Default '0') -eq '1'
+    # Monster health: what .env says, and the game's own for anything that
+    # does not read as a setting.
+    $currentMonsterHp = 'default'
+    try { $currentMonsterHp = ConvertTo-MonsterHpSetting (Get-DotEnvValue -Key 'M2_MONSTER_HP' -Default 'default') } catch { }
+    $currentMonsterPct = $(if ($currentMonsterHp -eq 'easy') { '80' } elseif ($currentMonsterHp -eq 'default') { '100' } else { $currentMonsterHp })
+    Write-Host "Aktualny poziom trudności: $current (przy 'custom': Biolog $currentBio h, Stajenny $currentHorse h, księgi: gracze $currentBook h, boty $currentBotBook h)." -ForegroundColor Gray
+    Write-Host "Auto Łowy: $(if ($currentAutoHunt) { 'włączone' } else { 'wyłączone' }) ($(if ($currentAutoHuntItem) { 'tylko po kupnie przedmiotu z ItemShop' } else { 'dla każdego' })); Towarzysz: $(if ($currentSidekick) { 'włączony' } else { 'wyłączony' }); Skrzynia Ucznia: $(if ($currentStarter) { 'tak' } else { 'nie' }); Dom Towarowy: $(if ($currentFlea) { 'włączony' } else { 'wyłączony' }); Moduł Arezzo: $(if ($currentArezzo) { 'włączony' } else { 'wyłączony' })." -ForegroundColor Gray
+    Write-Host "Życie potworów, bossów i Metinów: $currentMonsterPct% (100% = jak w grze)." -ForegroundColor Gray
+
+    # -Difficulty passed (from the GUI or scripting) is non-interactive, like
+    # -BotCount: never Read-Host, restart only with -Yes.
+    $level = "$Difficulty".Trim().ToLowerInvariant()
+    $bio = "$BiologistHours"
+    $horse = "$HorseHours"
+    $book = "$BookHours"
+    $botBook = "$BotBookHours"
+    $interactive = (-not $level)
+    if ($interactive) {
+        Write-Host ' 1. easy   - bez czekania u Biologa, u Stajennego, na kolejną księgę i Kamień Duchowy (tak jak dotąd)'
+        Write-Host ' 2. medium - Biolog 8 h; kucyk i Księgi Konia 4 h; treningi konia 6 h (1-10) i 7 h (11-19); księgi i Kamienie Duchowe 7 h'
+        Write-Host ' 3. hard   - jak w oryginale: Biolog 24 h; kucyk i Księgi 12 h; treningi 18 h i 21 h; księgi 21 h, Kamienie Duchowe 12 h'
+        Write-Host ' 4. custom - własne godziny (Biolog, każde czekanie u Stajennego, księgi graczy i księgi botów)'
+        $customChances = Get-ExchangeChances -Level 'custom'
+        Write-Host ("    Szanse wymiany u NPC (Magiczny Pył / Pergamin / Materiały Rzemieślnicze): easy 100/100/55%, medium 90/45/55%, hard 55/40/55%, custom - M2_EXCHANGE_* w .env (teraz {0}/{1}/{2}%)" -f $customChances[0], $customChances[1], $customChances[2])
+        $answer = Read-Host 'Wybierz poziom (1-4)'
+        $level = switch ($answer) { '1' { 'easy' } '2' { 'medium' } '3' { 'hard' } '4' { 'custom' } default { '' } }
+        if (-not $level) { Write-Host 'Anulowano.' -ForegroundColor Yellow; return }
+        if ($level -eq 'custom') {
+            $bio = Read-Host 'Ile godzin czeka się u Biologa między oddaniami (0 = bez czekania, ułamki dozwolone)'
+            $horse = Read-Host 'Ile godzin czeka się u Stajennego na kucyka, Księgę Konia i trening (0 = bez czekania)'
+            $book = Read-Host 'Ile godzin gracz czeka między dwiema księgami tej samej umiejętności i między Kamieniami Duchowymi, te najwyżej 12 h (0 = od razu)'
+            $botBook = Read-Host 'Ile godzin czekają na kolejną księgę i Kamień Duchowy boty, na Kamień najwyżej 12 h (0 = od razu)'
+        }
+    }
+    # Auto Lowy, the companion, the apprentice chest and the Dom Towarowy:
+    # asked in the text menu after the level, and taken from -AutoHunt/
+    # -Sidekick/-StarterChest/-FleaMarket otherwise; what .env says when neither. The chest was asked only where a
+    # fresh world is made, so a world already standing had no way to it - and
+    # "gdzie te skrzynie ucznia do wylaczenia ... w launcherze szukam, ni ma"
+    # (Drip, 25 September) was answered with this very window.
+    $autoHuntOn = $currentAutoHunt
+    $autoHuntItemOn = $currentAutoHuntItem
+    $sidekickOn = $currentSidekick
+    $starterOn = $currentStarter
+    $fleaOn = $currentFlea
+    $arezzoOn = $currentArezzo
+    $monsterSetting = $currentMonsterHp
+    if ($interactive) {
+        $answer = Read-Host "Auto Łowy (automatyczne polowanie w kliencie, klawisz K) włączone? (T/n, Enter = $(if ($currentAutoHunt) { 'tak' } else { 'nie' }))"
+        if ("$answer".Trim()) { $autoHuntOn = "$answer".Trim().ToLowerInvariant() -notin @('n', 'nie', 'no', '0') }
+        if ($autoHuntOn) {
+            # The operator, 27 September: the panel for everybody, or only for
+            # a character that bought "Auto Lowy (8h)" in the ItemShop.
+            $answer = Read-Host "Panel Autołowy: 1 = dostępny dla każdego, 2 = dostępny tylko po kupnie przedmiotu z ItemShop (Enter = $(if ($currentAutoHuntItem) { '2' } else { '1' }))"
+            if ("$answer".Trim() -eq '1') { $autoHuntItemOn = $false }
+            elseif ("$answer".Trim() -eq '2') { $autoHuntItemOn = $true }
+        }
+        $answer = Read-Host "Towarzysz (stały kompan gracza, list i okno P) włączony? (T/n, Enter = $(if ($currentSidekick) { 'tak' } else { 'nie' }))"
+        if ("$answer".Trim()) { $sidekickOn = "$answer".Trim().ToLowerInvariant() -notin @('n', 'nie', 'no', '0') }
+        $answer = Read-Host "Skrzynia Ucznia w grze - dla nowych postaci graczy i dla botów? (T/n, Enter = $(if ($currentStarter) { 'tak' } else { 'nie' }))"
+        if ("$answer".Trim()) { $starterOn = "$answer".Trim().ToLowerInvariant() -notin @('n', 'nie', 'no', '0') }
+        $answer = Read-Host "Dom Towarowy (wszystkie oferty sklepów offline u Handlarki Różności w M1) włączony? (T/n, Enter = $(if ($currentFlea) { 'tak' } else { 'nie' }))"
+        if ("$answer".Trim()) { $fleaOn = "$answer".Trim().ToLowerInvariant() -notin @('n', 'nie', 'no', '0') }
+        $answer = Read-Host "Moduł Arezzo (nowe mapy: Dolina Cyklopów, Pustkowie Faraona, Zaczarowany Las i 4 lochy) włączony? (t/N, Enter = $(if ($currentArezzo) { 'tak' } else { 'nie' }))"
+        if ("$answer".Trim()) { $arezzoOn = "$answer".Trim().ToLowerInvariant() -in @('t', 'tak', 'y', 'yes', '1') }
+        $answer = Read-Host "Życie potworów, bossów i Metinów: 1 = jak w grze (100%), 2 = łatwiej (80%) (Enter = $currentMonsterPct%)"
+        if ("$answer".Trim() -eq '1') { $monsterSetting = 'default' }
+        elseif ("$answer".Trim() -eq '2') { $monsterSetting = 'easy' }
+    }
+    else {
+        if ($AutoHunt -ge 0) { $autoHuntOn = ($AutoHunt -ne 0) }
+        if ($AutoHuntItem -ge 0) { $autoHuntItemOn = ($AutoHuntItem -ne 0) }
+        if ($Sidekick -ge 0) { $sidekickOn = ($Sidekick -ne 0) }
+        if ($StarterChest -ge 0) { $starterOn = ($StarterChest -ne 0) }
+        if ($FleaMarket -ge 0) { $fleaOn = ($FleaMarket -ne 0) }
+        if ($Arezzo -ge 0) { $arezzoOn = ($Arezzo -ne 0) }
+        # Read before anything is written, so a value it refuses leaves .env as it was.
+        if ("$MonsterHp".Trim()) { $monsterSetting = ConvertTo-MonsterHpSetting $MonsterHp }
+    }
+    if ($level -notin @('easy', 'medium', 'hard', 'custom')) {
+        throw "Nieznany poziom trudności: '$level'. Dozwolone: easy, medium, hard, custom."
+    }
+    if ($level -ne 'custom') {
+        $bio = $script:DifficultyPresets[$level].Biologist
+        $horse = $script:DifficultyPresets[$level].Horse
+        $book = $script:DifficultyPresets[$level].Book
+        $botBook = $script:DifficultyPresets[$level].BotBook
+    }
+    # An older GUI passes no book hours for custom: what .env already says.
+    if ("$book".Trim() -eq '') { $book = $currentBook }
+    if ("$botBook".Trim() -eq '') { $botBook = $currentBotBook }
+    if (-not (Test-DifficultyHours $bio)) { throw "Godziny u Biologa: podaj liczbę od 0 do 720 (np. 12 albo 0.5), nie '$bio'." }
+    if (-not (Test-DifficultyHours $horse)) { throw "Godziny u Stajennego: podaj liczbę od 0 do 720 (np. 12 albo 0.5), nie '$horse'." }
+    if (-not (Test-DifficultyHours $book)) { throw "Godziny między księgami graczy: podaj liczbę od 0 do 720 (np. 21 albo 0.5), nie '$book'." }
+    if (-not (Test-DifficultyHours $botBook)) { throw "Godziny między księgami botów: podaj liczbę od 0 do 720 (np. 21 albo 0.5), nie '$botBook'." }
+    $bio = "$bio".Trim().Replace(',', '.')
+    $horse = "$horse".Trim().Replace(',', '.')
+    $book = "$book".Trim().Replace(',', '.')
+    $botBook = "$botBook".Trim().Replace(',', '.')
+    Set-DotEnvValue -Key 'M2_DIFFICULTY' -Value $level
+    Set-DotEnvValue -Key 'M2_BIOLOGIST_WAIT_HOURS' -Value $bio
+    Set-DotEnvValue -Key 'M2_HORSE_WAIT_HOURS' -Value $horse
+    Set-DotEnvValue -Key 'M2_BOOK_WAIT_HOURS' -Value $book
+    Set-DotEnvValue -Key 'M2_BOT_BOOK_WAIT_HOURS' -Value $botBook
+    Set-DotEnvValue -Key 'M2_AUTOHUNT' -Value $(if ($autoHuntOn) { '1' } else { '0' })
+    Set-DotEnvValue -Key 'M2_AUTOHUNT_ITEM' -Value $(if ($autoHuntItemOn) { '1' } else { '0' })
+    Set-DotEnvValue -Key 'M2_SIDEKICK' -Value $(if ($sidekickOn) { '1' } else { '0' })
+    Set-DotEnvValue -Key 'M2_STARTER_CHEST' -Value $(if ($starterOn) { '1' } else { '0' })
+    Set-DotEnvValue -Key 'M2_FLEA_MARKET' -Value $(if ($fleaOn) { '1' } else { '0' })
+    Set-DotEnvValue -Key 'M2_AREZZO' -Value $(if ($arezzoOn) { '1' } else { '0' })
+    Set-DotEnvValue -Key 'M2_MONSTER_HP' -Value $monsterSetting
+    $chances = Get-ExchangeChances -Level $level
+    Write-Host "Zapisano: poziom trudności $level (Biolog $bio h, Stajenny $horse h, księgi: gracze $book h, boty $botBook h; wymiana u NPC: Magiczny Pył $($chances[0])%, Pergamin $($chances[1])%, Materiały $($chances[2])%)." -ForegroundColor Green
+    Write-Host "Auto Łowy: $(if ($autoHuntOn) { 'włączone' } else { 'wyłączone' }) ($(if ($autoHuntItemOn) { 'tylko po kupnie przedmiotu z ItemShop' } else { 'dla każdego' })); Towarzysz: $(if ($sidekickOn) { 'włączony' } else { 'wyłączony' }); Skrzynia Ucznia: $(if ($starterOn) { 'tak' } else { 'nie' }); Dom Towarowy: $(if ($fleaOn) { 'włączony' } else { 'wyłączony' }); Moduł Arezzo: $(if ($arezzoOn) { 'włączony' } else { 'wyłączony' })." -ForegroundColor Green
+    $monsterPct = $(if ($monsterSetting -eq 'easy') { '80' } elseif ($monsterSetting -eq 'default') { '100' } else { $monsterSetting })
+    Write-Host "Życie potworów, bossów i Metinów: $monsterPct%." -ForegroundColor Green
+    if ($Yes) {
+        Start-Server
+        Write-Host "Serwer zrestartowany z poziomem trudności: $level." -ForegroundColor Green
+        return
+    }
+    if ($interactive -and (Confirm-Operation 'Zrestartować serwer teraz, aby zastosować zmianę? Baza i postęp botów pozostają bez zmian')) {
+        Start-Server
+        Write-Host "Serwer zrestartowany z poziomem trudności: $level." -ForegroundColor Green
+        return
+    }
+    Write-Host 'Zmiana zostanie zastosowana przy następnym starcie serwera.' -ForegroundColor Yellow
+}
+
+function Get-CurrentInstallTargetVolume {
+    # The db-data volume of THIS installation (import target).
+    $statePath = Join-Path $serverRoot '.m2install.json'
+    if (Test-Path -LiteralPath $statePath -PathType Leaf) {
+        try {
+            $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $volProp = $state.PSObject.Properties['databaseVolume']
+            if ($volProp -and [string]$volProp.Value) { return [string]$volProp.Value }
+            if ([string]$state.projectName) { return "$([string]$state.projectName)_db-data" }
+        }
+        catch { }
+    }
+    $envPath = Join-Path $serverRoot 'linux-port\docker\.env'
+    if (Test-Path -LiteralPath $envPath -PathType Leaf) {
+        $match = [Regex]::Match([IO.File]::ReadAllText($envPath), '(?m)^M2_COMPOSE_PROJECT_NAME=([a-z0-9][a-z0-9_-]+)\s*$')
+        if ($match.Success) { return "$($match.Groups[1].Value)_db-data" }
+    }
+    return $null
+}
+
+function Import-DatabaseAction {
+    if (-not (Test-M2DockerRunning)) {
+        Write-Host 'Silnik Dockera jest zatrzymany, więc nie widać żadnych baz.' -ForegroundColor Yellow
+        Write-Host 'Uruchom Docker (akcja StartDocker lub przycisk „URUCHOM DOCKER") i spróbuj ponownie.' -ForegroundColor Yellow
+        Write-Host 'Żadne dane nie zginęły — bazy są na dysku, tylko Docker ich teraz nie pokazuje.' -ForegroundColor Gray
+        return
+    }
+    $target = Get-CurrentInstallTargetVolume
+    if (-not $target) {
+        Write-Host 'Nie można ustalić bazy tej instalacji. Uruchom najpierw serwer (GRAJ) choć raz, aby utworzyć tożsamość i wolumen.' -ForegroundColor Yellow
+        return
+    }
+    Write-Host "Baza docelowa (ta instalacja): $target" -ForegroundColor Gray
+    if (-not (Test-M2VolumeInitialized -Volume $target)) {
+        Write-Host 'Ta instalacja nie ma jeszcze gotowej bazy danych.' -ForegroundColor Yellow
+        Write-Host 'Najpierw kliknij GRAJ i pozwól serwerowi wystartować choć raz (utworzy bazę ze schematami gry),' -ForegroundColor Yellow
+        Write-Host 'a dopiero potem importuj świat. Import na pustą bazę zostawiłby instalację bez schematów.' -ForegroundColor Yellow
+        return
+    }
+    $sources = @(Get-M2DbDataVolumes | Where-Object { $_.Name -ne $target })
+    if ($sources.Count -eq 0) {
+        Write-Host 'Nie znaleziono innej bazy Docker do importu na tym komputerze.' -ForegroundColor Yellow
+        return
+    }
+
+    $chosen = $null
+    if ($ImportSource) {
+        $chosen = $sources | Where-Object { $_.Name -eq $ImportSource -or $_.Project -eq $ImportSource } | Select-Object -First 1
+        if (-not $chosen) { Write-Host "Nie znaleziono źródła do importu: $ImportSource" -ForegroundColor Red; return }
+    }
+    else {
+        Write-Host 'Dostępne bazy do importu:' -ForegroundColor Cyan
+        for ($i = 0; $i -lt $sources.Count; $i++) {
+            $label = $sources[$i].Project
+            if ($sources[$i].CreatedAt) { $label = '{0}   (utworzona {1:yyyy-MM-dd HH:mm})' -f $label, $sources[$i].CreatedAt }
+            Write-Host ("  [{0}] {1}" -f ($i + 1), $label)
+        }
+        $pick = Read-Host 'Wybierz numer źródła (Enter = anuluj)'
+        if ($pick -notmatch '^\d+$') { Write-Host 'Anulowano.' -ForegroundColor Yellow; return }
+        $idx = [int]$pick - 1
+        if ($idx -lt 0 -or $idx -ge $sources.Count) { Write-Host 'Nieprawidłowy numer.' -ForegroundColor Yellow; return }
+        $chosen = $sources[$idx]
+    }
+
+    Write-Host "Sprawdzam świat źródłowy '$($chosen.Project)'..." -ForegroundColor Gray
+    $stats = Get-M2VolumeWorldStats -Volume $chosen.Name
+    if ($stats.Ok) {
+        Write-Host ("Źródło: {0} postaci, najwyższy poziom {1}." -f $stats.Players, $stats.MaxLevel) -ForegroundColor Green
+        if ($stats.Created) { Write-Host ("  Baza utworzona: {0}" -f $stats.Created) -ForegroundColor Gray }
+        if ($stats.LastPlay -and $stats.LastPlay -ne '0') { Write-Host ("  Ostatnia gra: {0}" -f $stats.LastPlay) -ForegroundColor Gray }
+    }
+    else {
+        Write-Host 'Nie udało się odczytać statystyk źródła (mimo to można spróbować importu).' -ForegroundColor Yellow
+    }
+
+    Write-Host ''
+    Write-Host "UWAGA: import ZASTĄPI obecny świat tej instalacji światem ze źródła '$($chosen.Project)'." -ForegroundColor Yellow
+    Write-Host "Źródło pozostaje nietknięte. Obecny świat trafi do kopii w 'backups' przed nadpisaniem." -ForegroundColor Yellow
+    if (-not (Confirm-Operation "Kontynuować import z '$($chosen.Project)'?")) { Write-Host 'Anulowano.' -ForegroundColor Yellow; return }
+
+    # Read this install's game DB user/password so the import can re-apply the
+    # user and grants afterwards (guards against the migrator failing to
+    # authenticate after a swap).
+    $dbUser = 'metin2'; $dbPass = ''
+    $importEnvPath = Join-Path $serverRoot 'linux-port\docker\.env'
+    if (Test-Path -LiteralPath $importEnvPath -PathType Leaf) {
+        $importEnvText = [IO.File]::ReadAllText($importEnvPath)
+        $userMatch = [Regex]::Match($importEnvText, '(?m)^M2_DB_USER=(.+?)\s*$')
+        if ($userMatch.Success) { $dbUser = $userMatch.Groups[1].Value }
+        $passMatch = [Regex]::Match($importEnvText, '(?m)^M2_DB_PASSWORD=(.+?)\s*$')
+        if ($passMatch.Success) { $dbPass = $passMatch.Groups[1].Value }
+    }
+
+    Write-Host 'Zatrzymuję serwer, aby zwolnić bazę docelową...' -ForegroundColor Cyan
+    Stop-Server
+
+    Write-Host 'Importuję bazę (to może potrwać chwilę)...' -ForegroundColor Cyan
+    $result = Invoke-M2DatabaseImport -SourceVolume $chosen.Name -TargetVolume $target -BackupRoot (Join-Path $serverRoot 'backups') -DbUser $dbUser -DbPassword $dbPass
+    Write-Host ("Gotowe. Zaimportowany świat: {0} postaci, najwyższy poziom {1}." -f $result.Players, $result.MaxLevel) -ForegroundColor Green
+    Write-Host ("Kopia poprzedniego świata: {0}" -f $result.Backup) -ForegroundColor Gray
+    Write-Host 'Kliknij GRAJ (lub akcja Start), aby uruchomić serwer z zaimportowanym światem.' -ForegroundColor Green
+}
+
+function Backup-DatabaseAction {
+    # Everything the import path already did to protect a world, asked for on
+    # purpose instead of as a side effect: five SQL dumps, a manifest and a zip.
+    if (-not (Test-M2DockerRunning)) {
+        Write-Host 'Silnik Dockera jest zatrzymany, wiec nie da sie odczytac bazy.' -ForegroundColor Yellow
+        Write-Host 'Uruchom Docker (akcja StartDocker) i sprobuj ponownie. Nic nie zginelo.' -ForegroundColor Gray
+        return
+    }
+    $target = Get-CurrentInstallTargetVolume
+    if (-not $target) {
+        Write-Host 'Nie mozna ustalic bazy tej instalacji. Uruchom najpierw serwer (GRAJ) choc raz.' -ForegroundColor Yellow
+        return
+    }
+    if (-not (Test-M2VolumeInitialized -Volume $target)) {
+        Write-Host 'Ta instalacja nie ma jeszcze bazy danych - nie ma czego zapisac.' -ForegroundColor Yellow
+        return
+    }
+    Write-Host 'Zatrzymuję serwer, aby baza była spójna w chwili zapisu...' -ForegroundColor Cyan
+    Stop-Server
+    Write-Host 'Zapisuję kopię (to może potrwać chwilę)...' -ForegroundColor Cyan
+    $result = New-M2DatabaseBackup -Volume $target -BackupRoot (Join-Path $serverRoot 'backups')
+    Write-Host ("Gotowe. Zapisany świat: {0} postaci, najwyższy poziom {1}." -f $result.Players, $result.MaxLevel) -ForegroundColor Green
+    Write-Host ("  Folder: {0}" -f $result.Folder) -ForegroundColor Gray
+    Write-Host ("  Plik:   {0}  ({1:N0} MB)" -f $result.Zip, ($result.ZipBytes / 1MB)) -ForegroundColor Gray
+    Write-Host 'Ten jeden plik zip wystarczy, aby odtworzyć świat na tym albo na innym komputerze.' -ForegroundColor Gray
+    Write-Host 'Kliknij GRAJ, aby uruchomić serwer z powrotem.' -ForegroundColor Green
+}
+
+function Restore-DatabaseAction {
+    if (-not (Test-M2DockerRunning)) {
+        Write-Host 'Silnik Dockera jest zatrzymany. Uruchom Docker i spróbuj ponownie.' -ForegroundColor Yellow
+        return
+    }
+    $target = Get-CurrentInstallTargetVolume
+    if (-not $target) {
+        Write-Host 'Nie mozna ustalic bazy tej instalacji. Uruchom najpierw serwer (GRAJ) choc raz.' -ForegroundColor Yellow
+        return
+    }
+    $picked = $RestoreSource
+    if (-not $picked) {
+        $backupRoot = Join-Path $serverRoot 'backups'
+        $found = @()
+        if (Test-Path -LiteralPath $backupRoot -PathType Container) {
+            $found = @(Get-ChildItem -LiteralPath $backupRoot -Filter 'db-backup-*.zip' -File |
+                       Sort-Object LastWriteTime -Descending)
+        }
+        if ($found.Count -eq 0) {
+            Write-Host "Nie znaleziono zadnej kopii w '$backupRoot'." -ForegroundColor Yellow
+            Write-Host 'Zrob najpierw kopie (akcja BackupDb), albo podaj sciezke: -RestoreSource "C:\...\db-backup-....zip"' -ForegroundColor Gray
+            return
+        }
+        Write-Host 'Dostępne kopie:' -ForegroundColor Cyan
+        for ($i = 0; $i -lt $found.Count; $i++) {
+            Write-Host ("  [{0}] {1}   ({2:yyyy-MM-dd HH:mm}, {3:N0} MB)" -f ($i + 1),
+                $found[$i].Name, $found[$i].LastWriteTime, ($found[$i].Length / 1MB))
+        }
+        $pick = Read-Host 'Wybierz numer kopii (Enter = anuluj)'
+        if ($pick -notmatch '^\d+$') { Write-Host 'Anulowano.' -ForegroundColor Yellow; return }
+        $idx = [int]$pick - 1
+        if ($idx -lt 0 -or $idx -ge $found.Count) { Write-Host 'Nieprawidłowy numer.' -ForegroundColor Yellow; return }
+        $picked = $found[$idx].FullName
+    }
+    if (-not (Test-Path -LiteralPath $picked)) {
+        Write-Host "Nie znaleziono kopii: $picked" -ForegroundColor Red
+        return
+    }
+    Write-Host ''
+    Write-Host "UWAGA: przywrócenie ZASTĄPI obecny świat tej instalacji zawartością kopii." -ForegroundColor Yellow
+    Write-Host 'Obecny świat zostanie najpierw zapisany do własnej kopii w folderze backups.' -ForegroundColor Yellow
+    if (-not (Confirm-Operation "Przywrócić świat z '$([IO.Path]::GetFileName($picked))'?")) {
+        Write-Host 'Anulowano.' -ForegroundColor Yellow; return
+    }
+    $creds = Get-InstallDbCredentials
+    Write-Host 'Zatrzymuję serwer, aby zwolnić bazę...' -ForegroundColor Cyan
+    Stop-Server
+    Write-Host 'Przywracam kopię (to może potrwać chwilę)...' -ForegroundColor Cyan
+    $result = Restore-M2DatabaseBackup -BackupPath $picked -TargetVolume $target `
+        -BackupRoot (Join-Path $serverRoot 'backups') -DbUser $creds.User -DbPassword $creds.Password
+    Write-Host ("Gotowe. Przywrócony świat: {0} postaci, najwyższy poziom {1}." -f $result.Players, $result.MaxLevel) -ForegroundColor Green
+    Write-Host ("  Kopia poprzedniego świata: {0}" -f $result.Safety) -ForegroundColor Gray
+    Write-Host 'Kliknij GRAJ, aby uruchomić serwer z przywróconym światem.' -ForegroundColor Green
+}
+
+function Test-RatePercent {
+    param([int]$Value)
+    return ($Value -ge 1 -and $Value -le 10000)
+}
+
+function Set-FreshWorldSettings {
+    <#
+      .SYNOPSIS
+        The rates a world about to be made starts on, and whether its bots wait.
+
+      .DESCRIPTION
+        Both are read by the migrator before the cores come up, and only for a
+        world whose event flags do not exist yet - a world already set from the
+        panel is never touched by .env, so this is asked where a fresh world is
+        about to be made and nowhere else.
+
+        The panel used to promise 650% experience on a world the game ran at
+        100%, and the first press of its button - field untouched - was what
+        made the promise real. That is the window NerrVoVy asked us to close
+        (20 September): "zanim sie zmieni ustawienia to juz cos sie tam
+        podzieje".
+
+        Non-interactive when the numbers come in as parameters or -Yes is set,
+        which is how the GUI calls every action; the console path asks.
+    #>
+    param([string]$Reason = 'nowego świata')
+
+    $exp = $RateExp
+    $drop = $RateDrop
+    $yang = $RateYang
+    $hold = $HoldBots
+    $starter = $StarterChest
+    $kit = "$StarterKit".Trim().ToLowerInvariant()
+    $interactive = (-not $Yes) -and $exp -lt 0 -and $drop -lt 0 -and $yang -lt 0 -and $hold -lt 0 -and $starter -lt 0 -and -not $kit
+    if ($interactive) {
+        Write-Host ''
+        Write-Host "Ustawienia $Reason - wchodzą w życie, zanim pojawi się pierwszy bot:" -ForegroundColor Cyan
+        Write-Host ' 1. Normalnie      - 100% doświadczenia, 100% dropu, 100% yang (tak, jak gra została stworzona)'
+        Write-Host ' 2. Spokojnie      - 300% / 200% / 200%'
+        Write-Host ' 3. Szybko         - 1000% / 500% / 500%'
+        Write-Host ' 4. Własne liczby'
+        Write-Host ' 5. Nie zmieniaj   - zostaw to, co jest w .env'
+        Write-Host 'UWAGA (yang): CENY I BOTY SĄ ZOPTYMALIZOWANE POD DROP 100%, ustawiając więcej, psujesz sobie rozgrywkę, a na serwerze będzie wielka inflacja, a ceny będą przesadzone.' -ForegroundColor Red
+        $answer = Read-Host 'Wybierz (1-5)'
+        switch ($answer) {
+            '1' { $exp = 100;  $drop = 100; $yang = 100 }
+            '2' { $exp = 300;  $drop = 200; $yang = 200 }
+            '3' { $exp = 1000; $drop = 500; $yang = 500 }
+            '4' {
+                $exp = [int](Read-Host 'Doświadczenie w procentach (100 = normalnie)')
+                $drop = [int](Read-Host 'Drop przedmiotów w procentach')
+                Write-Host 'CENY I BOTY SĄ ZOPTYMALIZOWANE POD DROP 100%, ustawiając więcej, psujesz sobie rozgrywkę, a na serwerze będzie wielka inflacja, a ceny będą przesadzone.' -ForegroundColor Red
+                $yang = [int](Read-Host 'Yang w procentach')
+            }
+            default { $exp = -1; $drop = -1; $yang = -1 }
+        }
+        Write-Host ''
+        Write-Host 'Boty mogą poczekać przy drzwiach, żeby dało się spokojnie ustawić resztę:' -ForegroundColor Cyan
+        if (Confirm-Operation 'Wstrzymać boty po starcie (wpuścisz je przyciskiem w panelu)?') {
+            $hold = 1
+        }
+        else {
+            $hold = 0
+        }
+        Write-Host ''
+        Write-Host 'Skrzynia Ucznia to zestaw skrzyń, który prowadzi postać przez pierwsze wioski - jeden przełącznik dla graczy i botów:' -ForegroundColor Cyan
+        # Enter keeps what the world had. A [t/N] question switched the chest off
+        # for everybody who pressed Enter, and the window ticked it back on for
+        # everybody who had it off - either way a wipe changed it unasked.
+        $starterNow = (Get-DotEnvValue -Key 'M2_STARTER_CHEST' -Default '1') -ne '0'
+        $answer = Read-Host "Skrzynia Ucznia w grze - dla nowych postaci graczy i dla botów? (T/n, Enter = $(if ($starterNow) { 'tak' } else { 'nie' }))"
+        if ("$answer".Trim()) { $starterNow = "$answer".Trim().ToLowerInvariant() -notin @('n', 'nie', 'no', '0') }
+        $starter = $(if ($starterNow) { 1 } else { 0 })
+        Write-Host ''
+        Write-Host 'Zestaw startowy - co noszą nowe postacie graczy i boty nowego świata:' -ForegroundColor Cyan
+        Write-Host ' 1. Jak dotąd'
+        Write-Host ' 2. Średni - broń i zbroja swojej klasy +5'
+        Write-Host ' 3. Łatwy  - cały zestaw poziomu 1 na +9 (broń, zbroja, hełm, tarcza, buty, bransoleta, naszyjnik, kolczyki)'
+        $kitNow = (Get-DotEnvValue -Key 'M2_STARTER_KIT' -Default 'default').Trim().ToLowerInvariant()
+        $answer = Read-Host "Wybierz (1-3, Enter = $kitNow)"
+        switch ("$answer".Trim()) {
+            '1' { $kit = 'default' }
+            '2' { $kit = 'medium' }
+            '3' { $kit = 'easy' }
+            default { $kit = '' }
+        }
+    }
+
+    $written = @()
+    foreach ($pair in @(
+            @{ Key = 'M2_RATE_EXP';  Value = $exp;  Label = 'doświadczenie' },
+            @{ Key = 'M2_RATE_DROP'; Value = $drop; Label = 'drop' },
+            @{ Key = 'M2_RATE_YANG'; Value = $yang; Label = 'yang' })) {
+        $v = [int]$pair.Value
+        if ($v -lt 0) { continue }
+        if (-not (Test-RatePercent -Value $v)) {
+            throw ("{0}: podaj całe procenty od 1 do 10000, nie '{1}'." -f $pair.Label, $v)
+        }
+        # MT2009_PLUS_YANG_RATE_CAP_V1: yang drops no higher than 1000%.
+        if ($pair.Key -eq 'M2_RATE_YANG' -and $v -gt 1000) {
+            throw ("{0}: najwyżej 1000%, nie '{1}'." -f $pair.Label, $v)
+        }
+        Set-DotEnvValue -Key $pair.Key -Value "$v"
+        $written += ('{0} {1}%' -f $pair.Label, $v)
+    }
+    if ($hold -ge 0) {
+        $heldValue = $(if ($hold -ge 1) { '1' } else { '0' })
+        Set-DotEnvValue -Key 'M2_PLAYERBOT_START_HELD' -Value $heldValue
+        $written += $(if ($heldValue -eq '1') { 'boty czekają na wpuszczenie' } else { 'boty wchodzą od razu' })
+    }
+    if ($starter -ge 0) {
+        $starterValue = $(if ($starter -ge 1) { '1' } else { '0' })
+        Set-DotEnvValue -Key 'M2_STARTER_CHEST' -Value $starterValue
+        $written += $(if ($starterValue -eq '1') { 'Skrzynia Ucznia w grze' } else { 'bez Skrzyni Ucznia (ani dla graczy, ani dla botów)' })
+    }
+    if ($kit) {
+        if ($kit -notin @('default', 'medium', 'easy')) {
+            throw "Zestaw startowy: podaj default, medium albo easy, nie '$kit'."
+        }
+        Set-DotEnvValue -Key 'M2_STARTER_KIT' -Value $kit
+        $written += $(switch ($kit) {
+                'medium' { 'zestaw startowy: broń i zbroja +5' }
+                'easy' { 'zestaw startowy: cały zestaw +9' }
+                default { 'zestaw startowy jak dotąd' }
+            })
+    }
+    if ($written.Count -gt 0) {
+        Write-Host ('Zapisano: ' + ($written -join ', ') + '.') -ForegroundColor Green
+    }
+}
+
+function Reset-WorldAction {
+    # "Zacznij od zera": the world a fresh install starts with, with the old one
+    # kept as a zip. The volume is deleted, because that is the only thing that
+    # makes MariaDB import initdb.d again.
+    if (-not (Test-M2DockerRunning)) {
+        Write-Host 'Silnik Dockera jest zatrzymany. Uruchom Docker i spróbuj ponownie.' -ForegroundColor Yellow
+        return
+    }
+    $target = Get-CurrentInstallTargetVolume
+    if (-not $target) {
+        Write-Host 'Nie mozna ustalic bazy tej instalacji.' -ForegroundColor Yellow
+        return
+    }
+    $missing = @(Get-M2MissingSqlDumps -ServerRoot $serverRoot)
+    if ($missing.Count -gt 0) {
+        Write-Host 'Nie mogę zresetować świata: brakuje zrzutów, z których powstaje nowa baza.' -ForegroundColor Red
+        Write-Host ('  Brakuje: ' + ($missing -join ', ')) -ForegroundColor Red
+        Write-Host '  Miejsce: linux-port\docker\mariadb\initdb.d\dumps' -ForegroundColor Gray
+        Write-Host 'Bez nich skasowanie bazy zostawiłoby instalację bez świata i bez sposobu na nowy.' -ForegroundColor Gray
+        return
+    }
+    Write-Host ''
+    Write-Host 'UWAGA: to kasuje CAŁY obecny świat - postacie, poziomy, ekwipunek, boty, konta gry.' -ForegroundColor Yellow
+    Write-Host 'Przed skasowaniem świat zostanie zapisany do kopii zip w folderze backups,' -ForegroundColor Yellow
+    Write-Host 'więc da się do niego wrócić akcją "Przywróć kopię".' -ForegroundColor Yellow
+    Write-Host 'Po resecie pierwszy start potrwa dłużej: baza powstaje od nowa i boty są zasiewane.' -ForegroundColor Gray
+    if (-not (Confirm-Operation 'Zresetować świat do stanu świeżej instalacji?')) {
+        Write-Host 'Anulowano.' -ForegroundColor Yellow; return
+    }
+    Set-FreshWorldSettings -Reason 'nowego świata'
+    Write-Host 'Zatrzymuję serwer i Dockera po stronie stosu...' -ForegroundColor Cyan
+    Stop-Server
+    Write-Host 'Zapisuję kopię i kasuję bazę...' -ForegroundColor Cyan
+    $result = Reset-M2WorldToFreshInstall -Volume $target -ServerRoot $serverRoot `
+        -BackupRoot (Join-Path $serverRoot 'backups')
+    if ($result.Backup) {
+        Write-Host ("Kopia poprzedniego świata ({0} postaci): {1}" -f $result.Players, $result.Backup) -ForegroundColor Gray
+    }
+    if ($ThenStart) {
+        Write-Host 'Świat skasowany. Uruchamiam serwer z nowym światem - baza powstaje od nowa i boty są zasiewane, to potrwa dłużej niż zwykły start.' -ForegroundColor Green
+        Start-Server
+        return
+    }
+    Write-Host 'Świat skasowany. Kliknij GRAJ - serwer zbuduje bazę od nowa i zasieje boty.' -ForegroundColor Green
+}
+
+function Reset-PanelPasswordAction {
+    # The panel keeps a PBKDF2 hash of its passphrase in m2panel.conf, on a
+    # volume of its own, and its entrypoint never regenerates it - regenerating
+    # would log every operator out and invalidate every session cookie. Right,
+    # except when the passphrase it hashed is one nobody has: the container
+    # invented it on a first run and printed it to a log nobody read.
+    #
+    # Deleting that one file is the whole reset. The entrypoint then rebuilds it
+    # from M2_PANEL_PASSWORD, which the launcher now guarantees is in .env.
+    $creds = Get-InstallDbCredentials
+    $panelPw = ''
+    if ($creds.EnvPath) {
+        $text = [IO.File]::ReadAllText($creds.EnvPath)
+        $match = [Regex]::Match($text, '(?m)^M2_PANEL_PASSWORD=(.+?)\s*$')
+        if ($match.Success) { $panelPw = $match.Groups[1].Value }
+    }
+    if (-not $panelPw) {
+        Write-Host 'W pliku .env nie ma hasla do panelu. Uruchom raz GRAJ - launcher je uzupelni i pokaze.' -ForegroundColor Yellow
+        return
+    }
+    Write-Host 'Haslo do panelu WWW (z pliku linux-port\docker\.env):' -ForegroundColor Cyan
+    Write-Host "  $panelPw"
+    Write-Host ''
+    Write-Host 'Jesli panel go nie przyjmuje, znaczy to, ze zapamietal starsze haslo.' -ForegroundColor Gray
+    Write-Host 'Reset kasuje jeden plik konfiguracyjny panelu; swiat, postacie i boty' -ForegroundColor Gray
+    Write-Host 'sa w bazie i nie sa tym ruszane. Wylogowuje otwarte sesje panelu.' -ForegroundColor Gray
+    if (-not (Confirm-Operation 'Zresetowac haslo panelu do tego z .env?')) {
+        Write-Host 'Anulowano - haslo wyzej pozostaje aktualne.' -ForegroundColor Yellow
+        return
+    }
+    # The panel's config volume is named after the same project as the database
+    # volume, which the launcher already knows how to find.
+    $dbVolume = Get-CurrentInstallTargetVolume
+    if (-not $dbVolume -or -not $dbVolume.EndsWith('_db-data')) {
+        Write-Host 'Nie moge ustalic nazwy projektu tej instalacji. Uruchom raz GRAJ.' -ForegroundColor Yellow
+        return
+    }
+    $volume = $dbVolume.Substring(0, $dbVolume.Length - '_db-data'.Length) + '_panel-conf'
+
+    $composeDir = Join-Path $serverRoot 'linux-port\docker'
+    $composeFile = Join-Path $composeDir 'docker-compose.yml'
+    $previousPreference = $ErrorActionPreference
+    try {
+        # docker compose writes progress to stderr; under 'Stop' that is a
+        # terminating error even when the command worked. See Stop-Server.
+        $ErrorActionPreference = 'Continue'
+        Write-Host 'Zatrzymuje panel...' -ForegroundColor Cyan
+        docker compose --project-directory $composeDir -f $composeFile stop panel 2>&1 | Out-Null
+        Write-Host 'Kasuje zapamietane haslo...' -ForegroundColor Cyan
+        docker run --rm -v "${volume}:/etc/m2panel" alpine:3.20 rm -f /etc/m2panel/m2panel.conf 2>&1 | Out-Null
+        $removeExit = $LASTEXITCODE
+        if ($removeExit -ne 0) {
+            Write-Host "Nie udalo sie skasowac pliku (kod $removeExit). Panel zostaje bez zmian." -ForegroundColor Red
+            docker compose --project-directory $composeDir -f $composeFile start panel 2>&1 | Out-Null
+            return
+        }
+        Write-Host 'Uruchamiam panel...' -ForegroundColor Cyan
+        docker compose --project-directory $composeDir -f $composeFile up -d --no-deps panel 2>&1 | Out-Null
+    }
+    finally { $ErrorActionPreference = $previousPreference }
+
+    Write-Host ''
+    Write-Host 'Gotowe. Zaloguj sie haslem:' -ForegroundColor Green
+    Write-Host "  $panelPw"
+}
+
+function Get-InstallDbCredentials {
+    # Everything a database client needs, straight from .env: the port the
+    # compose file publishes on 127.0.0.1, the game account and root. The root
+    # password is what MariaDB was initialised with, and what Repair-DatabaseAction
+    # puts back on root@'%' when the two have drifted apart.
+    $result = [pscustomobject]@{ User = 'metin2'; Password = ''; RootPassword = ''; Port = '3306'; EnvPath = '' }
+    $envPath = Join-Path $serverRoot 'linux-port\docker\.env'
+    if (Test-Path -LiteralPath $envPath -PathType Leaf) {
+        $result.EnvPath = $envPath
+        $text = [IO.File]::ReadAllText($envPath)
+        $userMatch = [Regex]::Match($text, '(?m)^M2_DB_USER=(.+?)\s*$')
+        if ($userMatch.Success) { $result.User = $userMatch.Groups[1].Value }
+        $passMatch = [Regex]::Match($text, '(?m)^M2_DB_PASSWORD=(.+?)\s*$')
+        if ($passMatch.Success) { $result.Password = $passMatch.Groups[1].Value }
+        $rootMatch = [Regex]::Match($text, '(?m)^M2_DB_ROOT_PASSWORD=(.+?)\s*$')
+        if ($rootMatch.Success) { $result.RootPassword = $rootMatch.Groups[1].Value }
+        $portMatch = [Regex]::Match($text, '(?m)^M2_DB_PUBLISH_PORT=(\d+)\s*$')
+        if ($portMatch.Success) { $result.Port = $portMatch.Groups[1].Value }
+    }
+    return $result
+}
+
+function Show-DatabaseAccessAction {
+    # Where a database client (Navicat, HeidiSQL, DBeaver) connects, and with
+    # which accounts. The passwords are not printed: this output lands in the
+    # launcher log, and the launcher log lands in support bundles that get
+    # posted on the Discord. The GUI shows them in a dialog of its own; here
+    # the .env is opened in Notepad instead.
+    $creds = Get-InstallDbCredentials
+    if (-not $creds.EnvPath) {
+        Write-Host 'Brak pliku linux-port\docker\.env — uruchom najpierw serwer (GRAJ), launcher go utworzy.' -ForegroundColor Yellow
+        return
+    }
+    Write-Host 'Dane do połączenia z bazą (Navicat, HeidiSQL, DBeaver — typ MySQL/MariaDB):' -ForegroundColor Cyan
+    Write-Host '  Host:      127.0.0.1'
+    Write-Host "  Port:      $($creds.Port)"
+    Write-Host '  Konto 1:   root        — pełny dostęp; hasło: M2_DB_ROOT_PASSWORD w pliku .env'
+    Write-Host "  Konto 2:   $($creds.User)      — tylko bazy gry; hasło: M2_DB_PASSWORD w pliku .env"
+    Write-Host "  Plik .env: $($creds.EnvPath)"
+    Write-Host ''
+    Write-Host 'Baza słucha tylko na tym komputerze (127.0.0.1), więc klient musi działać na nim.' -ForegroundColor Gray
+    if ((Get-M2ServerEngine -ServerRoot $serverRoot) -ne 'r40250') {
+        Write-Host 'Na plikach 2.x przedmioty i potwory (item_proto, mob_proto) są w bazie world; player.item_proto' -ForegroundColor Gray
+        Write-Host 'i player.mob_proto to tylko widoki. Zmiany w world zostają po restarcie serwera.' -ForegroundColor Gray
+    }
+    Write-Host 'Jeśli baza odrzuca hasło z .env („Access denied"), użyj akcji RepairDb (przycisk' -ForegroundColor Gray
+    Write-Host '„NAPRAW DOSTĘP DO BAZY"): ustawia konta root i metin2 na hasła z tego pliku.' -ForegroundColor Gray
+    Write-Host 'Nie wklejaj haseł z .env na Discordzie ani do paczki z logami.' -ForegroundColor Yellow
+    if (-not $Yes) {
+        $answer = Read-Host 'Otworzyć plik .env w Notatniku, żeby skopiować hasła? [t/N]'
+        if ($answer -match '^[tTyY]') { Start-Process notepad.exe -ArgumentList ('"' + $creds.EnvPath + '"') }
+    }
+}
+
+function Repair-DatabaseAction {
+    if (-not (Test-M2DockerRunning)) {
+        Write-Host 'Silnik Dockera jest zatrzymany, więc nie widać żadnych baz.' -ForegroundColor Yellow
+        Write-Host 'Uruchom Docker (akcja StartDocker lub przycisk „URUCHOM DOCKER") i spróbuj ponownie.' -ForegroundColor Yellow
+        Write-Host 'Żadne dane nie zginęły — bazy są na dysku, tylko Docker ich teraz nie pokazuje.' -ForegroundColor Gray
+        return
+    }
+    $target = Get-CurrentInstallTargetVolume
+    if (-not $target) {
+        Write-Host 'Nie można ustalić bazy tej instalacji. Uruchom najpierw serwer (GRAJ) choć raz.' -ForegroundColor Yellow
+        return
+    }
+    $creds = Get-InstallDbCredentials
+    if (-not $creds.Password) {
+        Write-Host 'Brak M2_DB_PASSWORD w linux-port\docker\.env — nie mam czego przywrócić.' -ForegroundColor Red
+        return
+    }
+    Write-Host "Naprawiam konta bazy dla instalacji: $target" -ForegroundColor Cyan
+    Write-Host 'To odtwarza wyłącznie użytkowników i uprawnienia bazy — konto gry i root — z hasłami z pliku .env. Postacie, przedmioty i boty pozostają bez zmian.' -ForegroundColor Gray
+    if (-not $creds.RootPassword) {
+        Write-Host 'Brak M2_DB_ROOT_PASSWORD w .env — konto root zostanie pominięte.' -ForegroundColor Yellow
+    }
+    Write-Host 'Zatrzymuję serwer, aby zwolnić bazę...' -ForegroundColor Cyan
+    Stop-Server
+    if (Repair-M2GameDbUser -Volume $target -DbUser $creds.User -DbPassword $creds.Password -RootPassword $creds.RootPassword) {
+        Write-Host 'Gotowe. Konta i uprawnienia bazy odtworzone. Kliknij GRAJ, aby uruchomić serwer.' -ForegroundColor Green
+        Write-Host "Do Navicat: host 127.0.0.1, port $($creds.Port), root albo $($creds.User) — hasła z .env (akcja DbAccess pokaże szczegóły)." -ForegroundColor Gray
+    }
+    else {
+        Write-Host 'Naprawa nie powiodła się. Zbierz logi (ZIP) i zgłoś problem.' -ForegroundColor Red
+    }
+}
+
+function Create-Logs {
+    $preflightLog = Join-Path $serverRoot 'launcher-logs\preflight-last.log'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $preflightLog) -Force | Out-Null
+    $report = Get-M2DockerPreflight -ServerRoot $serverRoot -CheckPanelPort
+    [IO.File]::WriteAllText(
+        $preflightLog,
+        (Format-M2DockerPreflightReport -Report $report),
+        [Text.UTF8Encoding]::new($false))
+    # Free space and the size of Docker's disk: whether the drive was full is
+    # the first question a report of a read-only Docker disk raises, and the
+    # bundle could not answer it (pattsito, 23 September).
+    $extra = @{}
+    try { $extra['disk-space.txt'] = Get-M2DiskSpaceReport -ServerRoot $serverRoot }
+    catch { $extra['disk-space.txt'] = "Nie udalo sie odczytac miejsca na dyskach: $($_.Exception.Message)" }
+    $bundle = New-M2SupportBundle -ServerRoot $serverRoot -ExtraFiles $extra
+    Write-Host "Gotowa paczka diagnostyczna: $bundle" -ForegroundColor Green
+    return $bundle
+}
+
+function Send-Logs {
+    $config = Get-Config
+    $support = Get-M2SupportSettings -Config $config
+    if (-not $support.UploadUrl) {
+        throw "Kanał zgłoszeń jest teraz niedostępny. Utwórz ZIP akcją Logs i wyślij go ręcznie na Discordzie: $($support.ContactUrl)"
+    }
+    $bundle = Create-Logs
+    Write-Host 'Paczka zawiera logi Dockera i konfigurację z usuniętymi hasłami.' -ForegroundColor Yellow
+    $target = if ($support.Source -eq 'manifest') { 'kanału zgłoszeń autora' } else { $support.UploadUrl }
+    if (-not (Confirm-Operation "Wysłać $bundle do $target?")) {
+        Write-Host 'Nie wysłano. ZIP pozostał na dysku.' -ForegroundColor Yellow
+        return
+    }
+    $response = Send-M2SupportBundle -BundlePath $bundle -UploadUrl $support.UploadUrl
+    if ($response) { Write-Host "Wysłano. Odpowiedź serwera: $response" -ForegroundColor Green }
+    else { Write-Host 'Wysłano paczkę diagnostyczną.' -ForegroundColor Green }
+}
+
+function Send-Report {
+    # ZGLOS / REPORT (launcher\Metin2Launcher.Report.psm1): the player's own
+    # words, the versions and - unless -NoLogs - the support bundle, sent to
+    # the report address (reportUrl in .m2launcher.json, else the manifest's
+    # support.reportUrl, else the log button's Discord webhook) or kept as a
+    # ZIP when there is none. The window hands its form over in -ReportFile
+    # and reads the answer the module leaves beside it; the text launcher asks
+    # for the form here. A report that was sent or kept is the action's
+    # success either way - the answer says which.
+    if (-not (Get-Command Invoke-M2Report -ErrorAction SilentlyContinue)) {
+        throw 'Brakuje modułu launcher\Metin2Launcher.Report.psm1 - ta paczka nie ma zgłoszeń.'
+    }
+    $resultPath = ''
+    if ($ReportFile) {
+        $request = Read-M2ReportRequest -Path $ReportFile
+        $resultPath = Get-M2ReportResultPath -RequestPath $ReportFile
+    }
+    elseif ($Message) {
+        $request = New-M2ReportRequest -Category $Category -Description $Message -Contact $Contact -AttachLogs (-not $NoLogs)
+    }
+    elseif ($Yes) {
+        throw 'Zgłoszenie bez okna potrzebuje treści: -Message "opis".'
+    }
+    else {
+        $request = Read-M2ReportFromConsole -ServerRoot $serverRoot -Category $Category -Contact $Contact -NoLogs:$NoLogs
+        if (-not $request) {
+            Write-Host 'Bez opisu - nic nie wysłano.' -ForegroundColor Yellow
+            return
+        }
+        if (-not (Confirm-Operation ('Wysłać zgłoszenie ({0}, logi: {1})?' -f (Get-M2ReportCategoryText -Category $request.category), $(if ($request.attachLogs) { 'tak' } else { 'nie' })))) {
+            Write-Host 'Nie wysłano.' -ForegroundColor Yellow
+            return
+        }
+    }
+    # What the Logs action's ZIP carries beside the bundle: the preflight and
+    # the free space on the drives (Create-Logs).
+    $extra = @{}
+    if ($request.attachLogs) {
+        try { $extra['preflight.txt'] = Format-M2DockerPreflightReport -Report (Get-M2DockerPreflight -ServerRoot $serverRoot -CheckPanelPort) } catch { }
+        try { $extra['disk-space.txt'] = Get-M2DiskSpaceReport -ServerRoot $serverRoot } catch { }
+    }
+    $result = Invoke-M2Report -ServerRoot $serverRoot -Config (Get-Config) -Request $request -ExtraFiles $extra -ResultPath $resultPath
+    if ($ReportFile) { Remove-Item -LiteralPath $ReportFile -Force -ErrorAction SilentlyContinue }
+    # The window opens the folder itself when it shows the answer.
+    if (-not $Yes -and $result.Outcome -ne 'sent' -and $result.Path) {
+        Start-Process -FilePath 'explorer.exe' -ArgumentList ('/select,"{0}"' -f $result.Path)
+    }
+}
+
+# ---------------------------------------------------------------- co-op
+# Playing the host's world with friends over the Internet (experimental;
+# launcher\Metin2Launcher.Coop.psm1 does the work). The window's COOP dialog
+# runs CoopHost, CoopStop and CoopCheck through here and does the rest itself:
+# anything that prints a password is for the console only, because the
+# window's action output is a file under launcher-logs, which the support
+# bundle collects.
+
+function Assert-CoopModule {
+    if (-not (Get-Command Get-M2CoopNetworkReport -ErrorAction SilentlyContinue)) {
+        throw 'Brak modułu launcher\Metin2Launcher.Coop.psm1 - ta paczka nie ma trybu COOP.'
+    }
+}
+
+function Write-CoopNetworkReport {
+    param($Report)
+    Write-Host ("Karta sieciowa: {0} ({1}), brama {2}" -f $Report.LanAddress, $Report.Interface, $Report.Gateway)
+    Write-Host ("Adres widziany z internetu: {0}" -f $(if ($Report.PublicAddress) { $Report.PublicAddress } else { 'nie odczytano' }))
+    if ($Report.Router) { Write-Host ("Router (UPnP): {0}, adres WAN {1}" -f $Report.Router, $Report.RouterWan) }
+    else { Write-Host 'Router: nie odpowiedział na UPnP' }
+    $color = $(if ($Report.Verdict -eq 'public') { 'Green' } elseif (@('no-upnp', 'mismatch', 'no-wan') -contains $Report.Verdict) { 'Yellow' } else { 'Red' })
+    Write-Host ("Wynik: {0}" -f $Report.Text) -ForegroundColor $color
+    $vpns = @($Report.Vpns)
+    foreach ($vpn in $vpns) { Write-Host ("Sieć VPN: {0}, adres {1} (karta {2})" -f $vpn.Name, $vpn.Address, $vpn.Interface) }
+    if ($vpns.Count -eq 0) { Write-Host 'Sieć VPN: nie wykryto (Radmin VPN, Tailscale, ZeroTier, Hamachi).' }
+}
+
+function Get-CoopHostingField {
+    # One field of the hosting record, '' when the record or the field is not
+    # there (a state file written before a field existed). Under StrictMode a
+    # missing property is an error, not an empty value.
+    param($Hosting, [Parameter(Mandatory = $true)][string]$Name)
+    if (-not $Hosting) { return '' }
+    if (-not (@($Hosting.PSObject.Properties.Name) -contains $Name)) { return '' }
+    return [string]$Hosting.$Name
+}
+
+function Show-CoopCheckAction {
+    Assert-CoopModule
+    Write-Phase 'sprawdzanie sieci'
+    $report = Get-M2CoopNetworkReport
+    Write-CoopNetworkReport -Report $report
+    if (@('cgnat', 'double-nat') -contains $report.Verdict) {
+        $vpns = @($report.Vpns)
+        if ($vpns.Count -gt 0) { Write-Host ("Rozwiązanie: hostuj przez {0} - HOSTUJ ŚWIAT wybierze go sam." -f $vpns[0].Name) -ForegroundColor Yellow }
+        else {
+            Write-Host ('Rozwiązanie: zainstaluj Radmin VPN albo Tailscale, połącz się ze znajomymi w jednej sieci i hostuj ponownie - ' +
+                'launcher wykryje VPN i użyje go zamiast routera.') -ForegroundColor Yellow
+        }
+    }
+    $ports = Get-M2CoopGamePorts -ServerRoot $serverRoot
+    if ($report.Verdict -eq 'no-wan') {
+        $vpns = @($report.Vpns)
+        if ($vpns.Count -gt 0) { Write-Host ("Masz {0} - hostuj przez niego (HOSTUJ ŚWIAT wybierze go sam, gdy router nie otworzy portów)." -f $vpns[0].Name) -ForegroundColor Yellow }
+        foreach ($line in @(Get-M2CoopRouterHelp -Router $report.Router -LanAddress $report.LanAddress -Ports $ports)) { Write-Host $line -ForegroundColor Yellow }
+    }
+    Write-Host ("Porty gry: {0}" -f ($ports -join ', '))
+    $bindings = Get-M2CoopGameBindings -ServerRoot $serverRoot
+    if (-not $bindings.Running) { Write-Host 'Serwer gry nie działa (brak opublikowanych portów).' -ForegroundColor Yellow }
+    elseif ($bindings.Public) { Write-Host 'Porty gry są otwarte na wszystkich kartach sieciowych - świat jest hostowany.' -ForegroundColor Green }
+    else { Write-Host 'Porty gry słuchają tylko lokalnie (127.0.0.1) - świat nie jest hostowany.' }
+    $hostingState = (Read-M2CoopState -ServerRoot $serverRoot).hosting
+    if ((Get-CoopHostingField $hostingState 'mode') -eq 'vpn') {
+        Write-Host ("Ostatnie hostowanie: przez {0}, adres dla znajomych {1}." -f (Get-CoopHostingField $hostingState 'vpnName'), (Get-CoopHostingField $hostingState 'friendAddress'))
+    }
+    if ($report.GatewayInfo) {
+        foreach ($port in $ports) {
+            $m = Get-M2CoopPortMapping -Gateway $report.GatewayInfo -Port $port
+            if ($m) { Write-Host ("  router: port {0} -> {1}:{2} ({3})" -f $port, $m.InternalClient, $m.InternalPort, $m.Description) }
+            else { Write-Host ("  router: port {0} bez przekierowania" -f $port) }
+        }
+    }
+    # The rule has to let in every channel's ports, not only the ones of the
+    # day it was made (CH2 switched on after the first hosting).
+    $ruleState = $(if (Test-M2CoopFirewallRule -Ports $ports) { 'jest' }
+        elseif (Test-M2CoopFirewallRule) { 'jest, ale bez części portów gry (HOSTUJ ŚWIAT ją poprawi)' }
+        else { 'brak (doda ją Hostuj)' })
+    Write-Host ("Reguła zapory Windows dla portów gry: {0}" -f $ruleState)
+    foreach ($block in @(Get-M2CoopFirewallBlocks)) {
+        Write-Host ("  UWAGA: zapora blokuje program {0} (reguła '{1}', profil {2}) - taka reguła wygrywa z każdą regułą zezwalającą." -f $block.Program, $block.Name, $block.Profile) -ForegroundColor Yellow
+    }
+    try {
+        $defaults = @(Get-M2CoopDefaultPasswordAccounts -ServerRoot $serverRoot)
+        if ($defaults.Count -gt 0) { Write-Host ("Konta z hasłem z paczki: {0} - przed hostowaniem użyj 'Zabezpiecz konta'." -f ($defaults -join ', ')) -ForegroundColor Yellow }
+        else { Write-Host 'Konta admin i test nie mają haseł z paczki.' -ForegroundColor Green }
+    }
+    catch { Write-Host "Baza nie odpowiada: $($_.Exception.Message)" -ForegroundColor Yellow }
+    $state = Read-M2CoopState -ServerRoot $serverRoot
+    Write-Host ("Znajomi: {0}" -f @($state.friends).Count)
+    foreach ($f in @($state.friends)) {
+        Write-Host ("  {0}: login {1}{2}" -f $f.name, $f.login, $(if ($f.blocked) { ' (zablokowany)' } else { '' }))
+    }
+}
+
+function Protect-CoopAccountsAction {
+    Assert-CoopModule
+    $changed = Protect-M2CoopAccounts -ServerRoot $serverRoot
+    $names = @($changed.PSObject.Properties | ForEach-Object { $_.Name })
+    if ($names.Count -eq 0) {
+        Write-Host 'Konta admin i test nie mają haseł z paczki - nic do zmiany.' -ForegroundColor Green
+        return
+    }
+    foreach ($name in $names) {
+        Write-Host ("Nowe hasło konta {0}: {1}" -f $name, $changed.$name) -ForegroundColor Yellow
+    }
+    Write-Host 'Zapisz je - od teraz logujesz się nimi (okno COOP w launcherze też je pokazuje).'
+}
+
+function Add-CoopFriendAction {
+    Assert-CoopModule
+    $name = $FriendName
+    if (-not $name) { $name = Read-Host 'Imię albo nick znajomego' }
+    if (-not $name) { throw 'Nie podano imienia znajomego.' }
+    $friend = New-M2CoopFriend -ServerRoot $serverRoot -Name $name
+    Write-Host ("Konto dla {0}: login {1}, hasło {2}, kod usuwania postaci {3}" -f $friend.name, $friend.login, $friend.password, $friend.socialId) -ForegroundColor Green
+    $target = Get-M2CoopInviteTarget -ServerRoot $serverRoot
+    if ($target.Address) {
+        Write-Host 'Kod zaproszenia (skopiuj i wyślij znajomemu):'
+        Write-Host (Get-M2CoopFriendInvite -ServerRoot $serverRoot -Friend $friend -HostAddress $target.Address -Vpn $target.Vpn -Lan $target.Lan) -ForegroundColor Cyan
+        if ($target.Vpn) { Write-Host ("Znajomy musi być w Twojej sieci {0} - kod prowadzi na adres {1}." -f $target.VpnName, $target.Address) -ForegroundColor Yellow }
+    }
+}
+
+function Set-CoopFriendBlockedAction {
+    param([bool]$Blocked = $true)
+    Assert-CoopModule
+    $login = $FriendLogin
+    if (-not $login) { $login = Read-Host 'Login znajomego' }
+    if (-not $login) { throw 'Nie podano loginu.' }
+    Set-M2CoopFriendBlocked -ServerRoot $serverRoot -Login $login -Blocked $Blocked
+    if ($Blocked) { Write-Host "Konto $login zablokowane: nie zaloguje się, dopóki go nie odblokujesz." -ForegroundColor Green }
+    else { Write-Host "Konto $login odblokowane." -ForegroundColor Green }
+}
+
+function Show-CoopInviteAction {
+    Assert-CoopModule
+    $state = Read-M2CoopState -ServerRoot $serverRoot
+    $target = Get-M2CoopInviteTarget -ServerRoot $serverRoot
+    if (-not $target.Address) {
+        if ($target.Vpn) { throw ("Nie udało się odczytać adresu {0} - uruchom go i spróbuj jeszcze raz." -f $target.VpnName) }
+        throw 'Nie udało się odczytać adresu publicznego (brak internetu?).'
+    }
+    $shown = 0
+    foreach ($f in @($state.friends)) {
+        if ($FriendLogin -and [string]$f.login -ne $FriendLogin) { continue }
+        if ($f.blocked) { continue }
+        Write-Host ("{0} (login {1}, hasło {2}):" -f $f.name, $f.login, $f.password)
+        Write-Host (Get-M2CoopFriendInvite -ServerRoot $serverRoot -Friend $f -HostAddress $target.Address -Vpn $target.Vpn -Lan $target.Lan) -ForegroundColor Cyan
+        $shown++
+    }
+    if ($shown -eq 0) { Write-Host 'Brak znajomych - dodaj ich najpierw.' -ForegroundColor Yellow }
+    elseif ($target.Vpn) { Write-Host ("Kody prowadzą na adres {0} w sieci {1} - znajomi muszą być w tej sieci." -f $target.Address, $target.VpnName) -ForegroundColor Yellow }
+}
+
+function Invoke-CoopGameRecreate {
+    # Docker cannot move a running container's published ports, so the game
+    # container is recreated with the new address - every core restarts, about
+    # a minute. The panels stay on M2_PANEL_BIND_ADDRESS, written out as
+    # 127.0.0.1 first if it was empty, so they never follow the game outwards.
+    # PublicAddress, when given, is what the cores advertise (M2_PUBLIC_ADDRESS
+    # -> PROXY_IP, rendered at the container's start): the MT2009 Plus client
+    # connects to the address a warp names (TPacketGCWarp), so a friend sent
+    # to 127.0.0.1 at the first map of another core would knock on his own PC.
+    param([Parameter(Mandatory = $true)][string]$BindAddress, [string]$PublicAddress = '')
+    if (-not (Get-DotEnvValue -Key 'M2_PANEL_BIND_ADDRESS')) { Set-DotEnvValue -Key 'M2_PANEL_BIND_ADDRESS' -Value '127.0.0.1' }
+    Set-DotEnvValue -Key 'M2_HOST_BIND_ADDRESS' -Value $BindAddress
+    if ($PublicAddress) { Set-DotEnvValue -Key 'M2_PUBLIC_ADDRESS' -Value $PublicAddress }
+    $composeDir = Join-Path $serverRoot 'linux-port\docker'
+    $composeFile = Join-Path $composeDir 'docker-compose.yml'
+    # compose writes its progress to stderr, which 'Stop' would turn into a
+    # failure; the exit code decides (the same shape as Stop-Server).
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        # MT2009_PLUS_COOP_RECREATE_RETRY_V1: Docker Desktop frees the old
+        # container's published ports a moment after the container is gone,
+        # so the new one may find its own port still taken ("ports are not
+        # available ... Only one usage of each socket address"): it is created
+        # and stays down, and the world with it until START. The port is free
+        # a few seconds later, so the same up is asked again - three times at
+        # most, five seconds apart.
+        $exit = 0
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+            if ($attempt -gt 1) {
+                Write-Host ("docker compose up game zakończył się kodem {0} - ponawiam za 5 s (próba {1} z 3)." -f $exit, $attempt) -ForegroundColor Yellow
+                Start-Sleep -Seconds 5
+            }
+            docker compose --project-directory $composeDir -f $composeFile up -d --no-deps game
+            $exit = $LASTEXITCODE
+            if ($exit -eq 0) { break }
+        }
+    }
+    finally { $ErrorActionPreference = $previousPreference }
+    if ($exit -ne 0) { throw "docker compose up game zakończył się kodem $exit." }
+}
+
+function Test-CoopCoreAnswers {
+    # A core is up when it sends its handshake. A connection alone proves
+    # nothing: Docker Desktop's port proxy accepts one before anything inside
+    # the container listens and then closes it, so "connected" came back
+    # eleven seconds into a boot the cores needed forty for.
+    param([int]$Port)
+    $client = New-Object Net.Sockets.TcpClient
+    try {
+        $wait = $client.BeginConnect('127.0.0.1', $Port, $null, $null)
+        if (-not ($wait.AsyncWaitHandle.WaitOne(2000) -and $client.Connected)) { return $false }
+        $client.EndConnect($wait)
+        $stream = $client.GetStream()
+        $stream.ReadTimeout = 3000
+        $buffer = New-Object byte[] 16
+        return ($stream.Read($buffer, 0, $buffer.Length) -gt 0)
+    }
+    catch { return $false }
+    finally { $client.Close() }
+}
+
+function Wait-CoopGameReady {
+    # Every core the client may be sent to has to answer, not only the auth:
+    # a friend who logs in while game2 is still booting is dropped at the
+    # first map that core hosts.
+    param([int]$TimeoutSeconds = 240)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $pending = New-Object System.Collections.Generic.List[int]
+    foreach ($port in @(Get-M2CoopGamePorts -ServerRoot $serverRoot)) { $pending.Add([int]$port) }
+    while ((Get-Date) -lt $deadline) {
+        foreach ($port in @($pending)) { if (Test-CoopCoreAnswers -Port $port) { [void]$pending.Remove($port) } }
+        if ($pending.Count -eq 0) { return $true }
+        Start-Sleep -Seconds 3
+    }
+    Write-Host ("Nie odpowiadają jeszcze porty: {0}" -f ($pending -join ', ')) -ForegroundColor Yellow
+    return $false
+}
+
+function Start-CoopHostingAction {
+    Assert-CoopModule
+    Write-Phase 'sprawdzanie sieci'
+    $report = Get-M2CoopNetworkReport
+    Write-CoopNetworkReport -Report $report
+    if (@('no-lan', 'offline') -contains $report.Verdict) {
+        throw 'Ten komputer nie ma połączenia z internetem - hostowanie przerwane, nic nie zmieniono.'
+    }
+    # The text menu asks when there is a real choice - a VPN here and an
+    # Internet that could work too; the window's button passes its own answer.
+    $requested = $CoopVia
+    $vpns = @($report.Vpns)
+    if ($Action -eq 'Menu' -and $requested -eq 'auto' -and $vpns.Count -gt 0 -and -not (@('cgnat', 'double-nat') -contains $report.Verdict)) {
+        if (Confirm-Operation -Question ("Wykryto {0} (adres {1}). Hostować przez VPN zamiast przez internet?" -f $vpns[0].Name, $vpns[0].Address)) { $requested = $vpns[0].Kind }
+        else { $requested = 'internet' }
+    }
+    $via = Resolve-M2CoopHostingVia -Report $report -Requested $requested
+    if ($via.Mode -eq 'blocked') {
+        throw ('Z tej sieci znajomi nie połączą się bezpośrednio (operator albo drugi router nie daje publicznego adresu) - hostowanie przerwane, nic nie zmieniono. ' +
+            'Zainstaluj Radmin VPN albo Tailscale, połącz się ze znajomymi w jednej sieci i hostuj ponownie: launcher wykryje VPN i użyje go zamiast routera.')
+    }
+    if ($via.Mode -eq 'vpn') { Write-Host ("Hostowanie przez {0}, adres {1}." -f $via.Vpn.Name, $via.Vpn.Address) -ForegroundColor Green }
+    $defaults = @(Get-M2CoopDefaultPasswordAccounts -ServerRoot $serverRoot)
+    if ($defaults.Count -gt 0) {
+        throw ("Konta {0} mają hasła z paczki - każdy w internecie mógłby się na nie zalogować. Najpierw 'Zabezpiecz konta'." -f ($defaults -join ', '))
+    }
+    $ports = Get-M2CoopGamePorts -ServerRoot $serverRoot
+    # The address the friends get, and the one the cores have to name in every
+    # warp (PROXY_IP): the client follows the warp's address, not the one it
+    # logged in through. Settled after the router (Resolve-M2CoopAdvertisedAddress);
+    # here only whether there is any address at all.
+    $friendAddress = $(if ($via.Mode -eq 'vpn') { $via.Vpn.Address } else { $report.PublicAddress })
+    if (-not $friendAddress -and -not $report.LanAddress) { throw 'Nie udało się ustalić adresu dla znajomych - hostowanie przerwane, nic nie zmieniono.' }
+    $state = Read-M2CoopState -ServerRoot $serverRoot
+    $advertised = Get-DotEnvValue -Key 'M2_PUBLIC_ADDRESS' -Default '127.0.0.1'
+    # What the player had before any hosting, kept for "Zakończ"; an address
+    # an earlier hosting wrote is not the player's own.
+    $ownAddress = $advertised
+    $hostingNames = @()
+    if ($state.hosting) { $hostingNames = @($state.hosting.PSObject.Properties.Name) }
+    if (($hostingNames -contains 'ownPublicAddress') -and [string]$state.hosting.ownPublicAddress -and
+            (($hostingNames -contains 'friendAddress') -and $advertised -eq [string]$state.hosting.friendAddress)) {
+        $ownAddress = [string]$state.hosting.ownPublicAddress
+    }
+    Write-Phase 'zapora Windows'
+    # The window asks for the rule itself before it starts this action
+    # (-CoopFirewallAsked): from here, a hidden process, Windows only blinks
+    # its question on the taskbar, and xXxDaronxXx's (24 September) went
+    # unanswered twice - the second time for two minutes - so nothing outside
+    # his PC could reach the world.
+    $firewallOk = [bool](Test-M2CoopFirewallRule -Ports $ports)
+    if ($firewallOk) { Write-Host 'Reguła zapory dla portów gry już jest.' }
+    elseif ($CoopFirewallAsked) { Write-Host 'Reguły zapory nie dodano - okno launchera zapytało o nią Windows i nie dostało zgody.' -ForegroundColor Red }
+    else {
+        Write-Host 'Windows zapyta o zgodę administratora na regułę zapory dla portów gry - potwierdź (okienko Windows może tylko migać na pasku zadań).' -ForegroundColor Yellow
+        $firewallOk = [bool](Add-M2CoopFirewallRule -Ports $ports)
+        if ($firewallOk) { Write-Host 'Reguła zapory dodana.' -ForegroundColor Green }
+        else { Write-Host ('Reguły zapory nie dodano ({0}).' -f $(if ($global:M2CoopFirewallError) { $global:M2CoopFirewallError } else { 'odmowa zgody albo brak odpowiedzi' })) -ForegroundColor Red }
+    }
+    if (-not $firewallOk) {
+        Write-Host 'UWAGA: bez tej reguły zapora Windows może nie wpuścić nikogo spoza tego komputera - ani znajomych z internetu, ani laptopa w tym samym domu. Kliknij HOSTUJ ŚWIAT jeszcze raz i w okienku Windows wybierz "Tak".' -ForegroundColor Red
+        # MT2009_PLUS_COOP_FIREWALL_V1: the way round the question, for an
+        # account that is not an administrator's or a question that never shows.
+        if (Get-Command Get-M2CoopFirewallManualCommand -ErrorAction SilentlyContinue) {
+            Write-Host ('Jeśli okienko Windows się nie pojawia albo to konto nie ma uprawnień administratora: uruchom Wiersz polecenia jako administrator (menu Start, wpisz cmd, prawy przycisk - Uruchom jako administrator), wklej tę linię i naciśnij Enter, potem HOSTUJ ŚWIAT jeszcze raz: {0}' -f (Get-M2CoopFirewallManualCommand -Ports $ports)) -ForegroundColor Yellow
+        }
+    }
+    foreach ($block in @(Get-M2CoopFirewallBlocks)) {
+        Write-Host ("UWAGA: zapora blokuje program {0} (reguła '{1}') - usuń tę regułę w Zaporze Windows, inaczej znajomi się nie połączą." -f $block.Program, $block.Name) -ForegroundColor Yellow
+    }
+    $mapped = @()
+    $routerRefused = $false
+    $state = Read-M2CoopState -ServerRoot $serverRoot
+    if ($via.Mode -eq 'vpn') {
+        # Nothing is opened in the router, and what hosting over the Internet
+        # opened before is closed: through a VPN the world is for the VPN's
+        # members and the LAN, not for everybody who scans the address.
+        $wasMapped = @()
+        if ($state.hosting -and (@($state.hosting.PSObject.Properties.Name) -contains 'mapped')) { $wasMapped = @($state.hosting.mapped) }
+        if ($report.GatewayInfo -and $wasMapped.Count -gt 0) {
+            Write-Phase 'router: zamykanie portów z hostowania przez internet'
+            foreach ($port in $wasMapped) {
+                if (Remove-M2CoopPortMapping -Gateway $report.GatewayInfo -Port ([int]$port) -LanAddress $report.LanAddress) { Write-Host "  port $port zamknięty" }
+            }
+        }
+        Write-Host ("W routerze nic nie otwieram - znajomi łączą się przez {0}." -f $via.Vpn.Name)
+    }
+    elseif ($report.GatewayInfo) {
+        Write-Phase 'przekierowania w routerze (UPnP)'
+        foreach ($port in $ports) {
+            $r = Add-M2CoopPortMapping -Gateway $report.GatewayInfo -Port $port -LanAddress $report.LanAddress
+            if ($r.Ok) {
+                $mapped += $port
+                $lease = $(if ($r.Lease -gt 0) { "na $([int]($r.Lease / 3600)) h" } else { 'bez terminu' })
+                Write-Host ("  port {0}: otwarty ({1})" -f $port, $lease) -ForegroundColor Green
+            }
+            else { Write-Host ("  port {0}: {1}" -f $port, $r.Reason) -ForegroundColor Red }
+        }
+        # Not one port opened: through a VPN on this machine when the way was
+        # left to the launcher (Resolve-M2CoopRouterFallback), else said out
+        # loud - "Hostowanie włączone" in green over seven refusals is what
+        # sent Sudak's friend a code for a world that was offline.
+        $fallback = Resolve-M2CoopRouterFallback -Via $via -Requested $requested -Vpns $vpns -Mapped $mapped.Count -Ports @($ports).Count
+        if ($fallback.Mode -eq 'vpn' -and $via.Mode -ne 'vpn') {
+            $via = $fallback
+            Write-Host ("Router nie otworzył żadnego portu - hostuję przez {0}, adres {1}." -f $via.Vpn.Name, $via.Vpn.Address) -ForegroundColor Yellow
+        }
+        elseif ($mapped.Count -eq 0) {
+            $routerRefused = $true
+            Write-Host 'UWAGA: router nie otworzył żadnego portu - znajomi z internetu się nie połączą (serwer będzie dla nich offline), chyba że porty są już przekierowane w routerze ręcznie.' -ForegroundColor Red
+            foreach ($line in @(Get-M2CoopRouterHelp -Router $report.Router -LanAddress $report.LanAddress -Ports $ports)) { Write-Host $line -ForegroundColor Yellow }
+        }
+    }
+    else {
+        # A router that does not answer the search opens nothing either: the
+        # same way out as one that refused every port - a VPN here when the
+        # way was left to the launcher, and otherwise said out loud, not
+        # "Hostowanie włączone" in green (xXxDaronxXx, 24 September).
+        $fallback = Resolve-M2CoopRouterFallback -Via $via -Requested $requested -Vpns $vpns -Mapped 0 -Ports @($ports).Count
+        if ($fallback.Mode -eq 'vpn' -and $via.Mode -ne 'vpn') {
+            $via = $fallback
+            Write-Host ("Router nie odpowiada na UPnP - hostuję przez {0}, adres {1}." -f $via.Vpn.Name, $via.Vpn.Address) -ForegroundColor Yellow
+        }
+        else {
+            $routerRefused = $true
+            Write-Host 'UWAGA: router nie odpowiada na UPnP, więc launcher nie otworzył w nim żadnego portu - znajomi z internetu się nie połączą, dopóki nie przekierujesz portów ręcznie.' -ForegroundColor Red
+            foreach ($line in @(Get-M2CoopRouterHelp -Router '' -LanAddress $report.LanAddress -Ports $ports)) { Write-Host $line -ForegroundColor Yellow }
+            if ($vpns.Count -gt 0) {
+                Write-Host ("Albo wybierz w oknie COOP połączenie {0} i hostuj jeszcze raz - wtedy router nie jest potrzebny." -f $vpns[0].Name) -ForegroundColor Yellow
+            }
+        }
+    }
+    # The address the cores advertise is settled only now, after the router:
+    # a VPN the router step fell back on, or the LAN address when nothing was
+    # opened (Resolve-M2CoopAdvertisedAddress) - one restart, with the address
+    # that works.
+    $decided = Resolve-M2CoopAdvertisedAddress -Via $via -Requested $requested -Mapped $mapped.Count `
+        -PublicAddress $report.PublicAddress -LanAddress $report.LanAddress
+    $friendAddress = $decided.Address
+    if (-not $friendAddress) { throw 'Nie udało się ustalić adresu dla znajomych - hostowanie przerwane.' }
+    if ($decided.Lan) {
+        Write-Host ("Serwer ogłasza adres z sieci domowej {0}: grasz Ty i komputery w tym domu. Adres internetowy ({1}) bez otwartych portów nie wpuściłby nawet Ciebie - po wyborze postaci gra wracałaby do wyboru kanału." -f $friendAddress, $report.PublicAddress) -ForegroundColor Yellow
+        Write-Host 'Znajomi z internetu: Radmin VPN albo Tailscale u Ciebie i u nich, potem HOSTUJ ŚWIAT jeszcze raz. Jeśli przekierowałeś porty w routerze ręcznie, wybierz w oknie COOP "przez internet".' -ForegroundColor Yellow
+    }
+    $bindings = Get-M2CoopGameBindings -ServerRoot $serverRoot
+    if ($bindings.Public -and $advertised -eq $friendAddress) { Write-Host 'Porty gry są już otwarte na wszystkich kartach sieciowych.' -ForegroundColor Green }
+    else {
+        Write-Phase 'porty gry dla sieci (restart serwera gry, około minuty)'
+        Invoke-CoopGameRecreate -BindAddress '0.0.0.0' -PublicAddress $friendAddress
+        if (Wait-CoopGameReady) { Write-Host 'Serwer gry wstał.' -ForegroundColor Green }
+        else { Write-Host 'Serwer gry jeszcze wstaje - znajomi zalogują się za chwilę.' -ForegroundColor Yellow }
+    }
+    Write-Host ("Opublikowane: {0}" -f ((Get-M2CoopGameBindings -ServerRoot $serverRoot).Lines -join '; '))
+    $state.hosting = [pscustomobject]@{
+        active = $true; since = (Get-Date).ToString('s'); lanAddress = $report.LanAddress
+        publicAddress = $report.PublicAddress; ports = @($ports); mapped = @($mapped)
+        mode = $via.Mode; vpn = $(if ($via.Vpn) { $via.Vpn.Kind } else { '' }); vpnName = $(if ($via.Vpn) { $via.Vpn.Name } else { '' })
+        friendAddress = $friendAddress; ownPublicAddress = $ownAddress
+    }
+    Save-M2CoopState -ServerRoot $serverRoot -State $state
+    Write-Host ''
+    if ($via.Mode -eq 'vpn') {
+        Write-Host ("Hostowanie włączone przez {0}. Adres dla znajomych: {1}" -f $via.Vpn.Name, $friendAddress) -ForegroundColor Green
+        Write-Host ("Znajomi muszą dołączyć do Twojej sieci {0}, zanim wkleją kod zaproszenia." -f $via.Vpn.Name) -ForegroundColor Yellow
+    }
+    elseif ($decided.Lan) {
+        Write-Host ("Hostowanie włączone w sieci domowej, adres {0}. Znajomi z internetu - przez VPN (UWAGA wyżej)." -f $friendAddress) -ForegroundColor Yellow
+    }
+    elseif ($routerRefused) {
+        Write-Host ("Hostowanie włączone, ale bez portów w routerze (UWAGA wyżej). Adres dla znajomych: {0}" -f $friendAddress) -ForegroundColor Yellow
+    }
+    else {
+        Write-Host ("Hostowanie włączone. Adres dla znajomych: {0}" -f $friendAddress) -ForegroundColor Green
+        # Every warp names the public address now, the host's own client's too,
+        # and reaching one's own public address from inside needs the router's
+        # NAT loopback.
+        Write-Host 'Jeśli u Ciebie samego zmiana mapy zawiesza się na ładowaniu, Twój router nie wpuszcza połączeń na własny adres publiczny - hostuj przez Radmin VPN albo Tailscale.' -ForegroundColor Yellow
+    }
+    if ($report.LanAddress) {
+        Write-Host ("W tej samej sieci domowej (drugi komputer, laptop na tym samym Wi-Fi) gra łączy się przez {0}, bez routera: kod zaproszenia ma też ten adres, a Dolacz.bat i launcher same go wybiorą." -f $report.LanAddress)
+    }
+    Write-Host 'Ty grasz dalej na serwerze 1 (Metin2 SinglePlayer). Kody zaproszeń dla znajomych są w oknie COOP.'
+    if (@($state.friends).Count -eq 0) { Write-Host 'Nie masz jeszcze znajomych - dodaj ich w oknie COOP.' -ForegroundColor Yellow }
+    if ($mapped.Count -gt 0 -and $mapped.Count -lt $ports.Count) {
+        Write-Host 'Nie wszystkie porty udało się otworzyć - bez nich znajomy utknie przy zmianie mapy.' -ForegroundColor Yellow
+    }
+}
+
+function Stop-CoopHostingAction {
+    Assert-CoopModule
+    $state = Read-M2CoopState -ServerRoot $serverRoot
+    $ports = Get-M2CoopGamePorts -ServerRoot $serverRoot
+    $lan = Get-M2CoopLanAddress
+    if ($lan) {
+        $gateway = Find-M2CoopGateway -LanAddress $lan.Address
+        if ($gateway) {
+            Write-Phase 'router: zamykanie portów'
+            foreach ($port in $ports) {
+                if (Remove-M2CoopPortMapping -Gateway $gateway -Port $port -LanAddress $lan.Address) { Write-Host "  port $port zamknięty" }
+                else { Write-Host "  port $port ma cudze przekierowanie - nie ruszam go" -ForegroundColor Yellow }
+            }
+        }
+    }
+    $bindings = Get-M2CoopGameBindings -ServerRoot $serverRoot
+    $previous = Get-DotEnvValue -Key 'M2_HOST_BIND_ADDRESS'
+    # The cores go back to the address the player had before hosting (on a
+    # PC 127.0.0.1), and only when hosting is what put the other one there.
+    $restoreAddress = ''
+    if ($state.hosting) {
+        $names = @($state.hosting.PSObject.Properties.Name)
+        $advertised = Get-DotEnvValue -Key 'M2_PUBLIC_ADDRESS' -Default '127.0.0.1'
+        if (($names -contains 'friendAddress') -and $advertised -eq [string]$state.hosting.friendAddress) {
+            $restoreAddress = $(if (($names -contains 'ownPublicAddress') -and [string]$state.hosting.ownPublicAddress) { [string]$state.hosting.ownPublicAddress } else { '127.0.0.1' })
+        }
+    }
+    if ($bindings.Public -or $previous -ne '127.0.0.1' -or $restoreAddress) {
+        Write-Phase 'porty gry tylko dla tego komputera (restart serwera gry, około minuty)'
+        Invoke-CoopGameRecreate -BindAddress '127.0.0.1' -PublicAddress $restoreAddress
+        [void](Wait-CoopGameReady)
+    }
+    Write-Host ("Opublikowane: {0}" -f ((Get-M2CoopGameBindings -ServerRoot $serverRoot).Lines -join '; '))
+    if ($state.hosting) { $state.hosting.active = $false }
+    Save-M2CoopState -ServerRoot $serverRoot -State $state
+    Write-Host 'Hostowanie wyłączone. Reguła zapory zostaje, ale porty słuchają już tylko na tym komputerze.' -ForegroundColor Green
+}
+
+function Update-CoopHostingLease {
+    # A mapping leased for four hours has to be renewed by somebody: GRAJ and
+    # the window's timer both come here. Only while hosting is on, and quietly.
+    if (-not (Get-Command Read-M2CoopState -ErrorAction SilentlyContinue)) { return }
+    $state = Read-M2CoopState -ServerRoot $serverRoot
+    if (-not ($state.hosting -and $state.hosting.active)) { return }
+    # Through a VPN nothing is leased in the router.
+    if ((Get-CoopHostingField $state.hosting 'mode') -eq 'vpn') { return }
+    $lan = Get-M2CoopLanAddress
+    if (-not $lan) { return }
+    $gateway = Find-M2CoopGateway -LanAddress $lan.Address
+    if (-not $gateway) { return }
+    $ok = 0
+    foreach ($port in @(Get-M2CoopGamePorts -ServerRoot $serverRoot)) {
+        if ((Add-M2CoopPortMapping -Gateway $gateway -Port $port -LanAddress $lan.Address).Ok) { $ok++ }
+    }
+    Write-Host ("COOP: przekierowania w routerze odnowione ({0})." -f $ok)
+}
+
+function Join-CoopAction {
+    Assert-CoopModule
+    $code = $Invite
+    if (-not $code) { $code = Read-Host 'Wklej kod zaproszenia od znajomego' }
+    $inv = Read-M2CoopInvite -Code $code
+    $client = Get-M2CoopClientFolder -ServerRoot $serverRoot
+    if (-not $client) { throw 'Nie znaleziono folderu klienta (wskaż go przyciskiem WYBIERZ KLIENTA).' }
+    # The host's home address when this machine is in that network and the
+    # world answers there (Select-M2CoopJoinHost), the invite's own otherwise.
+    $choice = Resolve-M2CoopJoinHost -Invite $inv
+    $path = Write-M2CoopClientConfig -ClientFolder $client -Invite $inv -HostAddress $choice.Host
+    Write-Host ("Zapisano {0} (adres {1})" -f $path, $choice.Host) -ForegroundColor Green
+    Write-Host ("W kliencie wybierz serwer 'Online: {0}' i zaloguj się: login {1}, hasło {2}" -f $inv.name, $inv.login, $inv.password) -ForegroundColor Cyan
+    $advice = $(if ($choice.Lan) { '' } else { Get-M2CoopJoinAdvice -Invite $inv })
+    if ($advice) { Write-Host $advice -ForegroundColor Yellow }
+    foreach ($note in @(Get-M2CoopJoinNotes -Choice $choice)) {
+        Write-Host $note -ForegroundColor $(if ($choice.Answers) { 'Green' } else { 'Yellow' })
+    }
+    # A client exe from before 2.0.17 cannot enter a friend's world at all
+    # (Test-M2CoopClientExeOld).
+    if (Test-M2CoopClientExeOld -ClientFolder $client) { Write-Host (Get-M2CoopOldClientNote) -ForegroundColor Red }
+}
+
+# ---------------------------------------------------------------- vps
+# This world on a rented Linux VPS (launcher\Metin2Launcher.Vps.psm1 does the
+# work, linux-port/tools/vps-install.sh does it on the VPS). The window's VPS
+# dialog runs the long ones through here - the install, the update, the
+# status, the logs - and does the key, the tunnel and anything that shows a
+# password in-process: an action's output is a file under launcher-logs, which
+# support bundles carry. Installing, updating and the panels are for
+# everybody; invite codes are behind the COOP testers' password.
+
+function Assert-VpsModule {
+    if (-not (Get-Command Install-M2Vps -ErrorAction SilentlyContinue)) {
+        throw 'Brak modułu launcher\Metin2Launcher.Vps.psm1 - ta paczka nie ma opcji VPS.'
+    }
+}
+
+function Get-VpsStateForAction {
+    # The saved VPS with whatever -VpsHost/-VpsUser/-VpsPort/-VpsDir said,
+    # asked for in the text menu when there is none yet (or -Ask), and saved.
+    param([switch]$Ask)
+    Assert-VpsModule
+    $state = Get-M2VpsState -ServerRoot $serverRoot
+    if ($VpsHost) { $state.host = $VpsHost.Trim() }
+    if ($VpsUser) { $state.user = $VpsUser.Trim() }
+    if ($VpsPort -gt 0) { $state.port = $VpsPort }
+    if ($VpsDir) { $state.remoteDir = $VpsDir.Trim() }
+    if (($Ask -or -not $state.host) -and $Action -eq 'Menu') {
+        $answer = Read-Host ('Adres VPS (IPv4 albo domena){0}' -f $(if ($state.host) { ' [' + $state.host + ']' } else { '' }))
+        if ($answer) { $state.host = $answer.Trim() }
+        $answer = Read-Host ('Użytkownik na VPS [{0}]' -f $state.user)
+        if ($answer) { $state.user = $answer.Trim() }
+        $answer = Read-Host ('Port SSH [{0}]' -f $state.port)
+        $number = 0
+        if ($answer -and [int]::TryParse($answer, [ref]$number)) { $state.port = $number }
+    }
+    Assert-M2VpsState -State $state
+    Save-M2VpsState -ServerRoot $serverRoot -State $state
+    return $state
+}
+
+function Assert-VpsConsole {
+    # Passwords go to a person and never into a file: the window runs actions
+    # with their output redirected into launcher-logs.
+    if ([Console]::IsOutputRedirected) {
+        throw 'To polecenie pokazuje hasła, więc działa w menu tekstowym albo w oknie VPS launchera, nie jako akcja w tle.'
+    }
+}
+
+function Connect-VpsAction {
+    $state = Get-VpsStateForAction -Ask
+    Write-Host 'Otworzy się okno ssh - wpisz w nim hasło do VPS (tylko ten jeden raz; launcher go nie widzi).' -ForegroundColor Yellow
+    if (Install-M2VpsKey -State $state) { Write-Host ('Klucz działa: launcher łączy się z {0} bez hasła.' -f $state.host) -ForegroundColor Green }
+    else { throw 'Klucz nie działa - sprawdź adres, użytkownika i hasło, i spróbuj jeszcze raz.' }
+}
+
+function Show-VpsCheckAction {
+    $state = Get-VpsStateForAction
+    Write-Phase 'sprawdzanie VPS'
+    $machine = Test-M2VpsMachine -State $state
+    foreach ($line in (Format-M2VpsMachineReport -Machine $machine)) { Write-Host $line }
+    if (-not $machine.Verdict.Ok) { throw 'VPS nie spełnia wymagań - szczegóły wyżej.' }
+}
+
+function Write-VpsOutcome {
+    param([Parameter(Mandatory = $true)]$Status, [Parameter(Mandatory = $true)]$State, [string]$What = 'Instalacja')
+    if ($Status.State -ne 'done') {
+        throw ('{0} na VPS: {1} (etap {2}) - {3}. Szczegóły: LOGI VPS.' -f $What, $Status.State, $Status.Phase, $Status.Message)
+    }
+    Write-Host ('Serwer działa na VPS, wersja {0}.' -f $Status.Version) -ForegroundColor Green
+    Write-Host ('Gracze łączą się z {0} (porty TCP {1} i {2}; jeśli dostawca VPS ma własną zaporę, otwórz je tam).' -f (Get-M2VpsWorldAddress -State $State -Status $Status), $Status.AuthPort, $Status.GamePortRange)
+    Write-Host 'Panele słuchają tylko na VPS: otwiera je OTWÓRZ PANEL (tunel SSH). Hasła kont admin i test pokazuje HASŁA KONT - w tym logu ich nie ma.'
+}
+
+function Install-VpsAction {
+    $state = Get-VpsStateForAction
+    if (-not (Confirm-Operation ('Zainstalować ten świat na VPS {0}? Folder serwera pójdzie na VPS (około 100 MB), a pierwsza budowa trwa tam 15-40 minut.' -f $state.host))) { return }
+    Write-Phase 'instalacja na VPS'
+    $final = Install-M2Vps -State $state -ServerRoot $serverRoot
+    Write-VpsOutcome -Status $final -State $state
+}
+
+function Update-VpsAction {
+    $state = Get-VpsStateForAction
+    if (-not (Confirm-Operation ('Zaktualizować serwer na VPS {0} do najnowszej wersji z GitHuba?' -f $state.host))) { return }
+    Write-Phase 'aktualizacja VPS'
+    $final = Update-M2Vps -State $state -ServerRoot $serverRoot
+    Write-VpsOutcome -Status $final -State $state -What 'Aktualizacja'
+}
+
+function Show-VpsStatusAction {
+    $state = Get-VpsStateForAction
+    $status = Get-M2VpsStatus -State $state
+    $words = @{ running = 'trwa'; done = 'gotowe'; failed = 'NIE UDAŁO SIĘ'; interrupted = 'PRZERWANE (VPS zrestartowany w trakcie? uruchom instalację jeszcze raz)'; none = 'nic jeszcze nie uruchomiono' }
+    $said = $(if ($words.ContainsKey($status.State)) { $words[$status.State] } else { $status.State })
+    Write-Host ('VPS {0}: wersja {1}, zadanie "{2}": {3}' -f $state.host, $status.Version, $status.Kind, $said)
+    if ($status.Message) { Write-Host ('  {0} (etap {1}, od {2}{3})' -f $status.Message, $status.Phase, $status.Started, $(if ($status.Finished) { ' do ' + $status.Finished } else { '' })) }
+    Write-Host ('Adres dla graczy: {0}, porty {1} i {2}; panele na {3}, gra na {4}; botów: {5}' -f $status.PublicAddress, $status.AuthPort, $status.GamePortRange, $status.PanelBind, $status.HostBind, $status.Bots)
+    if ($status.LogText) { Write-Host '--- koniec logu instalacji ---'; Write-Host $status.LogText }
+    if ($status.PsText) { Write-Host '--- kontenery ---'; Write-Host $status.PsText }
+}
+
+function Open-VpsPanelAction {
+    $state = Get-VpsStateForAction
+    $addresses = Open-M2VpsPanel -State $state -ServerRoot $serverRoot
+    Write-Host ('Tunel do paneli VPS działa: panel {0}, panel zaawansowany {1}, ItemShop {2}.' -f $addresses.ClassicUrl, $addresses.SebanUrl, $addresses.ItemShopUrl) -ForegroundColor Green
+    Write-Host 'Działa po zamknięciu launchera; kończy go ZAMKNIJ TUNEL albo zerwane połączenie.'
+    Start-Process $addresses.ClassicUrl
+}
+
+function Close-VpsPanelAction {
+    Assert-VpsModule
+    if (Close-M2VpsPanel -ServerRoot $serverRoot) { Write-Host 'Tunel do paneli VPS zamknięty.' -ForegroundColor Green }
+    else { Write-Host 'Tunel do paneli VPS nie był otwarty.' }
+}
+
+function Show-VpsLogsAction {
+    $state = Get-VpsStateForAction
+    Write-Host (Get-M2VpsLogs -State $state -Lines 300)
+}
+
+function Show-VpsPasswordsAction {
+    Assert-VpsConsole
+    $state = Get-VpsStateForAction
+    $accounts = @(Get-M2VpsAccounts -State $state)
+    if ($accounts.Count -eq 0) { Write-Host 'Na VPS nie ma jeszcze pliku z hasłami - powstaje, gdy baza wstanie po instalacji.' -ForegroundColor Yellow; return }
+    foreach ($account in $accounts) {
+        Write-Host ('  login {0,-14} hasło {1}{2}' -f $account.Login, $account.Password, $(if ($account.Note) { '   (' + $account.Note + ')' } else { '' })) -ForegroundColor Cyan
+    }
+    Write-Host ('Te same hasła leżą na VPS w /root/metin2-accounts.txt (tylko dla roota).')
+}
+
+function Write-VpsClientAction {
+    $state = Get-VpsStateForAction
+    $result = Write-M2VpsClientEntry -State $state -ServerRoot $serverRoot
+    Write-Host ('Zapisano {0}: w kliencie wybierz serwer "Online: {1}" ({2}).' -f $result.Path, $result.Name, $result.Host) -ForegroundColor Green
+    if ($result.Replaced) { Write-Host ('Zastąpił świat znajomego "{0}" - klient ma jedno takie miejsce; kod zaproszenia wpisze go z powrotem.' -f $result.Replaced) -ForegroundColor Yellow }
+}
+
+function Show-VpsInviteAction {
+    Assert-VpsConsole
+    $state = Get-VpsStateForAction
+    $name = $FriendName
+    if (-not $name) { $name = Read-Host 'Imię albo nick znajomego (z niego powstanie login na VPS)' }
+    if (-not $name) { throw 'Nie podano imienia znajomego.' }
+    $status = Get-M2VpsStatus -State $state
+    $friend = New-M2VpsFriend -State $state -Name $name
+    Write-Host ('Konto na VPS dla {0}: login {1}, hasło {2}' -f $friend.name, $friend.login, $friend.password) -ForegroundColor Green
+    Write-Host 'Kod zaproszenia (skopiuj i wyślij znajomemu w prywatnej wiadomości - zawiera hasło):'
+    Write-Host (Get-M2VpsFriendInvite -State $state -Account $friend -Status $status) -ForegroundColor Cyan
+}
+
+function Invoke-Action {
+    param([Parameter(Mandatory = $true)][string]$SelectedAction)
+    $config = Get-Config
+    switch ($SelectedAction) {
+        'Start' { Start-Server }
+        'Stop' {
+            Stop-Server
+            if (Test-M2DockerRunning) {
+                Write-Host 'Serwer zatrzymany, Docker Desktop działa dalej. Dane pozostają zapisane w wolumenach.' -ForegroundColor Green
+            }
+        }
+        'StartDocker' { Start-Docker }
+        'StopAll' { Stop-DockerAndServer }
+        'FreePorts' { Clear-PortConflictsAction }
+        'Check' {
+            $remote = Get-M2UpdateManifest -Source (Get-ManifestSource $config)
+            Show-UpdateStatus -RemoteManifest $remote
+        }
+        'UpdateServer' {
+            $remote = Get-M2UpdateManifest -Source (Get-ManifestSource $config)
+            Show-UpdateStatus -RemoteManifest $remote
+            Update-Server -RemoteManifest $remote
+        }
+        'UpdateClient' {
+            $remote = Get-M2UpdateManifest -Source (Get-ManifestSource $config)
+            Show-UpdateStatus -RemoteManifest $remote
+            Update-Client -RemoteManifest $remote -Config $config
+        }
+        'RepairClientExe' {
+            $remote = Get-M2UpdateManifest -Source (Get-ManifestSource $config)
+            Repair-ClientExe -RemoteManifest $remote -Config $config
+        }
+        'UpdateAll' {
+            $remote = Get-M2UpdateManifest -Source (Get-ManifestSource $config)
+            Show-UpdateStatus -RemoteManifest $remote
+            $clientComponent = Get-ManifestComponent -RemoteManifest $remote -Name 'client'
+            $hasPatcher = [bool](Get-M2ClientPatcher -ClientFolder (Get-M2ClientFolder -Config $config))
+            if (-not $hasPatcher -and $clientComponent -and -not (Test-InstalledVersion -Installed ([string](Read-State).client) -Available ([string]$clientComponent.version))) {
+                Assert-ClientNotRunning -Config $config
+            }
+            Update-Server -RemoteManifest $remote
+            Update-Client -RemoteManifest $remote -Config $config
+        }
+        'Diagnose' {
+            Show-DockerDiagnostics -CheckPanelPort | Out-Null
+            # MT2009_PLUS_LAUNCHER_DOCKER_RAM_V1
+            $memoryAdvice = Get-DockerMemoryAdviceSafe
+            if ($memoryAdvice -and $memoryAdvice.Low) { Write-DockerMemoryAdvice -Advice $memoryAdvice }
+        }
+        'DockerRam' { Show-DockerMemoryAction }
+        'RestartDockerWsl' { Restart-DockerWsl }
+        'Logs' { Create-Logs | Out-Null }
+        'SendLogs' { Send-Logs }
+        'Report' { Send-Report }
+        'Configure' { Configure-Launcher }
+        'SetBots' { Set-BotCountAction }
+        'SetDifficulty' { Set-DifficultyAction }
+        'ImportDb' { Import-DatabaseAction }
+        'BackupDb' { Backup-DatabaseAction }
+        'RestoreDb' { Restore-DatabaseAction }
+        'ResetWorld' { Reset-WorldAction }
+        'RepairDb' { Repair-DatabaseAction }
+        'DbAccess' { Show-DatabaseAccessAction }
+        'PanelPassword' { Reset-PanelPasswordAction }
+        'CoopCheck' { Show-CoopCheckAction }
+        'CoopSecure' { Protect-CoopAccountsAction }
+        'CoopAddFriend' { Add-CoopFriendAction }
+        'CoopBlockFriend' { Set-CoopFriendBlockedAction -Blocked $true }
+        'CoopUnblockFriend' { Set-CoopFriendBlockedAction -Blocked $false }
+        'CoopInvite' { Show-CoopInviteAction }
+        'CoopHost' { Start-CoopHostingAction }
+        'CoopStop' { Stop-CoopHostingAction }
+        'CoopRenew' { Assert-CoopModule; Update-CoopHostingLease }
+        'CoopJoin' { Join-CoopAction }
+        'VpsConnect' { Connect-VpsAction }
+        'VpsCheck' { Show-VpsCheckAction }
+        'VpsInstall' { Install-VpsAction }
+        'VpsUpdate' { Update-VpsAction }
+        'VpsStatus' { Show-VpsStatusAction }
+        'VpsPanel' { Open-VpsPanelAction }
+        'VpsPanelClose' { Close-VpsPanelAction }
+        'VpsLogs' { Show-VpsLogsAction }
+        'VpsPasswords' { Show-VpsPasswordsAction }
+        'VpsClient' { Write-VpsClientAction }
+        'VpsInvite' { Show-VpsInviteAction }
+        default { throw "Nieznana akcja: $SelectedAction" }
+    }
+}
+
+function Show-Menu {
+    # MT2009_PLUS_LAUNCHER_DOCKER_RAM_V1: Docker's memory read once when the
+    # menu opens (and again after option 42), and a line above the menu while
+    # it is short - a notice, nothing is stopped by it.
+    $memoryNotice = Get-DockerMemoryAdviceSafe
+    while ($true) {
+        Write-Header
+        if ($memoryNotice -and $memoryNotice.Low) {
+            Write-Host ('  UWAGA: Docker ma tylko {0} GB pamięci RAM (do budowy serwera zalecane co najmniej 6 GB).' -f $memoryNotice.MemText) -ForegroundColor Yellow
+            Write-Host '  Przed aktualizacją wybierz 42 - instrukcja z plikiem .wslconfig i automatyczne ustawienie.' -ForegroundColor Yellow
+            Write-Host ''
+        }
+        Write-Host '  1. Uruchom serwer'
+        Write-Host '  2. Zatrzymaj serwer'
+        Write-Host '  3. Uruchom tylko Docker Desktop'
+        Write-Host '  4. Zatrzymaj serwer i Docker (postęp zostaje)'
+        Write-Host '  5. Sprawdź aktualizacje'
+        Write-Host '  6. Aktualizuj serwer'
+        Write-Host '  7. Aktualizuj klienta'
+        Write-Host '  8. Aktualizuj wszystko'
+        Write-Host '  9. Sprawdź Docker, WSL, wirtualizację i porty'
+        Write-Host ' 10. Utwórz paczkę diagnostyczną ZIP'
+        Write-Host ' 11. Utwórz i wyślij logi (po potwierdzeniu)'
+        Write-Host ' 12. Konfiguracja launchera'
+        Write-Host ' 13. Ustaw liczbę grających botów (0-2500)'
+        Write-Host ' 14. Importuj bazę z innej instalacji (wyższe postacie)'
+        Write-Host ' 15. Zapisz kopię świata (backup do pliku zip)'
+        Write-Host ' 16. Przywróć świat z kopii'
+        Write-Host ' 17. Wyzeruj świat i zacznij od nowa (świeża instalacja; kopia zapisywana automatycznie)'
+        Write-Host ' 18. Napraw dostęp do bazy (gdy migrate/serwer nie startuje albo Navicat odrzuca hasło)'
+        Write-Host ' 19. Dane do połączenia z bazą (Navicat, HeidiSQL)'
+        Write-Host ' 20. Hasło do panelu WWW (pokaż / zresetuj)'
+        Write-Host ' 21. Zwolnij porty (gdy „port jest już zajęty” blokuje start lub aktualizację)'
+        Write-Host ' 22. Poziom trudności (czekanie u Biologa i Stajennego: easy / medium / hard / własne godziny)'
+        if (Get-Command Get-M2CoopNetworkReport -ErrorAction SilentlyContinue) {
+            Write-Host '     COOP jest teraz dostępny dla wszystkich. Jeśli chcesz, możesz wesprzeć rozwój paczki singleplayer: https://buycoffee.to/mt2009plus' -ForegroundColor DarkGray
+            Write-Host ' 23. COOP: sprawdź sieć i stan hostowania (eksperymentalne)'
+            Write-Host ' 24. COOP: zabezpiecz konta admin i test (nowe hasła)'
+            Write-Host ' 25. COOP: dodaj znajomego (konto i kod zaproszenia)'
+            Write-Host ' 26. COOP: pokaż kody zaproszeń'
+            Write-Host ' 27. COOP: hostuj świat dla znajomych'
+            Write-Host ' 28. COOP: zakończ hostowanie'
+            Write-Host ' 29. COOP: dołącz do świata znajomego (wklej kod)'
+        }
+        if (Get-Command Install-M2Vps -ErrorAction SilentlyContinue) {
+            Write-Host ' 30. VPS: adres i połączenie (klucz SSH; hasło do VPS wpisujesz raz)'
+            Write-Host ' 31. VPS: sprawdź serwer (procesor, pamięć, dysk, uprawnienia)'
+            Write-Host ' 32. VPS: zainstaluj ten świat na VPS'
+            Write-Host ' 33. VPS: aktualizuj serwer na VPS'
+            Write-Host ' 34. VPS: stan instalacji'
+            Write-Host ' 35. VPS: otwórz panel WWW (tunel SSH)'
+            Write-Host ' 36. VPS: zamknij tunel do paneli'
+            Write-Host ' 37. VPS: hasła kont gry (admin, test, znajomi)'
+            Write-Host ' 38. VPS: dopisz serwer VPS do klienta gry'
+            Write-Host ' 39. VPS: logi serwera'
+            Write-Host ' 40. VPS: konto i kod zaproszenia dla znajomego (COOP)'
+        }
+        if (Get-Command Invoke-M2Report -ErrorAction SilentlyContinue) {
+            Write-Host ' 41. Zgłoś błąd, propozycję albo pytanie (do autora, z logami)'
+        }
+        Write-Host ' 42. Pamięć RAM Dockera (sprawdź; ustaw .wslconfig, gdy jest jej za mało)'
+        Write-Host '  0. Wyjście'
+        Write-Host ''
+        $choice = Read-Host 'Wybierz opcję'
+        $selected = switch ($choice) {
+            '1' { 'Start' } '2' { 'Stop' } '3' { 'StartDocker' } '4' { 'StopAll' }
+            '5' { 'Check' } '6' { 'UpdateServer' } '7' { 'UpdateClient' }
+            '8' { 'UpdateAll' } '9' { 'Diagnose' } '10' { 'Logs' } '11' { 'SendLogs' } '12' { 'Configure' }
+            '13' { 'SetBots' }
+            '14' { 'ImportDb' }
+            '15' { 'BackupDb' }
+            '16' { 'RestoreDb' }
+            '17' { 'ResetWorld' }
+            '18' { 'RepairDb' }
+            '19' { 'DbAccess' }
+            '20' { 'PanelPassword' }
+            '21' { 'FreePorts' }
+            '22' { 'SetDifficulty' }
+            '23' { 'CoopCheck' }
+            '24' { 'CoopSecure' }
+            '25' { 'CoopAddFriend' }
+            '26' { 'CoopInvite' }
+            '27' { 'CoopHost' }
+            '28' { 'CoopStop' }
+            '29' { 'CoopJoin' }
+            '30' { 'VpsConnect' }
+            '31' { 'VpsCheck' }
+            '32' { 'VpsInstall' }
+            '33' { 'VpsUpdate' }
+            '34' { 'VpsStatus' }
+            '35' { 'VpsPanel' }
+            '36' { 'VpsPanelClose' }
+            '37' { 'VpsPasswords' }
+            '38' { 'VpsClient' }
+            '39' { 'VpsLogs' }
+            '40' { 'VpsInvite' }
+            '41' { 'Report' }
+            '42' { 'DockerRam' }
+            '0' { return }
+            default { '' }
+        }
+        if (-not $selected) { continue }
+        try { Invoke-Action -SelectedAction $selected }
+        catch { Write-Host "BŁĄD: $($_.Exception.Message)" -ForegroundColor Red }
+        if ($selected -in @('DockerRam', 'Start', 'StartDocker', 'UpdateServer', 'UpdateAll')) { $memoryNotice = Get-DockerMemoryAdviceSafe }
+        $script:dockerMemoryChecked = $false
+        Write-Host ''
+        Read-Host 'Naciśnij Enter, aby wrócić do menu' | Out-Null
+    }
+}
+
+try {
+    if ($Action -eq 'Menu') { Show-Menu }
+    else { Invoke-Action -SelectedAction $Action }
+}
+catch {
+    Write-Host "BŁĄD: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}

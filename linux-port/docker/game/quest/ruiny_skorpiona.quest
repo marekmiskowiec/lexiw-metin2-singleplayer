@@ -1,0 +1,765 @@
+-- MT2009_PLUS_AREZZO_V1 (skorpion): Ruiny Skorpiona - loch od poziomu 65, trudniejszy ni¿ Razador (mapa 365,
+-- plechito_scorpion_dungeon z Arezzo), tylko dla graczy. Wzorzec biblioteka_wiedzy.quest (tools/questgen.py):
+-- Stra¿nik Ruin (20424) na Ognistej Ziemi obok stra¿nika Razadora. Etapy: 3 fale po 40 skorpionów (Pieczêæ Ruin
+-- 30767), 6 Metinów Skorpiona, 3 Czerwone Skorpiony, 4 Metiny, Król Skorpionów; potem 2-4 Skrzynie Skorpiona
+-- (30775) dla ka¿dego gracza. Limit 45 minut, ponowne wejœcie po 60 minutach.
+quest ruiny_skorpiona begin
+	state start begin
+		function cfg()
+			return {
+				map = 365,
+				base_x = 8448, base_y = 5888, size = 512,
+				entry = {268, 228},
+				exit_map = 62, exit_x = 5989, exit_y = 7058,
+				min_level = 65,
+				near = 30,
+				cooldown = 60 * 60,
+				limit_min = 45,
+				-- MT2009_PLUS_DUNGEON_FEE_V1: the price of a new expedition (each player, paid on entering it) and
+				-- how many new expeditions a player may start a day (Polish midnight).
+				fee = 10000000, fee_text = "10 000 000",
+				daily = 5,
+				-- 1 October: 40 (was 50) - the waves (wave.txt: 8 groups every 30 s, was 16 every 15 s) for a
+				-- party at the entry level 65.
+				wave_kills = 40,
+				seals = 3,
+				chests_min = 2, chests_max = 4,
+				path = "data/dungeon/ruiny_skorpiona/",
+			}
+		end
+
+		-- MT2009_PLUS_DUNGEON_FEE_V1: the entry fee and the daily limit. Checked for everyone at the guard (with
+		-- the level and the rest), paid on the first login into a new instance (every way in:
+		-- the guard, the lobby, the lobby's own timer) - no money or no runs left there sends
+		-- the player out. "Wróæ do lochu" into the same instance costs nothing. GMs are free.
+		function today()
+			return math.floor((get_global_time() + 7200) / 86400)
+		end
+
+		function runs_today()
+			if pc.getf("ruiny_skorpiona", "day") ~= ruiny_skorpiona.today() then
+				return 0
+			end
+			return pc.getf("ruiny_skorpiona", "runs")
+		end
+
+		function over_limit()
+			local c = ruiny_skorpiona.cfg()
+			return not pc.is_gm() and ruiny_skorpiona.runs_today() >= c.daily
+		end
+
+		function too_poor()
+			local c = ruiny_skorpiona.cfg()
+			return not pc.is_gm() and pc.get_money() < c.fee
+		end
+
+		function pay_entry()
+			local c = ruiny_skorpiona.cfg()
+			if pc.is_gm() or pc.is_playerbot() then
+				return true
+			end
+			if ruiny_skorpiona.over_limit() then
+				syschat("Wykorzysta³eœ ju¿ dzisiejsze wyprawy do tego lochu ("..c.daily.."). Wróæ jutro.")
+				return false
+			end
+			if pc.get_money() < c.fee then
+				syschat("Wejœcie kosztuje "..c.fee_text.." Yang - nie masz tyle przy sobie.")
+				return false
+			end
+			pc.change_money(-c.fee)
+			local day = ruiny_skorpiona.today()
+			if pc.getf("ruiny_skorpiona", "day") ~= day then
+				pc.setf("ruiny_skorpiona", "day", day)
+				pc.setf("ruiny_skorpiona", "runs", 0)
+			end
+			pc.setf("ruiny_skorpiona", "runs", pc.getf("ruiny_skorpiona", "runs") + 1)
+			syschat("Op³ata za wejœcie: "..c.fee_text.." Yang. Dzisiejsza wyprawa "..pc.getf("ruiny_skorpiona", "runs").."/"..c.daily..".")
+			return true
+		end
+
+		function inside()
+			local idx = pc.get_map_index()
+			return idx >= 365 * 10000 and idx < 366 * 10000
+		end
+
+		-- MT2009_PLUS_DUNGEON_END_V1 (2 October): the end of a run, seen from every core. A player used a
+		-- Teleport Ring in the minute after the boss, and his guard (another core: d.find cannot tell what
+		-- game2 holds) kept offering "Wróæ do lochu" into an instance that was gone. The boss's kill (or the
+		-- time limit) now writes the end time to an event flag of the instance's slot (map and the last two
+		-- digits of its index - a slot comes round again only after 100 more instances of the map), and
+		-- every core compares it with the player's own entry time: a run that ended after he went in is over.
+		function end_flag(idx)
+			return "mt2009_dgend_"..math.floor(idx / 10000).."_"..math.mod(idx, 100)
+		end
+
+		function run_ended()
+			local idx = pc.getf("ruiny_skorpiona", "idx")
+			return idx > 0 and game.get_event_flag(ruiny_skorpiona.end_flag(idx)) >= pc.getf("ruiny_skorpiona", "entry")
+		end
+
+		-- In the instance (the boss's kill, the time limit): the event flag for those outside, the
+		-- rejoin state of those inside. The daily count and the cooldown stay as the entry set them.
+		function mark_ended()
+			if d.getf("ended") == 1 then
+				return
+			end
+			d.setf("ended", 1)
+			d.setqf2("ruiny_skorpiona", "idx", 0)
+			if d.getf("mt2009_dgbot") ~= 1 then
+				game.set_event_flag(ruiny_skorpiona.end_flag(d.get_map_index()), get_global_time())
+			end
+		end
+
+		-- A rejoin state with nothing behind it any more (the run ended, the time is up) is cleared;
+		-- true when the run ended while the player was out of it.
+		function clear_stale()
+			local c = ruiny_skorpiona.cfg()
+			if pc.getf("ruiny_skorpiona", "idx") <= 0 then
+				return false
+			end
+			if ruiny_skorpiona.run_ended() then
+				pc.setf("ruiny_skorpiona", "idx", 0)
+				return true
+			end
+			if get_global_time() - pc.getf("ruiny_skorpiona", "entry") >= c.limit_min * 60 then
+				pc.setf("ruiny_skorpiona", "idx", 0)
+			end
+			return false
+		end
+
+		function end_text(n)
+			if n == 1 then
+				return "Za 1 sekundê zostaniesz teleportowany na Ognist¹ Ziemiê."
+			elseif n >= 2 and n <= 4 then
+				return "Za "..n.." sekundy zostaniesz teleportowany na Ognist¹ Ziemiê."
+			end
+			return "Za "..n.." sekund zostaniesz teleportowany na Ognist¹ Ziemiê."
+		end
+
+		-- After the last boss: one notice a second, 5 to 0, then everyone out (finish).
+		function end_count(n)
+			d.notice("Ruiny Skorpiona: "..ruiny_skorpiona.end_text(n))
+			if n <= 0 then
+				ruiny_skorpiona.finish()
+				return
+			end
+			d.setf("end_in", n - 1)
+			server_timer("skorpion_end", 1, d.get_map_index())
+		end
+
+		function entry_xy()
+			local c = ruiny_skorpiona.cfg()
+			return (c.base_x + c.entry[1]) * 100, (c.base_y + c.entry[2]) * 100
+		end
+
+		function purge_mobs()
+			local c = ruiny_skorpiona.cfg()
+			d.purge_area(c.base_x * 100, c.base_y * 100, (c.base_x + c.size) * 100, (c.base_y + c.size) * 100)
+		end
+
+		function stage_text(stage)
+			local c = ruiny_skorpiona.cfg()
+			if stage == 1 then return "Pokonajcie "..c.wave_kills.." skorpionów, a potem u¿yjcie Pieczêci Ruin ("..d.getf("seals").."/"..c.seals..")."
+			elseif stage == 2 then return "Zniszczcie 6 Metinów Skorpiona."
+			elseif stage == 3 then return "Pokonajcie 3 Czerwone Skorpiony."
+			elseif stage == 4 then return "Zniszczcie 4 Metiny Skorpiona."
+			elseif stage == 5 then return "Pokonajcie Króla Skorpionów!"
+			end
+			return ""
+		end
+
+		function start_stage(stage)
+			local c = ruiny_skorpiona.cfg()
+			d.clear_regen()
+			ruiny_skorpiona.purge_mobs()
+			d.setf("stage", stage)
+			d.setf("kills", 0)
+			d.setf("seal_out", 0)
+			if stage == 1 then
+				d.set_regen_file(c.path.."wave.txt")
+			elseif stage == 2 then
+				d.setf("left", 6)
+				d.regen_file(c.path.."metins6.txt")
+				d.set_regen_file(c.path.."guards.txt")
+			elseif stage == 3 then
+				d.setf("left", 3)
+				d.regen_file(c.path.."reds.txt")
+				d.set_regen_file(c.path.."guards.txt")
+			elseif stage == 4 then
+				d.setf("left", 4)
+				d.regen_file(c.path.."metins4.txt")
+				d.set_regen_file(c.path.."guards.txt")
+			elseif stage == 5 then
+				d.spawn_mob(9694, 269, 226)
+			end
+			d.notice("Ruiny Skorpiona ("..stage.."/5): "..ruiny_skorpiona.stage_text(stage))
+		end
+
+		function next_stage()
+			local stage = d.getf("stage") + 1
+			d.clear_regen()
+			ruiny_skorpiona.purge_mobs()
+			d.setf("stage", 9 + stage)
+			d.notice("Ruiny Skorpiona: Etap zaliczony. Za 5 sekund nastêpne wyzwanie.")
+			server_timer("skorpion_stage", 5, d.get_map_index())
+		end
+
+		function seal_used()
+			local c = ruiny_skorpiona.cfg()
+			local s = d.getf("seals") + 1
+			d.setf("seals", s)
+			d.setf("seal_out", 0)
+			d.setf("kills", 0)
+			if s >= c.seals then
+				ruiny_skorpiona.next_stage()
+			else
+				d.set_regen_file(c.path.."wave.txt")
+				d.notice("Ruiny Skorpiona: Pieczêæ Ruin "..s.."/"..c.seals.." z³amana. Nadchodzi nastêpna fala!")
+			end
+		end
+
+		function init()
+			local c = ruiny_skorpiona.cfg()
+			d.setf("init", 1)
+			d.setf("entered", 1)
+			-- MT2009_PLUS_DUNGEON_RETURN_V1: the instance outlives its players until the time limit.
+			d.setf("mt2009_keep_until", get_global_time() + c.limit_min * 60 + 60)
+			d.setf("start", get_global_time())
+			d.setf("stage", 10)
+			d.setf("seals", 0)
+			d.setf("minutes", c.limit_min)
+			d.notice("Ruiny Skorpiona: Witajcie. Za 5 sekund z piasku wyjd¹ skorpiony.")
+			server_timer("skorpion_stage", 5, d.get_map_index())
+			server_timer("skorpion_tick", 60, d.get_map_index())
+		end
+
+		function finish()
+			ruiny_skorpiona.mark_ended() -- MT2009_PLUS_DUNGEON_END_V1
+			local c = ruiny_skorpiona.cfg()
+			d.setf("closed", 1)
+			d.setf("mt2009_keep_until", 0)
+			if d.getf("mt2009_dgbot") == 1 then
+				-- MT2009_PLUS_AREZZO_DUNGEON_BOTS_V1: the test cohort's run ends in its lobby (this map, game2).
+				d.set_warp_location(c.map, c.base_x + c.entry[1], c.base_y + c.entry[2])
+			else
+				d.set_warp_location(c.exit_map, c.exit_x, c.exit_y)
+			end
+			d.exit_all()
+		end
+
+		function reward()
+			local c = ruiny_skorpiona.cfg()
+			local took = get_global_time() - d.getf("start")
+			local pids = {}
+			if party.is_party() then
+				pids = {party.get_member_pids()}
+			end
+			if table.getn(pids) == 0 then
+				pids = {pc.get_player_id()}
+			end
+			for i, pid in next, pids, nil do
+				q.begin_other_pc_block(pid)
+				if not pc.is_playerbot() then
+					local n = number(c.chests_min, c.chests_max)
+					pc.give_item2(30775, n)
+					syschat("Ruiny Skorpiona: otrzymujesz skrzynie: "..n..".")
+				end
+				q.end_other_pc_block()
+			end
+			return took
+		end
+
+		when 20424.chat."Ruiny Skorpiona" with pc.get_map_index() ~= 365 and not ruiny_skorpiona.inside() begin
+			local c = ruiny_skorpiona.cfg()
+			say_title(mob_name(20424))
+			if pc.is_playerbot() then
+				return
+			end
+			say("W ruinach za pustyni¹ gnieŸdzi siê Król Skorpionów.")
+			say("Jego jad zabi³ ju¿ niejednego wojownika,")
+			say("który myœla³, ¿e poradzi sobie z Razadorem.")
+			say("")
+			say_reward("Wymagany poziom: "..c.min_level..". Limit "..c.limit_min.." minut, ponowne wejœcie po "..math.floor(c.cooldown / 60).." minutach.")
+			say_reward("Loch jest tylko dla graczy - boty z dru¿yny zostaj¹ tutaj.")
+			say_reward("Wejœcie: "..c.fee_text.." Yang. Najwy¿ej "..c.daily.." wypraw dziennie (dziœ: "..ruiny_skorpiona.runs_today().."/"..c.daily..").") -- MT2009_PLUS_DUNGEON_FEE_V1
+			if select("WejdŸ do lochu", "Nie teraz") ~= 1 then
+				return
+			end
+			if not pc.is_gm() and game.get_event_flag("mt2009_arezzo_closed") > 0 then
+				say_title(mob_name(20424))
+				say("Przejœcie jest jeszcze zamkniête. Wróæ póŸniej.")
+				return
+			end
+			local now = get_global_time()
+			local x, y = ruiny_skorpiona.entry_xy()
+			-- MT2009_PLUS_DUNGEON_END_V1: a run that ended while the player was out is no longer his.
+			if ruiny_skorpiona.clear_stale() then
+				say_title(mob_name(20424))
+				say("Ten loch zosta³ ju¿ ukoñczony.")
+			end
+			local idx = pc.getf("ruiny_skorpiona", "idx")
+			if idx > 0 and now - pc.getf("ruiny_skorpiona", "entry") < c.limit_min * 60 then
+				say_title(mob_name(20424))
+				say("Twoja wyprawa wci¹¿ trwa. Czy chcesz do niej wróciæ?")
+				local s
+				if pc.is_gm() then
+					s = select("Wróæ do lochu", "Nowa wyprawa (GM)", "Nie teraz")
+				else
+					s = select("Wróæ do lochu", "Nie teraz")
+					if s == 2 then s = 3 end
+				end
+				if s == 3 then
+					return
+				elseif s == 1 then
+					-- MT2009_PLUS_DUNGEON_END_V1: the login inside knows this jump (no second fee).
+					pc.setf("ruiny_skorpiona", "back", idx)
+					pc.setf("ruiny_skorpiona", "back_at", now)
+					if d.find(idx, x, y, pc.get_player_id()) then
+						pc.warp(x, y, idx)
+					else
+						say_title(mob_name(20424))
+						say("Jeœli wyprawa wci¹¿ trwa, przejœcie zaraz ciê zabierze.")
+						timer("skorpion_rejoin", 5)
+					end
+					return
+				end
+			end
+			if party.is_party() and not party.is_leader() then
+				say_title(mob_name(20424))
+				say("Tylko przywódca dru¿yny mo¿e otworzyæ przejœcie.")
+				say("Stañ przy mnie - przywódca zabierze dru¿ynê stoj¹c¹ obok.")
+				return
+			end
+			if pc.get_level() < c.min_level then
+				say_title(mob_name(20424))
+				say("Jesteœ za s³aby. Wróæ, gdy osi¹gniesz poziom "..c.min_level..".")
+				return
+			end
+			if not pc.can_warp() or pc.is_busy() then
+				say_title(mob_name(20424))
+				say("Poczekaj chwilê po handlu lub rozmowie i spróbuj ponownie.")
+				return
+			end
+			if now - pc.getf("ruiny_skorpiona", "pending") < 10 then
+				say_title(mob_name(20424))
+				say("Przejœcie ju¿ siê otwiera. Poczekaj chwilê.")
+				return
+			end
+			local me = pc.get_player_id()
+			local humans = {me}
+			local low = {}
+			local wait = {}
+			local full = {} -- MT2009_PLUS_DUNGEON_FEE_V1
+			local poor = {}
+			if not pc.is_gm() and now - pc.getf("ruiny_skorpiona", "entry") < c.cooldown then
+				table.insert(wait, pc.get_name())
+			end
+			if ruiny_skorpiona.over_limit() then table.insert(full, pc.get_name()) end
+			if ruiny_skorpiona.too_poor() then table.insert(poor, pc.get_name()) end
+			if party.is_party() then
+				local lmap, lx, ly = pc.get_map_index(), pc.get_x(), pc.get_y()
+				local pids = {party.get_member_pids()}
+				for i, pid in next, pids, nil do
+					if pid ~= me then
+						q.begin_other_pc_block(pid)
+						local dx, dy = pc.get_x() - lx, pc.get_y() - ly
+						if not pc.is_playerbot() and pc.get_map_index() == lmap and dx * dx + dy * dy <= c.near * c.near and pc.can_warp() then
+							table.insert(humans, pid)
+							if pc.get_level() < c.min_level then
+								table.insert(low, pc.get_name())
+							end
+							if not pc.is_gm() and now - pc.getf("ruiny_skorpiona", "entry") < c.cooldown then
+								table.insert(wait, pc.get_name())
+							end
+							if ruiny_skorpiona.over_limit() then table.insert(full, pc.get_name()) end
+							if ruiny_skorpiona.too_poor() then table.insert(poor, pc.get_name()) end
+						end
+						q.end_other_pc_block()
+					end
+				end
+			end
+			if table.getn(low) > 0 then
+				say_title(mob_name(20424))
+				say("Za s³abi, by wejœæ (poziom "..c.min_level.."+):")
+				for i, n in next, low, nil do say(color(1,1,0).."    "..n) end
+				return
+			end
+			if table.getn(full) > 0 then
+				say("Dzisiejsze wyprawy do tego lochu ju¿ wykorzystane ("..c.daily.." dziennie):")
+				for i, n in next, full, nil do say(color(1,1,0).."    "..n) end
+				return
+			end
+			if table.getn(poor) > 0 then
+				say("Wejœcie kosztuje "..c.fee_text.." Yang - za ma³o przy sobie:")
+				for i, n in next, poor, nil do say(color(1,1,0).."    "..n) end
+				return
+			end
+			if table.getn(wait) > 0 then
+				say_title(mob_name(20424))
+				say("Jeszcze nie odpoczêli po poprzedniej wyprawie:")
+				for i, n in next, wait, nil do say(color(1,1,0).."    "..n) end
+				local left = c.cooldown - (now - pc.getf("ruiny_skorpiona", "entry"))
+				if left > 0 then
+					say("")
+					say("Ty mo¿esz wejœæ za "..math.ceil(left / 60).." min.")
+				end
+				return
+			end
+			local r = d.new_jump_pids(c.map, x, y, humans)
+			if r < 0 then
+				ruiny_skorpiona.lobby()
+				return
+			end
+			pc.setf("ruiny_skorpiona", "pending", now)
+			if r == 0 then
+				timer("skorpion_fallback", 5)
+			end
+		end
+
+		function lobby()
+			local c = ruiny_skorpiona.cfg()
+			local x, y = ruiny_skorpiona.entry_xy()
+			if party.is_party() then
+				local me = pc.get_player_id()
+				local lmap, lx, ly = pc.get_map_index(), pc.get_x(), pc.get_y()
+				local pids = {party.get_member_pids()}
+				for i, pid in next, pids, nil do
+					if pid ~= me then
+						q.begin_other_pc_block(pid)
+						local dx, dy = pc.get_x() - lx, pc.get_y() - ly
+						if not pc.is_playerbot() and pc.get_map_index() == lmap and dx * dx + dy * dy <= c.near * c.near and pc.can_warp() then
+							pc.warp(x, y)
+						end
+						q.end_other_pc_block()
+					end
+				end
+			else
+				pc.setf("ruiny_skorpiona", "auto", 1)
+			end
+			pc.setf("ruiny_skorpiona", "pending", 0)
+			pc.warp(x, y)
+		end
+
+		when skorpion_fallback.timer begin
+			local c = ruiny_skorpiona.cfg()
+			if pc.get_map_index() ~= c.exit_map or pc.getf("ruiny_skorpiona", "pending") == 0 then
+				return
+			end
+			syschat("Ruiny Skorpiona: przejœcie prowadzi przez poczekalniê.")
+			ruiny_skorpiona.lobby()
+		end
+
+		function lobby_create(humans)
+			local c = ruiny_skorpiona.cfg()
+			local x, y = ruiny_skorpiona.entry_xy()
+			local list = {pc.get_player_id()}
+			for i, pid in next, humans, nil do
+				if pid ~= list[1] then
+					table.insert(list, pid)
+				end
+			end
+			return d.new_jump_pids(c.map, x, y, list) > 0
+		end
+
+		when 20424.chat."Otwórz przejœcie" with pc.get_map_index() == 365 begin
+			local c = ruiny_skorpiona.cfg()
+			say_title(mob_name(20424))
+			local now = get_global_time()
+			-- MT2009_PLUS_DUNGEON_END_V1: an ended run is no longer the player's; the lobby stands on the
+			-- instances' own core, so d.find here also tells an instance that is gone.
+			if ruiny_skorpiona.clear_stale() then
+				say("Ten loch zosta³ ju¿ ukoñczony.")
+			end
+			local idx = pc.getf("ruiny_skorpiona", "idx")
+			if idx > 0 and now - pc.getf("ruiny_skorpiona", "entry") < c.limit_min * 60 then
+				if d.find(idx) then
+					say("Twoja wyprawa wci¹¿ trwa. Czy chcesz do niej wróciæ?")
+					if select("Wróæ do lochu", "Nie teraz") == 1 then
+						local x, y = ruiny_skorpiona.entry_xy()
+						pc.warp(x, y, idx)
+					end
+					return
+				end
+				pc.setf("ruiny_skorpiona", "idx", 0)
+			end
+			if party.is_party() and not party.is_leader() then
+				say("Tylko przywódca dru¿yny mo¿e otworzyæ przejœcie.")
+				say("Poczekaj tu na niego - zabierze ca³¹ dru¿ynê.")
+				return
+			end
+			local humans = {}
+			local low = {}
+			local wait = {}
+			local full = {} -- MT2009_PLUS_DUNGEON_FEE_V1
+			local poor = {}
+			if party.is_party() then
+				local pids = {party.get_member_pids()}
+				for i, pid in next, pids, nil do
+					q.begin_other_pc_block(pid)
+					if not pc.is_playerbot() then
+						table.insert(humans, pid)
+						if pc.get_level() < c.min_level then
+							table.insert(low, pc.get_name())
+						end
+						if not pc.is_gm() and now - pc.getf("ruiny_skorpiona", "entry") < c.cooldown then
+							table.insert(wait, pc.get_name())
+						end
+						if ruiny_skorpiona.over_limit() then table.insert(full, pc.get_name()) end
+						if ruiny_skorpiona.too_poor() then table.insert(poor, pc.get_name()) end
+					end
+					q.end_other_pc_block()
+				end
+			else
+				table.insert(humans, pc.get_player_id())
+				if pc.get_level() < c.min_level then
+					table.insert(low, pc.get_name())
+				end
+				if not pc.is_gm() and now - pc.getf("ruiny_skorpiona", "entry") < c.cooldown then
+					table.insert(wait, pc.get_name())
+				end
+				if ruiny_skorpiona.over_limit() then table.insert(full, pc.get_name()) end
+				if ruiny_skorpiona.too_poor() then table.insert(poor, pc.get_name()) end
+			end
+			if table.getn(low) > 0 then
+				say("Za s³abi, by wejœæ (poziom "..c.min_level.."+):")
+				for i, n in next, low, nil do say(color(1,1,0).."    "..n) end
+				return
+			end
+			if table.getn(full) > 0 then
+				say("Dzisiejsze wyprawy do tego lochu ju¿ wykorzystane ("..c.daily.." dziennie):")
+				for i, n in next, full, nil do say(color(1,1,0).."    "..n) end
+				return
+			end
+			if table.getn(poor) > 0 then
+				say("Wejœcie kosztuje "..c.fee_text.." Yang - za ma³o przy sobie:")
+				for i, n in next, poor, nil do say(color(1,1,0).."    "..n) end
+				return
+			end
+			if table.getn(wait) > 0 then
+				say("Jeszcze nie odpoczêli po poprzedniej wyprawie:")
+				for i, n in next, wait, nil do say(color(1,1,0).."    "..n) end
+				return
+			end
+			say("Dru¿yna na tej mapie wejdzie razem z tob¹.")
+			if select("Otwórz przejœcie", "Nie teraz") ~= 1 then
+				return
+			end
+			if not ruiny_skorpiona.lobby_create(humans) then
+				say_title(mob_name(20424))
+				say("Nie uda³o siê otworzyæ przejœcia. Spróbuj ponownie za chwilê.")
+			end
+		end
+
+		when skorpion_auto.timer begin
+			local c = ruiny_skorpiona.cfg()
+			if pc.get_map_index() ~= c.map or party.is_party() then
+				return
+			end
+			local now = get_global_time()
+			if pc.get_level() < c.min_level or (not pc.is_gm() and now - pc.getf("ruiny_skorpiona", "entry") < c.cooldown) then
+				syschat("Ruiny Skorpiona: porozmawiaj ze stra¿nikiem, aby otworzyæ przejœcie.")
+				return
+			end
+			if not ruiny_skorpiona.lobby_create({pc.get_player_id()}) then
+				syschat("Ruiny Skorpiona: nie uda³o siê otworzyæ przejœcia - porozmawiaj ze stra¿nikiem.")
+			end
+		end
+
+		-- MT2009_PLUS_DUNGEON_END_V1: "Wróæ do lochu" went to another core (d.find) and nobody took the
+		-- player there within 5 seconds: the instance is gone, and so is the rejoin state.
+		when skorpion_rejoin.timer begin
+			if ruiny_skorpiona.inside() or pc.getf("ruiny_skorpiona", "idx") <= 0 then
+				return
+			end
+			pc.setf("ruiny_skorpiona", "idx", 0)
+			syschat("Ruiny Skorpiona: Ta wyprawa ju¿ siê zakoñczy³a. Porozmawiaj ze stra¿nikiem, aby wyruszyæ na now¹.")
+		end
+
+		when login begin
+			local c = ruiny_skorpiona.cfg()
+			local idx = pc.get_map_index()
+			if idx == c.map then
+				if pc.is_playerbot() then
+					pc.warp(c.exit_x * 100, c.exit_y * 100)
+					return
+				end
+				pc.set_warp_location(c.exit_map, c.exit_x, c.exit_y)
+				pc.setf("ruiny_skorpiona", "pending", 0)
+				if pc.getf("ruiny_skorpiona", "auto") == 1 and not party.is_party() then
+					pc.setf("ruiny_skorpiona", "auto", 0)
+					syschat("Ruiny Skorpiona: przejœcie siê otwiera...")
+					timer("skorpion_auto", 1)
+				else
+					pc.setf("ruiny_skorpiona", "auto", 0)
+					syschat("Ruiny Skorpiona: porozmawiaj ze stra¿nikiem, aby otworzyæ przejœcie.")
+				end
+			elseif ruiny_skorpiona.inside() then
+				if pc.is_playerbot() then
+					pc.warp(c.exit_x * 100, c.exit_y * 100)
+					return
+				end
+				pc.set_warp_location(c.exit_map, c.exit_x, c.exit_y)
+				pc.setf("ruiny_skorpiona", "inside", 1)
+				pc.setf("ruiny_skorpiona", "pending", 0)
+				-- MT2009_PLUS_DUNGEON_END_V1: an instance whose last boss is down (or whose time is up) takes
+				-- nobody back in, and costs nothing.
+				if d.getf("ended") == 1 or d.getf("closed") == 1 then
+					if pc.getf("ruiny_skorpiona", "idx") == idx then
+						pc.setf("ruiny_skorpiona", "idx", 0)
+					end
+					syschat("Ruiny Skorpiona: Ten loch zosta³ ju¿ ukoñczony.")
+					pc.warp(c.exit_x * 100, c.exit_y * 100)
+					return
+				end
+				-- the guard's "Wróæ do lochu" (its 5-second check may have cleared the state while the jump ran)
+				local back = pc.getf("ruiny_skorpiona", "back") == idx and get_global_time() - pc.getf("ruiny_skorpiona", "back_at") < 60
+				pc.setf("ruiny_skorpiona", "back", 0)
+				if pc.getf("ruiny_skorpiona", "idx") ~= idx then
+					if back then
+						pc.setf("ruiny_skorpiona", "idx", idx)
+					else
+						if not ruiny_skorpiona.pay_entry() then -- MT2009_PLUS_DUNGEON_FEE_V1
+							pc.warp(c.exit_x * 100, c.exit_y * 100)
+							return
+						end
+						pc.setf("ruiny_skorpiona", "idx", idx)
+						pc.setf("ruiny_skorpiona", "entry", get_global_time())
+					end
+				end
+				if d.getf("init") == 0 then
+					ruiny_skorpiona.init()
+				end
+			else
+				if pc.getf("ruiny_skorpiona", "inside") == 1 then
+					pc.setf("ruiny_skorpiona", "inside", 0)
+					if pc.count_item(30767) > 0 then pc.remove_item(30767, pc.count_item(30767)) end
+				end
+				-- MT2009_PLUS_DUNGEON_END_V1: the run ended while the player was out of it (or its time is up).
+				if not pc.is_playerbot() and ruiny_skorpiona.clear_stale() then
+					syschat("Ruiny Skorpiona: Ten loch zosta³ ju¿ ukoñczony.")
+				end
+			end
+		end
+
+		when skorpion_stage.server_timer begin
+			if d.select(get_server_timer_arg()) then
+				if d.getf("closed") == 1 then
+					return
+				end
+				local s = d.getf("stage")
+				if s >= 10 then
+					ruiny_skorpiona.start_stage(s - 9)
+				end
+			end
+		end
+
+		when skorpion_tick.server_timer begin
+			if d.select(get_server_timer_arg()) then
+				if d.getf("closed") == 1 then
+					return
+				end
+				local left = d.getf("minutes") - 1
+				if d.getf("mt2009_dgbot") == 1 then
+					-- MT2009_PLUS_AREZZO_DUNGEON_BOTS_V1: the test cohort's runs have no time limit.
+					left = d.getf("minutes")
+				end
+				d.setf("minutes", left)
+				if left <= 0 then
+					d.notice("Ruiny Skorpiona: Czas min¹³. Stra¿nik wyprowadza was z lochu.")
+					ruiny_skorpiona.finish()
+					return
+				end
+				if d.getf("stage") == 1 and d.getf("seal_out") == 1 and get_global_time() - d.getf("seal_time") > 180 then
+					d.notice("Ruiny Skorpiona: Pieczêæ Ruin zadzia³a³a sama.")
+					ruiny_skorpiona.seal_used()
+				end
+				if left == 15 or left == 10 or left == 5 or left == 1 then
+					d.notice("Ruiny Skorpiona: Pozosta³o "..left.." min.")
+				end
+				server_timer("skorpion_tick", 60, get_server_timer_arg())
+			end
+		end
+
+		-- MT2009_PLUS_AREZZO_DUNGEON_BOTS_V1: the start of a test cohort's run. The core makes the
+		-- instance itself (no guard, so no fee and no daily limit), marks it with the dungeon flag
+		-- mt2009_dgbot - nothing a player can set - and asks for this; a player's run starts in login.
+		when skorpion_dgbot.server_timer begin
+			if d.select(get_server_timer_arg()) then
+				if d.getf("mt2009_dgbot") == 1 and d.getf("init") == 0 then
+					ruiny_skorpiona.init()
+				end
+			end
+		end
+
+		-- MT2009_PLUS_DUNGEON_END_V1: the countdown after the last boss (end_count), a second at a time.
+		when skorpion_end.server_timer begin
+			if d.select(get_server_timer_arg()) then
+				if d.getf("closed") == 1 then
+					return
+				end
+				ruiny_skorpiona.end_count(d.getf("end_in"))
+			end
+		end
+
+		when 9697.kill or 9698.kill or 9699.kill or 9700.kill with ruiny_skorpiona.inside() and d.getf("stage") == 1 and d.getf("seal_out") == 0 begin
+			local c = ruiny_skorpiona.cfg()
+			local k = d.getf("kills") + 1
+			d.setf("kills", k)
+			if k >= c.wave_kills then
+				d.setf("seal_out", 1)
+				d.clear_regen()
+				ruiny_skorpiona.purge_mobs()
+				d.setf("seal_time", get_global_time())
+				pc.give_item2(30767, 1)
+				d.notice("Ruiny Skorpiona: "..pc.get_name().." zdobywa Pieczêæ Ruin. U¿yj jej, aby przyzwaæ nastêpn¹ falê.")
+			elseif math.mod(k, 20) == 0 then
+				d.notice("Ruiny Skorpiona: Pokonane potwory: "..k.." / "..c.wave_kills)
+			end
+		end
+
+		when 30767.use begin
+			if not ruiny_skorpiona.inside() or d.getf("stage") ~= 1 or d.getf("seal_out") ~= 1 then
+				syschat("Pieczêæ Ruin mo¿na u¿yæ tylko w lochu, po pokonaniu fali potworów.")
+				return
+			end
+			pc.remove_item(30767, 1)
+			ruiny_skorpiona.seal_used()
+		end
+
+		when 9696.kill with ruiny_skorpiona.inside() and (d.getf("stage") == 2 or d.getf("stage") == 4) begin
+			local left = d.getf("left") - 1
+			d.setf("left", left)
+			if left <= 0 then
+				ruiny_skorpiona.next_stage()
+			else
+				d.notice("Ruiny Skorpiona: Pozosta³o: "..left)
+			end
+		end
+
+		when 9695.kill with ruiny_skorpiona.inside() and d.getf("stage") == 3 begin
+			local left = d.getf("left") - 1
+			d.setf("left", left)
+			if left <= 0 then
+				ruiny_skorpiona.next_stage()
+			else
+				d.notice("Ruiny Skorpiona: Pozosta³o: "..left)
+			end
+		end
+
+		when 9694.kill with ruiny_skorpiona.inside() and d.getf("stage") == 5 begin
+			if d.getf("stage") == 5 then
+				d.setf("stage", 6)
+				d.clear_regen()
+				ruiny_skorpiona.purge_mobs()
+				local took = ruiny_skorpiona.reward()
+				d.update_ranking("skorpion", took) -- MT2009_PLUS_DUNGEON_PANEL_V1
+				-- MT2009_PLUS_DUNGEON_END_V1: the run is over for everyone in it (no "Wróæ do lochu" any more),
+				-- and five seconds later everyone is out (was a minute).
+				ruiny_skorpiona.mark_ended()
+				d.notice(string.format("Król Skorpionów pokonany! Czas: %d:%02d. Loch zosta³ ukoñczony.", math.floor(took / 60), math.mod(took, 60)))
+				ruiny_skorpiona.end_count(5)
+				return
+			end
+		end
+	end
+end

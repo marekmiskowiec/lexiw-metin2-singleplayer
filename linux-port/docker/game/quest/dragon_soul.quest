@@ -1,0 +1,226 @@
+-- Dragon Soul / Alchemy: the Alchemist's (20001) level-30 errand - the letter,
+-- the Dragon Stone Shards (30270) from monsters, the first Cor Draconis (50255)
+-- for ten shards and then the Power of the Dragon Eye: every ten shards picked
+-- up turn into a Cor by themselves, a limited number a day, renewed once a day
+-- at the Alchemist.
+--
+-- This file is the package's Gameforge quest (quest/_unused/dragon_soul).
+-- Since 1 October 2026 it speaks with the package's own Polish texts, the
+-- gameforge.dragon_soul.* keys of share/locale/poland/translate.lua (the
+-- table collect_quest_lv85 reads too) - the earlier literals were written
+-- when nobody had found that table. The lines without a good key, or whose
+-- key says the wrong thing here, are written out (this file is CP1250 like the
+-- other Polish quests in this directory).
+--
+-- MT2009 Plus rules on top of the package:
+--  * the world's alchemy switch (M2_ALCHEMY=0 in .env or the admin panel's
+--    "Alchemia i szarfy" page writes the event flag m2_alchemy_off). While it
+--    is off: no letter, no shard, no hand-in, no renewal - what a character
+--    already holds, and its state here, stays for the day it is on again;
+--  * Cors a day: the event flag ds_cor_day (1-20; anything else reads as 5,
+--    the operator's choice of 17 September - the package had 10). The panel
+--    sets it next to the shard chance; the bots read the same flag
+--    (playerbot_alchemy.h);
+--  * shard chance: the event flag ds_drop (1-100; questlib's
+--    drop_gamble_with_flag reads anything else as 10), the panel or /e ds_drop;
+--  * shards only from a monster at most 15 levels under the killer, or any
+--    higher (operator, 27 September 2026);
+--  * bots never get shards here and never get the letter: their own errand
+--    is playerbot_alchemy.h (NotePlayerBotDragonShardKill), and the letter's
+--    arrow on the Alchemist would be a target event kept for every bot of 30;
+--  * qc does not read define: shard 30270, Alchemist 20001, Cor 50255, ten
+--    shards, level 30 and the flag "ds_drop" are written out.
+--
+-- The state names and the flags (dragon_soul.eye_left, eye_timestamp) are the
+-- ones characters already have; renaming them would reset everybody.
+quest dragon_soul begin
+	state start begin
+		when levelup or letter with pc.level >= 30 and game.get_event_flag("m2_alchemy_off") == 0 and not pc.is_bot() begin
+			send_letter(gameforge.dragon_soul._1010_sendLetter)
+			local v = find_npc_by_vnum(20001)
+
+			if 0 != v then
+				target.vid("__TARGET__", v, mob_name(20001))
+			end
+		end
+		when info or button with game.get_event_flag("m2_alchemy_off") == 0 begin
+			say(gameforge.dragon_soul._1020_say)
+		end
+
+		when 20001.chat."Od³amek Smoczego Kamienia?!" with pc.level >= 30 and game.get_event_flag("m2_alchemy_off") == 0 begin
+			target.delete("__TARGET__")
+
+			say_title(mob_name(20001))
+			say(gameforge.dragon_soul._1040_say)
+			set_state(state_learning)
+		end
+	end
+	state state_learning begin
+		when letter with game.get_event_flag("m2_alchemy_off") == 0 begin
+			send_letter(gameforge.dragon_soul._1050_sendLetter)
+		end
+		when info or button with game.get_event_flag("m2_alchemy_off") == 0 begin
+			say(gameforge.dragon_soul._1060_say)
+		end
+		when kill with game.get_event_flag("m2_alchemy_off") == 0 begin
+			if npc.is_pc() then
+				return
+			end
+
+			-- Bots must not farm shards here (operator, 17 September 2026);
+			-- playerbot_alchemy.h is their errand.
+			if pc.is_bot() then
+				return
+			end
+
+			-- Only a monster at most 15 levels under the character, or any
+			-- higher (operator, 27 September 2026).
+			if npc.get_level0() < pc.get_level() - 15 then
+				return
+			end
+
+			if pc.count_item(30270) < 10 then
+				if drop_gamble_with_flag("ds_drop") then
+					game.drop_item_with_ownership(30270, 1, 300)
+				end
+			end
+		end
+		when 20001.chat.gameforge.dragon_soul._1050_sendLetter with game.get_event_flag("m2_alchemy_off") == 0 begin
+			say_title(mob_name(20001))
+			if pc.count_item(30270) >= 10 then
+				local per_day = game.get_event_flag("ds_cor_day")
+				if per_day < 1 or per_day > 20 then
+					per_day = 5
+				end
+				say(string.format(gameforge.dragon_soul._1070_say, per_day - 1))
+				pc.remove_item(30270, 10)
+				ds.give_qualification()
+				char_log(pc.get_player_id(), 'DS_QUALIFICATION', 'SUCCESS')
+				pc.give_item2(50255)
+				local today = math.floor(get_global_time() / 86400)
+				pc.setf("dragon_soul", "eye_timestamp", today)
+				pc.setf("dragon_soul", "eye_left", per_day - 1)
+				if per_day > 1 then
+					set_state(state_farming)
+				else
+					set_state(state_closed_season)
+				end
+			else
+				say(gameforge.dragon_soul._1080_say)
+			end
+		end
+	end
+	state state_farming begin
+		when letter with game.get_event_flag("m2_alchemy_off") == 0 begin
+			send_letter(gameforge.dragon_soul._1090_sendLetter)
+		end
+		when info or button with game.get_event_flag("m2_alchemy_off") == 0 begin
+			say(string.format(gameforge.dragon_soul._1100_say, pc.getf("dragon_soul", "eye_left")))
+		end
+		when kill with game.get_event_flag("m2_alchemy_off") == 0 begin
+			if npc.is_pc() then
+				return
+			end
+
+			-- Bots must not farm shards here (operator, 17 September 2026);
+			-- playerbot_alchemy.h is their errand.
+			if pc.is_bot() then
+				return
+			end
+
+			-- Only a monster at most 15 levels under the character, or any
+			-- higher (operator, 27 September 2026).
+			if npc.get_level0() < pc.get_level() - 15 then
+				return
+			end
+
+			if drop_gamble_with_flag("ds_drop") then
+				local eye_left = pc.getf("dragon_soul", "eye_left")
+				local haved_gemstone_number = pc.count_item(30270)
+
+				if eye_left > haved_gemstone_number / 10 then
+					game.drop_item_with_ownership(30270, 1, 300)
+				end
+			end
+		end
+		when 30270.pick with game.get_event_flag("m2_alchemy_off") == 0 begin
+			local eye_left = pc.getf("dragon_soul", "eye_left")
+			if eye_left <= 0 then
+				return
+			end
+
+			if pc.count_item(30270) >= 10 then
+				pc.setf("dragon_soul", "eye_left", eye_left - 1)
+				pc.remove_item(30270, 10)
+				pc.give_item2(50255)
+				if 1 == eye_left then
+					notice_multiline("Moc Smoczego Oka na dziœ siê wyczerpa³a. Jutro odbierz j¹ ponownie u Alchemika.", notice)
+					set_state(state_closed_season)
+				end
+			end
+		end
+		when 20001.chat.gameforge.dragon_soul._1120_npcChat with game.get_event_flag("m2_alchemy_off") == 0 begin
+			say_title(mob_name(20001))
+			local today = math.floor(get_global_time() / 86400)
+			if today == pc.getf("dragon_soul", "eye_timestamp") then
+				say(gameforge.dragon_soul._1130_say)
+			else
+				local per_day = game.get_event_flag("ds_cor_day")
+				if per_day < 1 or per_day > 20 then
+					per_day = 5
+				end
+				say((string.gsub(gameforge.dragon_soul._1140_say, "10 ", per_day .. " ")))
+				pc.setf("dragon_soul", "eye_timestamp", today)
+				pc.setf("dragon_soul", "eye_left", per_day)
+			end
+		end
+	end
+	state state_closed_season begin
+		when letter with game.get_event_flag("m2_alchemy_off") == 0 begin
+			send_letter(gameforge.dragon_soul._1150_sendLetter)
+		end
+		when info or button with game.get_event_flag("m2_alchemy_off") == 0 begin
+			say(gameforge.dragon_soul._1160_say)
+			local today = math.floor(get_global_time() / 86400)
+			if today == pc.getf("dragon_soul", "eye_timestamp") then
+				say(gameforge.dragon_soul._1170_say)
+			else
+				say(gameforge.dragon_soul._1180_say)
+			end
+		end
+
+		when 20001.chat.gameforge.dragon_soul._1120_npcChat with game.get_event_flag("m2_alchemy_off") == 0 begin
+			say_title(mob_name(20001))
+			local today = math.floor(get_global_time() / 86400)
+			if today == pc.getf("dragon_soul", "eye_timestamp") then
+				say(gameforge.dragon_soul._1130_say)
+			else
+				local per_day = game.get_event_flag("ds_cor_day")
+				if per_day < 1 or per_day > 20 then
+					per_day = 5
+				end
+				say((string.gsub(gameforge.dragon_soul._1140_say, "10 ", per_day .. " ")))
+				pc.setf("dragon_soul", "eye_timestamp", today)
+				pc.setf("dragon_soul", "eye_left", per_day)
+				set_state(state_farming)
+			end
+		end
+	end
+	-- Gameforge's older states, kept as the package has them: they only move
+	-- a character of those versions on.
+	state state_1 begin
+		when login begin
+			set_state(state_learning)
+		end
+	end
+	state state_2 begin
+		when login begin
+			set_state(state_learning)
+		end
+	end
+	state state_3 begin
+		when login begin
+			set_state(state_closed_season)
+		end
+	end
+end

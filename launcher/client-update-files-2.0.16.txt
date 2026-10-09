@@ -1,0 +1,15 @@
+# Pelna paczka klienta 2.0.16 (2.0.15 + paczka maps z poprawnymi sciezkami map Skipii i nowy pack/Index).
+metin2client.exe
+Dolacz.bat
+Dolacz.ps1
+pack/root.data
+pack/root.index
+pack/gamedata.data
+pack/gamedata.index
+pack/locale.data
+pack/locale.index
+pack/icon.data
+pack/icon.index
+pack/Index
+pack/maps.data
+pack/maps.index

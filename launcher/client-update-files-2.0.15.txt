@@ -1,0 +1,12 @@
+# Pelna paczka klienta 2.0.15 (2.0.14 + juki konne na zwyklym koniu i wierzchowcach z pieczeci).
+metin2client.exe
+Dolacz.bat
+Dolacz.ps1
+pack/root.data
+pack/root.index
+pack/gamedata.data
+pack/gamedata.index
+pack/locale.data
+pack/locale.index
+pack/icon.data
+pack/icon.index

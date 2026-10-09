@@ -1,0 +1,22 @@
+ScriptType               MotionData
+
+MotionFileName           "D:/Ymir Work/npc_mount/ramadan_2026_phoenix/wait1.GR2"
+MotionDuration           2.000000
+Accumulation           0.00	0.00	0.00
+
+Group MotionEventData
+{
+    MotionEventDataCount     1
+    Group Event00
+    {
+        MotionEventType      1
+        StartingTime         0.680000
+        
+        IndependentFlag      0
+        AttachingEnable      1
+        AttachingBoneName    "Bip01 Head"
+        FollowingEnable      1
+        EffectFileName       "d:/ymir work/effect/npc_mount/ramadan_2026_phoenix_blow_01.mse"
+        EffectPosition       0.000000 -50.000000 -5.000000
+    }
+}
