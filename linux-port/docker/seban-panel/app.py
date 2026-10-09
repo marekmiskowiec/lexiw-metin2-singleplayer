@@ -4621,6 +4621,11 @@ def players():
         # utf8mb4 collation stopped the page with "Illegal mix of collations".
         sql += " WHERE CONVERT(p.name USING utf8mb4) LIKE %s OR p.id=%s"
         args = [f"%{query}%", query if query.isdigit() else -1]
+    else:
+        # The list is read as the level ranking, and the admin account's
+        # level-90 game masters topped it. Left out as in /rankings
+        # (not_game_master); a search by name or id still finds them.
+        sql += " WHERE " + not_game_master("p")
     sql += " ORDER BY p.level DESC, p.exp DESC LIMIT 250"
     roster, live = rows(sql, args), live_statuses()
     full_plus9_ids = full_plus9_equipment_ids(character["id"] for character in roster)
