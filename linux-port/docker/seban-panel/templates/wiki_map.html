@@ -1,0 +1,25 @@
+{% extends 'base.html' %}{% block title %}{{ summary.name }} · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+{%- macro pct(value) -%}{% if value >= 10 %}{{ '%.0f'|format(value) }}%{% else %}{{ ('%.1f'|format(value)).replace('.', ',') }}%{% endif %}{%- endmacro -%}
+<p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · <a href="{{ url_for('wiki_maps') }}">MAPY</a></p>
+<h1>{{ summary.name }}</h1>
+<p class="muted">Mapa nr {{ summary.number }} · folder {{ summary.folder }}{% if not active %} · nie działa w tym świecie{% endif %}{% if region %} · wszystkie trzy królestwa razem: <a href="{{ url_for('wiki_region', key=region) }}">{{ region_name }}</a>{% endif %}</p>
+<div class="trend-grid wiki-map-cards">
+  <article class="trend-card"><span>Poziomy potworów</span><strong>{% if summary.levels %}{{ summary.levels[0] }}–{{ summary.levels[1] }}{% else %}—{% endif %}</strong></article>
+  <article class="trend-card"><span>Rodzaje potworów</span><strong>{{ summary.mobs }}</strong></article>
+  <article class="trend-card"><span>Metiny</span><strong>{{ summary.metins }}</strong></article>
+  <article class="trend-card"><span>Bossowie</span><strong>{{ summary.bosses }}</strong></article>
+</div>
+{% set titles = {'mob': 'Potwory', 'metin': 'Metiny', 'boss': 'Bossowie', 'npc': 'NPC i inne'} %}
+{% for key in ('mob', 'metin', 'boss', 'npc') %}{% set rows = sections[key] %}{% if rows %}
+<section class="panel">
+  <h2>{{ titles[key] }} ({{ rows|map(attribute='vnum')|unique|list|length }})</h2>
+  <table><thead><tr><th>{{ 'Kto' if key == 'npc' else 'Potwór' }}</th><th>Poziom</th>{% if key != 'npc' %}<th>Ranga</th><th>Jak</th><th>Punkty</th><th>Naraz (średnio)</th><th>Respawn</th>{% endif %}</tr></thead><tbody>
+  {% for e in rows %}<tr><td><a href="{{ url_for('wiki_mob', vnum=e.vnum) }}">{{ e.name }}</a></td><td>{{ e.level }}</td>{% if key != 'npc' %}<td>{{ e.rank_name }}</td><td>{{ e.how }}{% if e.how == 'w losowej grupie' %} ({{ pct(e.chance * 100) }}){% endif %}</td><td>{{ e.points_text }}</td><td data-sort="{{ e.count }}">{{ e.count_text }}</td><td data-sort="{{ e.start }}">{{ e.time }}{% if e.effective %} <small class="muted">→ {{ e.effective }} (Respawny: {{ e.percent }}%)</small>{% endif %}</td>{% endif %}</tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endif %}{% endfor %}
+{% if not (sections.mob or sections.metin or sections.boss or sections.npc) %}<section class="panel"><p class="muted">Pliki tej mapy nic nie stawiają — jej potwory przychodzą z questów albo z lochu.</p></section>{% endif %}
+<p class="muted wiki-note">„Punkty” to miejsca na mapie, „Naraz” — ile takich potworów stoi tam razem, średnio. Respawn to czas z plików mapy; strzałka pokazuje czas po przyspieszeniu ze strony Respawny.</p>
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+{% endblock %}

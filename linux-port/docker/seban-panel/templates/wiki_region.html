@@ -1,0 +1,33 @@
+{% extends 'base.html' %}{% block title %}{{ family.name }} · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+{%- macro pct(value) -%}{% if value >= 10 %}{{ '%.0f'|format(value) }}%{% else %}{{ ('%.1f'|format(value)).replace('.', ',') }}%{% endif %}{%- endmacro -%}
+<p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · <a href="{{ url_for('wiki_maps') }}">MAPY</a> · TRZY KRÓLESTWA</p>
+<h1>{{ family.name }}</h1>
+<p class="muted">Shinsoo, Chunjo i Jinno razem: te same potwory, Metiny i bossowie w każdym królestwie. Różni się liczba miejsc respawnu (inny kształt mapy), gdzieniegdzie czas respawnu i NPC — każde królestwo ma własnych strażników i sklepikarzy.
+Osobno: {% for kingdom, number in summary.kingdoms %}<a href="{{ url_for('wiki_map', number=number) }}">{{ kingdom }}</a>{{ ' · ' if not loop.last }}{% endfor %}.</p>
+<div class="trend-grid wiki-map-cards">
+  <article class="trend-card"><span>Poziomy potworów</span><strong>{% if summary.levels %}{{ summary.levels[0] }}–{{ summary.levels[1] }}{% else %}—{% endif %}</strong></article>
+  <article class="trend-card"><span>Rodzaje potworów</span><strong>{{ summary.mobs }}</strong></article>
+  <article class="trend-card"><span>Metiny</span><strong>{{ summary.metins }}</strong></article>
+  <article class="trend-card"><span>Bossowie</span><strong>{{ summary.bosses }}</strong></article>
+</div>
+{% set titles = {'mob': 'Potwory', 'metin': 'Metiny', 'boss': 'Bossowie'} %}
+{% for key in ('mob', 'metin', 'boss') %}{% set rows = sections[key] %}{% if rows %}
+<section class="panel">
+  <h2>{{ titles[key] }} ({{ rows|map(attribute='vnum')|unique|list|length }})</h2>
+  <table><thead><tr><th>Potwór</th><th>Poziom</th><th>Ranga</th><th>Jak</th><th>Punkty</th><th>Naraz (średnio)</th><th>Respawn</th></tr></thead><tbody>
+  {% for e in rows %}<tr><td><a href="{{ url_for('wiki_mob', vnum=e.vnum) }}">{{ e.name }}</a>{% if e.kingdoms|length < 3 %} <small class="muted">(tylko {{ e.kingdoms|join(', ') }})</small>{% endif %}</td><td>{{ e.level }}</td><td>{{ e.rank_name }}</td><td>{{ e.how }}{% if e.how == 'w losowej grupie' %} ({{ pct(e.chance * 100) }}){% endif %}</td><td data-sort="{{ e.points }}"{% if ' · ' in e.points_text %} class="wiki-split" title="Shinsoo · Chunjo · Jinno"{% endif %}>{{ e.points_text }}</td><td data-sort="{{ e.count }}"{% if ' · ' in e.count_text %} class="wiki-split" title="Shinsoo · Chunjo · Jinno"{% endif %}>{{ e.count_text }}</td><td data-sort="{{ e.start }}">{{ e.time }}{% if e.effective %} <small class="muted">→ {{ e.effective }}</small>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endif %}{% endfor %}
+{% if npcs %}
+<section class="panel">
+  <h2>NPC i inne ({{ npcs|length }})</h2>
+  <table><thead><tr><th>Kto</th><th>Poziom</th><th>Shinsoo</th><th>Chunjo</th><th>Jinno</th></tr></thead><tbody>
+  {% for n in npcs %}<tr><td>{{ n.name }}</td><td>{{ n.level }}</td>{% for kingdom, vnum in n.links %}<td>{% if vnum %}<a href="{{ url_for('wiki_mob', vnum=vnum) }}">VNUM {{ vnum }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endif %}
+<p class="muted wiki-note">Gdzie królestwa się różnią, liczby stoją po kolei: Shinsoo · Chunjo · Jinno („–”: w tym królestwie go nie ma). „Punkty” to miejsca na mapie, „Naraz” — ile takich potworów stoi tam razem, średnio. Respawn to zakres czasów z plików map wszystkich trzech królestw; strzałka pokazuje czas po przyspieszeniu ze strony Respawny.</p>
+{% endblock %}

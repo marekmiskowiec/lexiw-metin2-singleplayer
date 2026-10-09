@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% block title %}Mapy · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+<p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · MAPY</p><h1>Mapy</h1>
+<p class="muted">Mapy, które działają w tym świecie, i to, co się na nich pojawia — z plików map działającej gry. Kliknij nagłówek, żeby posortować, np. po poziomach potworów.</p>
+{% if not spawn_files_ready %}<p class="muted">Gra nie wyeksportowała jeszcze plików map dla wiki — pojawią się po następnym starcie serwera.</p>{% endif %}
+<section class="panel">
+  <table><thead><tr><th>Mapa</th><th>Poziomy potworów</th><th>Rodzaje potworów</th><th>Metiny</th><th>Bossowie</th></tr></thead><tbody>
+  {% for map in maps %}<tr><td>{% if map.region %}<a href="{{ url_for('wiki_region', key=map.region) }}">{{ map.name }}</a> <small class="muted">(trzy królestwa: {% for kingdom, number in map.kingdoms %}<a href="{{ url_for('wiki_map', number=number) }}">{{ kingdom }}</a>{{ ', ' if not loop.last }}{% endfor %})</small>{% else %}<a href="{{ url_for('wiki_map', number=map.number) }}">{{ map.name }}</a>{% endif %}</td><td data-sort="{{ map.levels[0] if map.levels else 999 }}">{% if map.levels %}{{ map.levels[0] }}–{{ map.levels[1] }}{% else %}—{% endif %}</td><td>{{ map.mobs }}</td><td>{{ map.metins }}</td><td>{{ map.bosses }}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endblock %}

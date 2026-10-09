@@ -497,6 +497,8 @@ JOB_NAMES = ("Wojownik", "Ninja", "Sura", "Szaman")
 # class it keeps - player.job % 4, the index into JOB_NAMES (both races of a
 # class: 0/4 Wojownik, 1/5 Ninja, 2/6 Sura, 3/7 Szaman).
 CLASS_FILTERS = {"woj": 0, "ninja": 1, "sura": 2, "szaman": 3}
+# Lexiw: the character list's page (/players).
+PLAYERS_PER_PAGE = 25
 
 
 def class_filter_arg():
@@ -4759,17 +4761,26 @@ def players():
     if query:
         # player.name is latin1: a query with Polish letters compared in its own
         # utf8mb4 collation stopped the page with "Illegal mix of collations".
-        sql += " WHERE (CONVERT(p.name USING utf8mb4) LIKE %s OR p.id=%s)"
+        where = " WHERE (CONVERT(p.name USING utf8mb4) LIKE %s OR p.id=%s)"
         args = [f"%{query}%", query if query.isdigit() else -1]
     else:
         # The list is read as the level ranking, and the admin account's
         # level-90 game masters topped it. Left out as in /rankings
         # (not_game_master); a search by name or id still finds them.
-        sql += " WHERE " + not_game_master("p")
+        where = " WHERE " + not_game_master("p")
     if cls:
-        sql += " AND MOD(p.job, 4) = %d" % CLASS_FILTERS[cls]
-    sql += " ORDER BY p.level DESC, p.exp DESC, p.id LIMIT 250"
-    roster, live = rows(sql, args), live_statuses()
+        where += " AND MOD(p.job, 4) = %d" % CLASS_FILTERS[cls]
+    # Lexiw: 25 a page, every character reachable (the list stopped at 250
+    # before); the places stay the whole list's, page 2 starts at 26.
+    total = int(one("SELECT COUNT(*) AS n FROM player.player p" + where, args).get("n") or 0)
+    total_pages = max(1, -(-total // PLAYERS_PER_PAGE))
+    try:
+        page = int(request.args.get("page", 1))
+    except (TypeError, ValueError):
+        page = 1
+    page = max(1, min(total_pages, page))
+    sql += where + " ORDER BY p.level DESC, p.exp DESC, p.id LIMIT %s OFFSET %s"
+    roster, live = rows(sql, args + [PLAYERS_PER_PAGE, (page - 1) * PLAYERS_PER_PAGE]), live_statuses()
     full_plus9_ids = full_plus9_equipment_ids(character["id"] for character in roster)
     for character in roster:
         character["full_plus9_equipment"] = character["id"] in full_plus9_ids
@@ -4781,7 +4792,18 @@ def players():
     legends = legend_tiers(character["id"] for character in roster)
     for character in roster:
         character["legend"] = legends.get(character["id"])
-    return render_template("players.html", players=roster, query=query, cls=cls, class_filters=CLASS_FILTERS)
+    # The pager: the first and last two pages, the ones around this one,
+    # None for a gap - as /rankings draws its own.
+    shown = {n for n in (1, 2, page - 1, page, page + 1, total_pages - 1, total_pages) if 1 <= n <= total_pages}
+    page_numbers = []
+    for number in sorted(shown):
+        if page_numbers and number - page_numbers[-1] > 1:
+            page_numbers.append(None)
+        page_numbers.append(number)
+    return render_template("players.html", players=roster, query=query, cls=cls, class_filters=CLASS_FILTERS,
+                           page=page, total_pages=total_pages, page_numbers=page_numbers, total=total,
+                           first=(page - 1) * PLAYERS_PER_PAGE + 1 if total else 0,
+                           last=min(total, page * PLAYERS_PER_PAGE))
 
 
 @app.route("/legends")
