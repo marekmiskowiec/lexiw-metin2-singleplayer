@@ -172,3 +172,6 @@ aside.sn .brand.brand--mark>.brand-words{display:block;min-width:0;margin:0;font
 /* The projects this panel is built on, at the foot of the sidebar. */
 .sn-credit{margin:10px 6px 4px;font-size:11px;line-height:1.4;color:var(--muted)}
 aside.sn .brand.brand--mark>.brand-words>span{font-size:10px;letter-spacing:.4px;white-space:nowrap}
+/* Lexiw: the item database's cards open the item's wiki page. */
+a.item-card{color:inherit;text-decoration:none}
+a.item-card:hover,a.item-card:focus-visible{border-color:var(--gold, #e8b93f)}

@@ -1,0 +1,34 @@
+/* Lexiw: the server wiki (wiki.py). */
+.wiki-search{margin:18px 0 8px}
+.wiki-search input{width:100%;max-width:720px;padding:13px 16px;font:inherit;font-size:16px;border:1px solid var(--edge);border-radius:8px;background:color-mix(in srgb,var(--panel) 85%,#000);color:var(--text)}
+.wiki-search input:focus{outline:2px solid var(--gold, #e8b93f);outline-offset:1px}
+.wiki-hint{margin:6px 2px 18px}
+.wiki-results{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start}
+.wiki-list{list-style:none;margin:0;padding:0}
+.wiki-list li+li{border-top:1px solid color-mix(in srgb,var(--edge) 60%,transparent)}
+.wiki-list a{display:flex;align-items:center;gap:12px;padding:8px 4px;text-decoration:none;color:var(--text)}
+.wiki-list a:hover{background:color-mix(in srgb,var(--gold, #e8b93f) 8%,transparent)}
+.wiki-list img,.wiki-noicon{width:32px;height:32px;object-fit:contain;flex:0 0 32px}
+.wiki-list span{display:flex;flex-direction:column;min-width:0}
+.wiki-list small{color:var(--muted);font-size:12px}
+.wiki-list em{color:var(--gold, #e8b93f);font-style:normal}
+.wiki-mobicon{flex:0 0 32px;align-items:center;color:var(--gold, #e8b93f);font-size:18px}
+.wiki-note{font-size:12px;margin-top:8px}
+
+.wiki-head{display:flex;align-items:center;gap:18px;margin:6px 0 18px}
+.wiki-head h1{margin:0}
+.wiki-head p{margin:4px 0 0}
+.wiki-icon{flex:0 0 76px;height:76px;display:flex;align-items:center;justify-content:center;border:1px solid var(--edge);border-radius:8px;background:color-mix(in srgb,var(--panel) 80%,#000)}
+.wiki-icon img{max-width:64px;max-height:64px;image-rendering:pixelated}
+.wiki-classes{display:flex;flex-wrap:wrap;gap:6px}
+.wiki-classes span{padding:2px 10px;border-radius:999px;font-size:12px;border:1px solid var(--edge)}
+.wiki-classes span.on{color:var(--gold, #e8b93f);border-color:var(--gold, #e8b93f)}
+.wiki-classes span.off{opacity:.35;text-decoration:line-through}
+.wiki-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.wiki-stats{list-style:none;margin:0 0 8px;padding:0}
+.wiki-stats li{padding:4px 0}
+.wiki-stats li.bonus{color:#63c993}
+.wiki-chain tr.current td{background:color-mix(in srgb,var(--gold, #e8b93f) 12%,transparent)}
+.wiki-chain .item-cell img,.panel .item-cell img{width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:8px}
+.panel h3{margin:18px 0 8px;font-size:15px}
+@media(max-width:900px){.wiki-results,.wiki-grid{grid-template-columns:1fr}}
