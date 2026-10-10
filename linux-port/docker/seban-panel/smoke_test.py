@@ -47,6 +47,7 @@ def sample_values():
         "key": "m1",
         "id": 1,
         "gid": 1,
+        "slug": "jak-uzywac-wiki",
     }
 
 

@@ -15,6 +15,7 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 ## 2.21.1-lexiw.11 — 2026-10-10 — Giełda: jedna strona rynku; Wiki: poradniki
 
 - [panel] Stary „Rynek (sklepy offline)” połączony z Giełdą: powstała karta „🧾 Obrót i sprzedaże” (Giełda → /market/sales) z liczbą sklepów, ofert i wartością rynku (te same liczby co na liście ofert), sklepami na mapach, wartością rynku w czasie, najszybciej sprzedającymi się przedmiotami, księgami i feedem ostatnich sprzedaży. Adres /economy/shops przekierowuje na nią, pozycja zniknęła z menu, a wszystkie karty Giełdy mają wspólny pasek kart.
+- [panel] Wiki, etap 5: poradniki w Markdownie. Każdy plik .md w folderze wiki_guides panelu to jeden poradnik (nagłówek: title, summary, order; potem zwykły Markdown z tabelami i kodem) pod /wiki/guide/<nazwa>, lista pod /wiki/guides, wpis w menu Wiki, kafelki na stronie Wiki i wyniki w wyszukiwarce. Odnośniki do wiki pisze się w podwójnych nawiasach ([[item:ID]], [[mob:ID]], [[map:ID]], [[region:m1]], [[guide:nazwa]], [[page:gielda]]); zły numer jest pokazany na czerwono. Na start trzy poradniki: Jak używać wiki, Mapy i królestwa, Bossowie i Metiny (z danymi z plików map). Przy dopisaniu pliku trzeba przebudować obraz panelu.
 
 ---
 

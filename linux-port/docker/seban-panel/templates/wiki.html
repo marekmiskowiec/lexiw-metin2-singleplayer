@@ -2,12 +2,14 @@
 <link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
 <p class="eyebrow">WIKI SERWERA</p><h1>Wiki</h1>
 <p class="muted">Przedmioty i potwory tego serwera, prosto z jego danych: {{ '{:,}'.format(item_count).replace(',', ' ') }} przedmiotów, {{ '{:,}'.format(mob_count).replace(',', ' ') }} potworów i NPC; {{ '{:,}'.format(dropped_items).replace(',', ' ') }} przedmiotów ma źródło w tabelach dropu i szkatułek. Drop i szkatułki są te, które działają w grze — także po Twoich zmianach w edytorach.</p>
-<p class="wiki-links"><a href="{{ url_for('wiki_maps') }}">Mapy →</a> · <a href="{{ url_for('wiki_bots') }}">Osobowości botów →</a></p>
+<p class="wiki-links"><a href="{{ url_for('wiki_guides') }}">Poradniki →</a> · <a href="{{ url_for('wiki_maps') }}">Mapy →</a> · <a href="{{ url_for('wiki_bots') }}">Osobowości botów →</a></p>
 <form class="wiki-search" action="{{ url_for('wiki') }}" method="get" role="search">
   <input id="wikiQuery" name="q" value="{{ query }}" placeholder="Nazwa przedmiotu lub potwora albo VNUM, np. Sejmitar, Dziki Pies, 50011" autocomplete="off" autofocus>
 </form>
 <p class="muted wiki-hint" id="wikiHint">Wpisz co najmniej 2 litery.</p>
+{% if guides %}<section class="panel wiki-guides-box" id="wikiGuidesHome"><h2>Poradniki</h2><ul class="wiki-list">{% for g in guides %}<li><a href="{{ url_for('wiki_guide', slug=g.slug) }}"><span class="wiki-mobicon" aria-hidden="true">📘</span><span><b>{{ g.title }}</b><small>{{ g.summary }}</small></span></a></li>{% endfor %}</ul></section>{% endif %}
 <div class="wiki-results" id="wikiResults" hidden>
+  <section class="panel" id="wikiGuidesBox" hidden><h2>Poradniki</h2><ul class="wiki-list" id="wikiGuides"></ul></section>
   <section class="panel"><h2>Przedmioty</h2><ul class="wiki-list" id="wikiItems"></ul></section>
   <section class="panel"><div id="wikiMapsBox" hidden><h2>Mapy</h2><ul class="wiki-list" id="wikiMaps"></ul></div><h2>Potwory, Metiny i bossowie</h2><ul class="wiki-list" id="wikiMobs"></ul>
 </section>
@@ -18,7 +20,8 @@
   const box = document.getElementById('wikiResults'), items = document.getElementById('wikiItems'), mobs = document.getElementById('wikiMobs');
   const itemUrl = "{{ url_for('wiki_item', vnum=0) }}".replace(/0$/, '');
   const mobUrl = "{{ url_for('wiki_mob', vnum=0) }}".replace(/0$/, '');
-  const mapUrl = "{{ url_for('wiki_map', number=0) }}".replace(/0$/, '');
+  const guideUrl = "{{ url_for('wiki_guide', slug='x') }}".replace(/x$/, '');
+  const mapUrl ="{{ url_for('wiki_map', number=0) }}".replace(/0$/, '');
   const regionUrl = "{{ url_for('wiki_region', key='m1') }}".replace(/m1$/, '');
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   let timer = null, last = '';
@@ -34,6 +37,10 @@
         items.innerHTML = data.items.length ? data.items.map((i) =>
           `<li><a href="${itemUrl}${i.vnum}">${i.icon ? `<img src="${esc(i.icon)}" alt="" loading="lazy">` : '<span class="wiki-noicon"></span>'}<span><b>${esc(i.name)}</b><small>${esc(i.type)} · VNUM ${i.vnum}${i.sources ? ' · <em>ma drop</em>' : ''}</small></span></a></li>`).join('')
           : '<li class="muted">Brak przedmiotów.</li>';
+        const guides = data.guides || [];
+        document.getElementById('wikiGuidesBox').hidden = !guides.length;
+        document.getElementById('wikiGuides').innerHTML = guides.map((g) =>
+          `<li><a href="${guideUrl}${esc(g.slug)}"><span class="wiki-mobicon" aria-hidden="true">📘</span><span><b>${esc(g.title)}</b><small>${esc(g.summary)}</small></span></a></li>`).join('');
         const maps = data.maps || [];
         document.getElementById('wikiMapsBox').hidden = !maps.length;
         document.getElementById('wikiMaps').innerHTML = maps.map((m) =>

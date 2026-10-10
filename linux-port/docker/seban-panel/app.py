@@ -11112,6 +11112,8 @@ from wiki import install_wiki  # noqa: E402
 install_wiki(sys.modules[__name__])
 from market import install_market  # noqa: E402
 install_market(sys.modules[__name__])
+from wiki_guides import install_guides  # noqa: E402
+install_guides(sys.modules[__name__])
 from observe import install_observe  # noqa: E402
 install_observe(sys.modules[__name__])
 

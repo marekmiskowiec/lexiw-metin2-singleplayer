@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block title %}Poradniki · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+<p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI SERWERA</a></p><h1>Poradniki</h1>
+<p class="muted">Krótkie opisy tego, jak ten świat działa: jak szukać, jak czytać mapy i kim są bossowie. Każdy poradnik to zwykły plik Markdown w folderze <code>wiki_guides</code> panelu.</p>
+<section class="guide-cards">
+  {% for g in guides %}<a class="panel guide-card" href="{{ url_for('wiki_guide', slug=g.slug) }}"><h2>{{ g.title }}</h2><p class="muted">{{ g.summary }}</p></a>
+  {% else %}<p class="muted">Nie ma jeszcze żadnych poradników.</p>{% endfor %}
+</section>
+{% endblock %}

@@ -11,6 +11,7 @@
 {%- set nav_groups = [
   {'id': 'wiki', 'icon': '📖', 'label': 'Wiki', 'items': [
     {'ep': 'wiki', 'label': 'Wiki serwera', 'desc': 'przedmioty, potwory, drop i szkatułki z danych serwera', 'kw': 'wiki baza wiedzy przedmiot potwor drop skad'},
+    {'ep': 'wiki_guides', 'label': 'Poradniki', 'desc': 'jak szukać w wiki, jak czytać mapy, bossowie i Metiny', 'kw': 'poradnik poradniki guide jak boss metin mapy wyszukiwanie'},
     {'ep': 'wiki_bots', 'label': 'Osobowości botów', 'desc': 'charaktery i persony botów: co robią, kiedy i jak długo', 'kw': 'osobowosc persona pogromca metinow metinolog hazardzista grinder nastroj prawo awansu'},
     {'ep': 'wiki_maps', 'label': 'Mapy', 'desc': 'mapy świata: potwory, Metiny, bossowie i respawn', 'kw': 'mapa mapy expowisko gdzie expic respawn metiny bossy'},
   ]},
@@ -77,7 +78,7 @@
   'player': 'players', 'account_detail': 'accounts', 'guild': 'guilds',
   'economy_item': 'economy', 'chest_edit': 'chests', 'drop_edit': 'drops',
   'daily_summary': 'dashboard',
-  'market_item': 'market', 'market_sales': 'market', 'wiki_item': 'wiki', 'wiki_mob': 'wiki', 'wiki_map': 'wiki_maps', 'wiki_region': 'wiki_maps',
+  'market_item': 'market', 'market_sales': 'market', 'wiki_guide': 'wiki_guides', 'wiki_item': 'wiki', 'wiki_mob': 'wiki', 'wiki_map': 'wiki_maps', 'wiki_region': 'wiki_maps',
 } -%}
 {%- set nav_sections = [
   {'ep': 'manage', 'anchor': 'raty-i-restart', 'label': 'Raty, liczba botów, ustawienia z restartem', 'short': 'Raty i restart', 'part': 'Serwer'},
