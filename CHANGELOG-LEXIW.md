@@ -12,6 +12,13 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
+## 2.21.1-lexiw.9 — 2026-10-10 — Giełda: oferty ze wszystkich sklepów
+
+- [panel] Gospodarka → Giełda (oferty): wszystkie oferty ze sklepów offline w jednej liście — ikona, nazwa z plusem, bonusy, ilość, cena za sztukę i stosu, sprzedawca z linkiem do karty, mapa i nazwa sklepu. Kategorie po lewej (miecze, sztylety, łuki, zbroje, hełmy, buty, kamienie, księgi, materiały…) z liczbą ofert; filtry: nazwa/VNUM, klasa, poziom, plus, bonus (i jego minimalna wartość), cena za sztukę; sortowanie po cenie i wieku; 50 ofert na stronę.
+- [panel] Kolumna „vs rynek”: cena za sztukę względem mediany tego przedmiotu wśród wszystkich ofert (zielona — wyraźnie taniej, czerwona — drożej). U góry liczby całego rynku (oferty, sklepy, wartość), pod listą najczęściej oferowane i najdroższe oferty.
+- [panel] Wiek oferty: collector zapisuje, kiedy zobaczył ofertę po raz pierwszy z obecną ceną (nowa tabela web_seban_offer_seen; zmiana ceny zaczyna wiek od nowa). Wiek liczy się od teraz, nie wstecz.
+- [panel] Szybkość: Giełda czyta z własnej płaskiej, zindeksowanej tabeli ofert (web_seban_offer_flat), którą collector przebudowuje co 5 minut w jednej transakcji, więc strona odpowiada w kilkadziesiąt milisekund; dane są ze zrzutu (tak jak na stronie Rynek), z godziną zrzutu w opisie.
+
 ## 2.21.1-lexiw.8 — 2026-10-10 — Wiki: potwory, mapy i osobowości botów; Aktywność botów; strony listy Postacie
 
 ### Wiki — osobowości botów
