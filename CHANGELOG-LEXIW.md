@@ -12,7 +12,15 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
-## 2.21.1-lexiw.8 — 2026-10-09 — Wiki: potwory, Metiny, bossowie i mapy; strony listy Postacie
+## 2.21.1-lexiw.8 — 2026-10-10 — Wiki: potwory, mapy i osobowości botów; Aktywność botów; strony listy Postacie
+
+### Wiki — osobowości botów
+- [panel] Wiki → Osobowości botów: opis każdego z 13 charakterów (m.in. sześć „Dropków” z ich poziomami blokady expa) i 20 person z systemu Iwakury — zwykłych, rzadkich (Metinolog, Nałogowiec, Szalony Naukowiec, Egzekutor, Szalony Wędkarz) i czterech hazardzistów. Co bot robi, kiedy persona go zajmuje i jak długo, szansa i przerwa świata rzadkich; np. Pogromca metinów to krótki stan sytuacyjny (Metin do 10 poziomów od bota, odpuszcza przy 3 botach z królestwa lub 35% życia), a długą wyprawę prowadzi Metinolog. Przy każdej osobowości liczba botów online.
+- [panel] Nastroje i zasady ich zmiany, tiery blokady poziomu Grindera i tabela Prawa Awansu (jaki plus broni, zbroi, tarczy i hełmu bot musi mieć); strona „Osobowości botów” w grupie Gracze i boty linkuje do tych opisów.
+
+### Panel — Aktywność botów
+- [panel] Nowa strona Gracze i boty → Aktywność botów: co robią boty online teraz — czynności, cele, ambicje, persony i nastroje — kafelki (boty online, w drużynach, stojące, najczęstsza czynność), tabela „Gdzie są boty” (mapa, liczba, poziomy, najczęstsza czynność) i lista botów stojących w miejscu ze statusem.
+- [panel] Historia czynności z doby (kolumna na godzinę): collector zapisuje co 5 minut liczbę botów na każdą czynność w istniejącej tabeli metryk. Wykres wypełni się po kilku godzinach działania serwera.
 
 ### Wiki — potwory
 - [panel] Strona każdego potwora, Metina i bossa: rodzaj, ranga, poziom, PŻ, doświadczenie, obrażenia, obrona, yang z zabicia; rasa i bonus, który na niego działa (np. „Silny przeciw zwierzętom”), odporności i specjalne ataki.
@@ -22,7 +30,7 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ### Wiki — mapy
 - [panel] Wiki → Mapy: lista map działających w tym świecie z poziomami potworów, liczbą rodzajów potworów, Metinów i bossów; strona każdej mapy z potworami, Metinami, bossami i NPC — poziom, ranga, jak się pojawiają, liczba miejsc, ile stoi naraz i co ile się odradzają (z czasem po przyspieszeniu ze strony Respawny).
-- [panel] Pierwsze wioski (M1) i drugie wioski (M2) trzech królestw jako jedna strona każda: te same potwory, Metiny i bossowie są w każdym królestwie, więc jeden wiersz na potwora; gdzie królestwa się różnią (liczba miejsc respawnu — inny kształt mapy, np. Metin Ciemności 6 · 5 · 5), liczby stoją po kolei Shinsoo · Chunjo · Jinno, wyróżnione na złoto. NPC — w każdym królestwie inne, o tych samych nazwach — jeden wiersz z linkiem do wersji każdego królestwa. Osobne strony królestw zostają; lista map i strony potworów pokazują M1 i M2 jako jeden wiersz.
+- [panel] Pierwsze wioski (M1), drugie wioski (M2), trzecie mapy (M3) i Loch Małp trzech królestw jako jedna strona każda: te same potwory, Metiny i bossowie są w każdym królestwie, więc jeden wiersz na potwora; gdzie królestwa się różnią (liczba miejsc respawnu — inny kształt mapy, np. Metin Ciemności 6 · 5 · 5), liczby stoją po kolei Shinsoo · Chunjo · Jinno, wyróżnione na złoto. NPC — w każdym królestwie inne, o tych samych nazwach — jeden wiersz z linkiem do wersji każdego królestwa. Osobne strony królestw zostają; lista map i strony potworów pokazują je jako jeden wiersz. Na górze każdej strony krótko, czym królestwa się różnią (w Lochu Małp tylko NPC).
 - [panel] Ten sam potwór pojawiający się tak samo na jednej mapie to jeden wiersz z zakresem czasu respawnu (pliki map dają czasy różniące się o sekundę).
 - [panel] Wyszukiwarka wiki znajduje też mapy (także „wioski”); mapy na stronach potworów prowadzą do stron map.
 - [serwer] Nowy skrypt m2-wiki-export: gra przy każdym starcie kopiuje pliki map (regen, Metiny, bossowie, NPC) i grupy potworów do wspólnego folderu, z którego czyta panel. Działa od następnej przebudowy obrazu gry; tym razem uruchomiony raz ręcznie (sam odczyt i kopia, bez restartu).

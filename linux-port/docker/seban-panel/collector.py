@@ -408,6 +408,21 @@ def live_positions():
     return result
 
 
+def live_action_counts():
+    """How many online bots are doing each action right now (act_<id>), for
+    the 'Aktywność botów' page's 24-hour history."""
+    counts = {}
+    for _channel, path in status_paths():
+        try:
+            if time.time() - path.stat().st_mtime > 25:
+                continue
+            for n, _status in parse_status_rows(path.read_text(encoding="cp1250", errors="replace")):
+                counts[n.get("action", 0)] = counts.get(n.get("action", 0), 0) + 1
+        except (OSError, ValueError):
+            continue
+    return counts
+
+
 def live_map_counts():
     counts = {}
     for index, _, _, channel in live_positions().values():
@@ -500,6 +515,9 @@ def collect(con, previous):
             for bracket, count in cur.fetchall():
                 cur.execute("INSERT IGNORE INTO player.web_seban_metric_snapshot VALUES (%s,%s,%s)",
                             (now, f"lvl_{int(bracket)}_{int(bracket)+9}", count))
+        for action, count in live_action_counts().items():
+            cur.execute("INSERT IGNORE INTO player.web_seban_metric_snapshot VALUES (%s,%s,%s)",
+                        (now, f"act_{int(action)}", count))
         check_plus9_refines(cur)
     return previous
 

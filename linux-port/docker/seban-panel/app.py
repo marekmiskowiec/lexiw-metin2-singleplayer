@@ -4929,6 +4929,79 @@ def bot_personalities():
                            personas=personas, selected_persona=selected_persona)
 
 
+BOT_ACTION_COLORS = ["#69a6ff", "#4dd0e1", "#ff6b6b", "#f2c34d", "#79e3af", "#c084fc", "#fbbf24", "#ff8fa3", "#a3a3a3", "#38bdf8",
+                     "#ef4444", "#4ade80", "#a855f7", "#fb923c", "#2dd4bf", "#e879f9", "#facc15", "#94a3b8", "#84cc16", "#f472b6"]
+
+
+def _tally(bots, key, labels):
+    """Counts of bots per value of `key`, biggest first, with label and share."""
+    counts = {}
+    for bot in bots:
+        value = bot.get(key)
+        if value is None:
+            continue
+        counts[int(value)] = counts.get(int(value), 0) + 1
+    total = sum(counts.values()) or 1
+    return [{"id": value, "label": labels.get(value, f"#{value}"), "count": count, "percent": round(count * 100 / total, 1)}
+            for value, count in sorted(counts.items(), key=lambda item: -item[1])]
+
+
+def _action_history():
+    """The last 24 hours of act_<id> snapshots as one stacked column per hour."""
+    found = rows(
+        "SELECT DATE_FORMAT(captured_at, '%%Y-%%m-%%d %%H') AS hour, metric, AVG(value) AS value"
+        " FROM player.web_seban_metric_snapshot WHERE metric LIKE 'act\\_%%' AND captured_at >= NOW() - INTERVAL 24 HOUR"
+        " GROUP BY hour, metric ORDER BY hour")
+    by_hour = {}
+    for row in found:
+        by_hour.setdefault(row["hour"], {})[int(row["metric"][4:])] = float(row["value"])
+    columns = []
+    for hour, values in sorted(by_hour.items()):
+        total = sum(values.values()) or 1
+        columns.append({"label": hour[-2:] + ":00", "total": round(total),
+                        "parts": [{"id": action, "label": BOT_ACTIONS.get(action, f"#{action}"),
+                                   "count": round(count), "percent": round(count * 100 / total, 2)}
+                                  for action, count in sorted(values.items()) if count > 0]})
+    return columns
+
+
+@app.route("/players/activity")
+@login_required
+def bot_activity():
+    """What the online bots are doing right now (actions, goals, ambitions,
+    personas, moods, maps) and how the action mix moved over the last day."""
+    bots = live_bots()
+    by_map = {}
+    for bot in bots:
+        entry = by_map.setdefault(int(bot["map_index"]), {"bots": 0, "levels": [], "actions": {}})
+        entry["bots"] += 1
+        entry["levels"].append(int(bot.get("level") or 0))
+        action = int(bot.get("action") or 0)
+        entry["actions"][action] = entry["actions"].get(action, 0) + 1
+    maps = []
+    for index, entry in by_map.items():
+        top_action, top_count = max(entry["actions"].items(), key=lambda item: item[1])
+        maps.append({"index": index, "name": map_name(index), "bots": entry["bots"],
+                     "level_min": min(entry["levels"]), "level_max": max(entry["levels"]),
+                     "top_action": BOT_ACTIONS.get(top_action, f"#{top_action}"),
+                     "top_percent": round(top_count * 100 / entry["bots"])})
+    maps.sort(key=lambda item: -item["bots"])
+    stuck = sorted((bot for bot in bots if bot.get("stuck")), key=lambda bot: -int(bot.get("level") or 0))
+    for bot in stuck:
+        bot["map_display"] = map_name(bot.get("map_index"))
+    try:
+        history = _action_history()
+    except pymysql.MySQLError:
+        history = []
+    actions = _tally(bots, "action", BOT_ACTIONS)
+    return render_template("bot_activity.html", total=len(bots), actions=actions,
+                           goals=_tally(bots, "goal", BOT_GOALS), ambitions=_tally(bots, "ambition", BOT_AMBITIONS),
+                           personas=_tally(bots, "persona", BOT_PERSONAS), moods=_tally(bots, "mood", BOT_MOODS),
+                           maps=maps[:25], stuck=stuck[:50], stuck_total=len(stuck), history=history,
+                           action_colors=BOT_ACTION_COLORS, action_names=BOT_ACTIONS,
+                           in_party=sum(1 for bot in bots if bot.get("in_party")))
+
+
 # MT2009_PLUS_PROGRESSION_V1: "Progresja botów" -- the map transition levels,
 # the early holds (Grinder tiers, Law of Advancement) and the checklist a bot
 # must meet before it may pass a level. The core re-reads the file within five

@@ -60,10 +60,19 @@ SPAWN_FILES = {"regen.txt": "Potwory", "stone.txt": "Metiny", "boss.txt": "Bosso
 # (e.g. 36 / 46 / 35), a respawn time here and there (1000 s / 1100 s), and
 # the NPCs - every kingdom its own guards and shopkeepers, by the same name.
 MAP_FAMILIES = {
-    "m1": {"name": "Pierwsze wioski (M1)", "numbers": (1, 21, 41)},
-    "m2": {"name": "Drugie wioski (M2)", "numbers": (3, 23, 43)},
+    "m1": {"name": "Pierwsze wioski (M1)", "numbers": (1, 21, 41),
+           "note": "Różni się liczba miejsc respawnu (inny kształt mapy), gdzieniegdzie czas respawnu i NPC — każde królestwo ma własnych strażników i sklepikarzy."},
+    "m2": {"name": "Drugie wioski (M2)", "numbers": (3, 23, 43),
+           "note": "Różni się liczba miejsc respawnu (inny kształt mapy) — także Metinów — i NPC: każde królestwo ma własnych strażników i sklepikarzy."},
+    # M3 (Jungrang / Waryong / Imha): the same monsters, the spots of four
+    # groups and the NPCs differ. Loch Małp: all but the NPCs the same.
+    "m3": {"name": "Trzecie mapy (M3)", "numbers": (4, 24, 44),
+           "note": "Różni się liczba miejsc respawnu kilku grup potworów (inny kształt mapy) i NPC."},
+    "loch": {"name": "Loch Małp", "numbers": (5, 25, 45),
+             "note": "Potwory, ich miejsca i czasy respawnu są identyczne w każdym królestwie; różnią się tylko NPC."},
 }
-KINGDOM_OF_MAP = {1: "Shinsoo", 3: "Shinsoo", 21: "Chunjo", 23: "Chunjo", 41: "Jinno", 43: "Jinno"}
+KINGDOM_OF_MAP = {1: "Shinsoo", 3: "Shinsoo", 4: "Shinsoo", 5: "Shinsoo", 21: "Chunjo", 23: "Chunjo", 24: "Chunjo",
+                  25: "Chunjo", 41: "Jinno", 43: "Jinno", 44: "Jinno", 45: "Jinno"}
 FAMILY_OF_MAP = {number: key for key, family in MAP_FAMILIES.items() for number in family["numbers"]}
 
 
@@ -544,6 +553,32 @@ def install_wiki(m):
         return render_template("wiki.html", query=request.args.get("q", "").strip(),
                                item_count=m.one("SELECT COUNT(*) AS n FROM player.item_proto").get("n", 0),
                                mob_count=len(m.drop_mob_rows()), dropped_items=len(index))
+
+    @app.route("/wiki/bots")
+    @m.login_required
+    def wiki_bots():
+        """The bots' personalities: the character (drawn at login) and the
+        persona (Iwakura's system, from what the bot does now), with how many
+        online bots carry each."""
+        import wiki_bots as texts
+        bots = m.live_bots()
+        character_counts, persona_counts = defaultdict(int), defaultdict(int)
+        for bot in bots:
+            character_counts[int(bot.get("personality") or 0)] += 1
+            if bot.get("persona") is not None:
+                persona_counts[int(bot["persona"])] += 1
+        characters = [dict(texts.CHARACTERS[pid], id=pid, name=name, color=m.BOT_PERSONALITY_COLORS.get(pid, "#cfe1fb"),
+                           count=character_counts.get(pid, 0))
+                      for pid, name in sorted(m.BOT_PERSONALITIES.items()) if pid in texts.CHARACTERS]
+        groups = []
+        for kind, title, intro in texts.PERSONA_GROUPS:
+            groups.append({"kind": kind, "title": title, "intro": intro, "items": [
+                dict(texts.PERSONAS[pid], id=pid, name=m.BOT_PERSONAS.get(pid, f"#{pid}"),
+                     color=m.BOT_PERSONA_COLORS.get(pid, "#cfe1fb"), count=persona_counts.get(pid, 0))
+                for pid in sorted(texts.PERSONAS) if texts.PERSONAS[pid]["kind"] == kind]})
+        return render_template("wiki_bots.html", characters=characters, groups=groups, online=len(bots),
+                               persona_on=bool(persona_counts), moods=texts.MOODS, mood_rules=texts.MOOD_RULES,
+                               tiers=texts.TIERS, law=texts.LAW)
 
     @app.get("/api/wiki/search")
     @m.login_required

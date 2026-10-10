@@ -4,7 +4,7 @@
 {%- macro pct(value) -%}{% if value >= 10 %}{{ '%.0f'|format(value) }}%{% else %}{{ ('%.1f'|format(value)).replace('.', ',') }}%{% endif %}{%- endmacro -%}
 <p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · <a href="{{ url_for('wiki_maps') }}">MAPY</a> · TRZY KRÓLESTWA</p>
 <h1>{{ family.name }}</h1>
-<p class="muted">Shinsoo, Chunjo i Jinno razem: te same potwory, Metiny i bossowie w każdym królestwie. Różni się liczba miejsc respawnu (inny kształt mapy), gdzieniegdzie czas respawnu i NPC — każde królestwo ma własnych strażników i sklepikarzy.
+<p class="muted">Shinsoo, Chunjo i Jinno razem: te same potwory, Metiny i bossowie w każdym królestwie. {{ family.note }}
 Osobno: {% for kingdom, number in summary.kingdoms %}<a href="{{ url_for('wiki_map', number=number) }}">{{ kingdom }}</a>{{ ' · ' if not loop.last }}{% endfor %}.</p>
 <div class="trend-grid wiki-map-cards">
   <article class="trend-card"><span>Poziomy potworów</span><strong>{% if summary.levels %}{{ summary.levels[0] }}–{{ summary.levels[1] }}{% else %}—{% endif %}</strong></article>
