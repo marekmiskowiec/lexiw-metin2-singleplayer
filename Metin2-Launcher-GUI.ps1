@@ -787,7 +787,22 @@ function Refresh-Status {
             'compose --project-directory "{0}" -f "{1}" ps --services --status running' -f $composeDirectory, $composeFile) -TimeoutMs 1800
         $serverRunning = $result.ExitCode -eq 0 -and $result.Output -match '(?m)^game\s*$'
     }
-    $script:serverStatus.Text = if ($serverRunning) { 'Serwer: DZIAŁA' } else { 'Serwer: ZATRZYMANY' }
+    # Lexiw: while the game runs, the panel says how many bots are in the world
+    # and how hard the busiest core works (/api/launcher-status; silent if the
+    # panel is not up yet).
+    $liveText = ''
+    if ($serverRunning) {
+        try {
+            $live = Invoke-RestMethod -Uri 'http://127.0.0.1:7794/api/launcher-status' -TimeoutSec 1 -ErrorAction Stop
+            if ($live.bots -gt 0) {
+                $liveText = if ($script:Lang -eq 'en') { " · $($live.bots) bots" } else { " · $($live.bots) botów" }
+                $cpus = @($live.cores | Where-Object { $null -ne $_.cpu } | ForEach-Object { [double]$_.cpu })
+                if ($cpus.Count -gt 0) { $liveText += (' · CPU {0:N0}%' -f ($cpus | Measure-Object -Maximum).Maximum) }
+            }
+        }
+        catch { }
+    }
+    $script:serverStatus.Text = if ($serverRunning) { "Serwer: DZIAŁA$liveText" } else { 'Serwer: ZATRZYMANY' }
     $script:serverStatus.ForeColor = if ($serverRunning) { [Drawing.Color]::LightGreen } else { [Drawing.Color]::Silver }
 
     if ($script:versionLabel) { Update-VersionFooter }

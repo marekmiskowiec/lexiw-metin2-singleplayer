@@ -70,6 +70,21 @@ def install_observe(m):
                                cpu_series=[{"core": core, "data": cpu[core]} for core in sorted(busy)],
                                bot_series=[{"core": core, "data": bots[core]} for core in sorted(busy) if core in bots])
 
+    @app.route("/api/launcher-status")
+    @m.login_required
+    def launcher_status():
+        """A few numbers for the launcher's status line (read every few seconds)."""
+        try:
+            latest = m.one("SELECT MAX(captured_at) AS at FROM player.web_seban_core_snapshot").get("at")
+            cores = list(m.rows("SELECT core, cpu_percent, bots, status_age FROM player.web_seban_core_snapshot "
+                                "WHERE captured_at=%s AND core LIKE 'ch%%' ORDER BY core", (latest,))) if latest else []
+        except pymysql.MySQLError:
+            latest, cores = None, []
+        return {"bots": sum(int(c["bots"] or 0) for c in cores),
+                "age": int((datetime.now() - latest).total_seconds()) if latest else None,
+                "cores": [{"core": c["core"], "cpu": float(c["cpu_percent"]) if c["cpu_percent"] is not None else None,
+                           "bots": int(c["bots"] or 0)} for c in cores]}
+
     # --------------------------------------------------------------- progress
 
     def progress_data():
