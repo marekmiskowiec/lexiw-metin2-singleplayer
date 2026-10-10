@@ -284,6 +284,30 @@ def init(cur):
     cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_metric_snapshot (
       captured_at DATETIME NOT NULL, metric VARCHAR(64) NOT NULL, value BIGINT NOT NULL,
       PRIMARY KEY(captured_at,metric), KEY(metric,captured_at)) ENGINE=InnoDB""")
+    # Giełda (market.py): when each offer, at its current price, was first
+    # seen on a counter -- the "13 godz." of an offer. One row per listed item
+    # id; a changed price starts the age again, and a row not seen for a day
+    # (sold, taken down) is dropped by collect().
+    cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_offer_seen (
+      item_id INT UNSIGNED NOT NULL PRIMARY KEY, price BIGINT UNSIGNED NOT NULL,
+      first_seen DATETIME NOT NULL, last_seen DATETIME NOT NULL, KEY(last_seen)) ENGINE=InnoDB""")
+    # The Giełda's own flat copy of every offer (rebuilt each snapshot): price,
+    # price per piece, category columns, bonuses, seller and age in one
+    # indexed row, so the page never joins the game's tables.
+    cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_offer_flat (
+      item_id INT UNSIGNED NOT NULL PRIMARY KEY, vnum INT UNSIGNED NOT NULL, cnt INT UNSIGNED NOT NULL,
+      price BIGINT UNSIGNED NOT NULL, unit DOUBLE NOT NULL,
+      ptype TINYINT UNSIGNED NOT NULL, psubtype TINYINT UNSIGNED NOT NULL, level SMALLINT UNSIGNED NOT NULL,
+      plus TINYINT UNSIGNED NULL, antiflag INT UNSIGNED NOT NULL,
+      owner_id INT UNSIGNED NOT NULL, seller VARCHAR(64) NOT NULL, shop_name VARCHAR(255) NOT NULL,
+      shop_map INT UNSIGNED NOT NULL, name VARCHAR(255) NOT NULL, pname VARCHAR(255) NOT NULL,
+      first_seen DATETIME NULL,
+      socket0 INT NOT NULL, socket1 INT NOT NULL, socket2 INT NOT NULL,
+      attrtype0 INT NOT NULL, attrvalue0 INT NOT NULL, attrtype1 INT NOT NULL, attrvalue1 INT NOT NULL,
+      attrtype2 INT NOT NULL, attrvalue2 INT NOT NULL, attrtype3 INT NOT NULL, attrvalue3 INT NOT NULL,
+      attrtype4 INT NOT NULL, attrvalue4 INT NOT NULL, attrtype5 INT NOT NULL, attrvalue5 INT NOT NULL,
+      attrtype6 INT NOT NULL, attrvalue6 INT NOT NULL,
+      KEY(vnum), KEY(ptype, psubtype), KEY(unit), KEY(price), KEY(first_seen), KEY(owner_id)) ENGINE=InnoDB""")
     cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_bot_position_snapshot (
       captured_at DATETIME NOT NULL, pid INT UNSIGNED NOT NULL, map_index INT UNSIGNED NOT NULL,
       x INT NOT NULL, y INT NOT NULL, PRIMARY KEY(captured_at,pid), KEY(pid,captured_at)) ENGINE=InnoDB""")
@@ -475,6 +499,36 @@ def collect(con, previous):
             AND i.ikashop_data IS NOT NULL AND i.ikashop_data <> ''
           WHERE o.duration > 0
           GROUP BY o.map, pi.empire""", (now,))
+        cur.execute("""INSERT INTO player.web_seban_offer_seen (item_id, price, first_seen, last_seen)
+          SELECT i.id, CAST(JSON_UNQUOTE(JSON_EXTRACT(i.ikashop_data,'$.yang')) AS UNSIGNED), %s, %s
+          FROM player.item i JOIN player.ikashop_offlineshop o ON o.owner=i.owner_id
+          WHERE i.window = 'IKASHOP_OFFLINESHOP' AND o.duration > 0
+            AND i.ikashop_data IS NOT NULL AND i.ikashop_data <> ''
+          ON DUPLICATE KEY UPDATE first_seen=IF(price<>VALUES(price), VALUES(first_seen), first_seen),
+            price=VALUES(price), last_seen=VALUES(last_seen)""", (now, now))
+        cur.execute("DELETE FROM player.web_seban_offer_seen WHERE last_seen < %s - INTERVAL 1 DAY", (now,))
+        # One transaction, so the page sees the old copy or the new one, never half.
+        cur.execute("START TRANSACTION")
+        cur.execute("DELETE FROM player.web_seban_offer_flat")
+        cur.execute("""INSERT INTO player.web_seban_offer_flat
+          (item_id, vnum, cnt, price, unit, ptype, psubtype, level, plus, antiflag, owner_id, seller, shop_name, shop_map,
+           name, pname, first_seen, socket0, socket1, socket2,
+           attrtype0, attrvalue0, attrtype1, attrvalue1, attrtype2, attrvalue2, attrtype3, attrvalue3,
+           attrtype4, attrvalue4, attrtype5, attrvalue5, attrtype6, attrvalue6)
+          SELECT i.id, i.vnum, GREATEST(i.count,1), CAST(JSON_UNQUOTE(JSON_EXTRACT(i.ikashop_data,'$.yang')) AS UNSIGNED),
+            CAST(JSON_UNQUOTE(JSON_EXTRACT(i.ikashop_data,'$.yang')) AS UNSIGNED) / GREATEST(i.count,1),
+            p.type, p.subtype,
+            COALESCE(CASE WHEN p.limittype0=1 THEN p.limitvalue0 WHEN p.limittype1=1 THEN p.limitvalue1 END, 0),
+            IF(p.type IN (1,2), i.vnum MOD 10, NULL), p.antiflag, i.owner_id, pl.name, COALESCE(o.name,''), o.map,
+            COALESCE(p.locale_name, CONCAT('VNUM ', i.vnum)), COALESCE(p.name,''), s.first_seen,
+            i.socket0, i.socket1, i.socket2,
+            i.attrtype0, i.attrvalue0, i.attrtype1, i.attrvalue1, i.attrtype2, i.attrvalue2, i.attrtype3, i.attrvalue3,
+            i.attrtype4, i.attrvalue4, i.attrtype5, i.attrvalue5, i.attrtype6, i.attrvalue6
+          FROM player.item i JOIN player.ikashop_offlineshop o ON o.owner=i.owner_id AND o.duration > 0
+          JOIN player.item_proto p ON p.vnum=i.vnum JOIN player.player pl ON pl.id=i.owner_id
+          LEFT JOIN player.web_seban_offer_seen s ON s.item_id=i.id
+          WHERE i.window = 'IKASHOP_OFFLINESHOP' AND i.ikashop_data IS NOT NULL AND i.ikashop_data <> ''""")
+        cur.execute("COMMIT")
         cur.execute("""INSERT IGNORE INTO player.web_seban_shop_item_snapshot (captured_at, vnum, socket0, offers, total_units, total_value)
           SELECT %s, vnum, IF(vnum=50300, socket0, 0), COUNT(*), SUM(count),
                  COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(ikashop_data,'$.yang')) AS UNSIGNED)),0)

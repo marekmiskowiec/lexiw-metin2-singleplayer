@@ -1,0 +1,74 @@
+{% extends 'base.html' %}{% block title %}Giełda · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('market.css') }}">
+{%- macro yang(n) -%}{{ '{:,}'.format(n|int).replace(',', ' ') }}{%- endmacro -%}
+{%- macro short(n) -%}{% if n >= 1000000 %}{{ ('%.2f'|format(n / 1000000)).rstrip('0').rstrip('.').replace('.', ',') }}M{% elif n >= 1000 %}{{ ('%.1f'|format(n / 1000)).rstrip('0').rstrip('.').replace('.', ',') }}k{% else %}{{ n|round|int }}{% endif %}{%- endmacro -%}
+<p class="eyebrow">GOSPODARKA</p><h1>Giełda</h1>
+{% if not ready %}<p class="muted">Giełda będzie gotowa po pierwszej migawce collectora (do 5 minut od startu panelu). Odśwież stronę za chwilę.</p>{% else %}
+<p class="muted">Wszystkie oferty ze sklepów offline serwera w jednym miejscu. Cena „za sztukę” to cena stosu podzielona przez ilość; „vs rynek” porównuje ją z medianą tego przedmiotu wśród wszystkich ofert (tylko gdy ofert jest co najmniej 3). Wiek oferty liczy się od chwili, gdy panel zobaczył ją po raz pierwszy z obecną ceną. Dane są ze zrzutu z {{ overview.snapshot.strftime('%H:%M') if overview.snapshot else '—' }} (odświeżane co 5 minut).</p>
+
+<div class="trend-grid market-kpi">
+  <article class="trend-card"><span>Oferty</span><strong>{{ yang(overview.offers) }}</strong><small>{{ yang(overview.pieces) }} sztuk</small></article>
+  <article class="trend-card"><span>Sklepy</span><strong>{{ yang(overview.shops) }}</strong></article>
+  <article class="trend-card"><span>Wartość ofert</span><strong>{{ short(overview.value) }}</strong><small>{{ yang(overview.value) }} yang</small></article>
+  <article class="trend-card"><span>Średnio na sklep</span><strong>{{ (overview.offers / overview.shops)|round(1)|string|replace('.', ',') if overview.shops else '—' }}</strong><small>ofert</small></article>
+</div>
+
+<div class="market-layout">
+  <aside class="market-cats panel">
+    <a class="{{ '' if not asked.cat else '' }}{{ 'active' if not asked.cat else '' }}" href="{{ url_for('market') }}">Wszystko <small>{{ yang(overview.offers) }}</small></a>
+    {% for title, items in groups %}<h3>{{ title }}</h3>
+    {% for key, label, _sql in items %}<a class="{{ 'active' if asked.cat == key else '' }}" href="{{ url_for('market', cat=key) }}">{{ label }} <small>{{ yang(counts[key]) }}</small></a>{% endfor %}
+    {% endfor %}
+  </aside>
+
+  <div class="market-main">
+    <form class="market-filters panel" method="get" action="{{ url_for('market') }}">
+      <input type="hidden" name="cat" value="{{ asked.cat }}">
+      <label>Nazwa lub VNUM<input name="q" value="{{ asked.q }}" placeholder="np. Miecz, 50011"></label>
+      <label>Klasa<select name="job"><option value="">dowolna</option>{% for key, (bit, name) in classes.items() %}<option value="{{ key }}" {{ 'selected' if asked.job == key }}>{{ name }}</option>{% endfor %}</select></label>
+      <label>Poziom<span class="range"><input name="lmin" type="number" min="0" max="255" value="{{ asked.lmin if asked.lmin is not none }}" placeholder="od"><input name="lmax" type="number" min="0" max="255" value="{{ asked.lmax if asked.lmax is not none }}" placeholder="do"></span></label>
+      <label>Plus<span class="range"><input name="pmin" type="number" min="0" max="9" value="{{ asked.pmin if asked.pmin is not none }}" placeholder="od"><input name="pmax" type="number" min="0" max="9" value="{{ asked.pmax if asked.pmax is not none }}" placeholder="do"></span></label>
+      <label>Bonus<select name="bonus"><option value="">dowolny</option>{% for b in bonuses %}<option value="{{ b.id }}" {{ 'selected' if asked.bonus == b.id }}>{{ b.label }}</option>{% endfor %}</select></label>
+      <label>Wartość bonusu od<input name="bmin" type="number" value="{{ asked.bmin if asked.bmin is not none }}" placeholder="np. 20"></label>
+      <label>Cena za sztukę<span class="range"><input name="cmin" type="number" min="0" value="{{ asked.cmin if asked.cmin is not none }}" placeholder="od"><input name="cmax" type="number" min="0" value="{{ asked.cmax if asked.cmax is not none }}" placeholder="do"></span></label>
+      <label>Sortuj<select name="sort">{% for key, (label, _s) in sorts.items() %}<option value="{{ key }}" {{ 'selected' if asked.sort == key }}>{{ label }}</option>{% endfor %}</select></label>
+      <div class="market-actions"><button>Szukaj</button><a class="button secondary" href="{{ url_for('market', cat=asked.cat or none) }}">Wyczyść filtry</a></div>
+    </form>
+
+    <p class="muted">Oferty {{ first }}–{{ last }} z {{ yang(total) }}</p>
+    <section class="panel table-wrap">
+      <table class="market-table"><thead><tr><th>Przedmiot</th><th>Ilość</th><th>Za sztukę</th><th>Cena stosu</th><th>vs rynek</th><th>Wiek</th><th>Sprzedawca</th></tr></thead><tbody>
+      {% for o in offers %}<tr>
+        <td class="market-item">{% if o.icon_url %}<img src="{{ o.icon_url }}" alt="" loading="lazy">{% endif %}<div><a href="{{ url_for('economy_item', vnum=o.vnum) }}"><b>{{ o.item_name }}</b></a>
+          {% if o.bonuses %}<ul class="market-bonus">{% for b in o.bonuses %}<li class="{{ b.source }}">{{ b.text }}</li>{% endfor %}</ul>{% endif %}</div></td>
+        <td data-sort="{{ o.count }}">{{ o.count }}</td>
+        <td data-sort="{{ o.unit }}"><b>{{ yang(o.unit) }}</b>{% if o.unit >= 1000 %}<small class="muted"> {{ short(o.unit) }}</small>{% endif %}</td>
+        <td data-sort="{{ o.price }}">{{ yang(o.price) }}</td>
+        <td>{% if o.diff is none %}<span class="muted" title="Za mało ofert, żeby porównać">—</span>{% else %}<span class="market-diff {{ 'cheap' if o.diff <= -15 else 'dear' if o.diff >= 15 else '' }}" title="Mediana rynku: {{ yang(o.median) }} za sztukę ({{ o.same_offers }} ofert)">{{ '%+d'|format(o.diff) }}%</span>{% endif %}</td>
+        <td data-sort="{{ o.first_seen.timestamp() if o.first_seen else 0 }}">{{ o.age }}</td>
+        <td><a href="{{ url_for('player', pid=o.owner_id) }}">{{ o.seller }}</a><small class="muted"> {{ o.map_name }}{% if o.shop_name %} · {{ o.shop_name }}{% endif %}</small></td>
+      </tr>{% else %}<tr><td colspan="7" class="muted">Brak ofert spełniających te filtry.</td></tr>{% endfor %}
+      </tbody></table>
+    </section>
+
+    {% if total_pages > 1 %}<div class="rank-pagination"><div class="rank-pages">
+      {% if page > 1 %}<a href="{{ url_for('market', page=page - 1, **args) }}">← Poprzednia</a>{% endif %}
+      {% for n in page_numbers %}{% if n is none %}<span class="rank-gap">…</span>{% else %}<a class="{{ 'active' if n == page }}" href="{{ url_for('market', page=n, **args) }}">{{ n }}</a>{% endif %}{% endfor %}
+      {% if page < total_pages %}<a href="{{ url_for('market', page=page + 1, **args) }}">Następna →</a>{% endif %}
+    </div></div>{% endif %}
+
+    <div class="market-lists">
+      <section class="panel"><h2>Najczęściej oferowane (broń i zbroje)</h2>
+        <table><thead><tr><th>Przedmiot</th><th>Ofert</th><th>Najtaniej</th></tr></thead><tbody>
+        {% for r in overview.common %}<tr><td><a href="{{ url_for('market', q=r.name) }}">{{ r.name }}</a></td><td>{{ r.offers }}</td><td>{{ yang(r.lowest) }}</td></tr>{% endfor %}
+        </tbody></table></section>
+      <section class="panel"><h2>Najdroższe oferty</h2>
+        <table><thead><tr><th>Przedmiot</th><th>Cena</th><th>Sprzedawca</th></tr></thead><tbody>
+        {% for r in overview.dearest %}<tr><td><a href="{{ url_for('economy_item', vnum=r.vnum) }}">{{ r.name }}</a></td><td>{{ yang(r.price) }}</td><td><a href="{{ url_for('player', pid=r.owner_id) }}">{{ r.seller }}</a></td></tr>{% endfor %}
+        </tbody></table></section>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
