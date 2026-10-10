@@ -25,7 +25,7 @@ developed on its own without updates from the pack's author (the update channel
 is off: `authorUpdates` in `launcher\branding.json`). New upstream versions are
 brought in through Git (the `upstream` branch, then merged into `main`).
 
-- **Fork changelog:** [CHANGELOG-LEXIW.md](CHANGELOG-LEXIW.md) (versions `2.21.1-lexiw.N`; in Polish).
+- **Fork version: `2.21.1-lexiw.11`** (always the newest heading of [CHANGELOG-LEXIW.md](CHANGELOG-LEXIW.md), in Polish; the launcher shows it in the "Versions" box and the panel in its Changelog tab). The `VERSION` files stay the author's package version (`2.21.1`): the installer and the comparisons with the author's channel rely on them.
 - **Panel** (`http://127.0.0.1:7794`): bot activity, progress and deaths, the
   Market (offers from every shop, prices, deals), game cores, bot wealth, server wiki.
 - **Launcher:** stopping ends with a database backup (`backups\`, last 5) and a

@@ -35,7 +35,7 @@ LINK_RE = re.compile(r"\[\[(item|mob|map|region|guide|page):([\w-]+)(?:\|([^\]]+
 CODE_RE = re.compile(r"(```.*?```|`[^`\n]+`)", re.S)
 SLUG_RE =re.compile(r"^[a-z0-9][a-z0-9-]*$")
 # [[page:x]]: panel pages a guide may point to (the wiki's own and the ones about the bots and the market).
-PAGES = {"wiki": "wiki", "mapy": "wiki_maps", "osobowosci-botow": "wiki_bots", "gielda": "market", "aktywnosc-botow": "bot_activity"}
+PAGES = {"wiki": "wiki", "mapy": "wiki_maps", "osobowosci-botow": "wiki_bots", "gielda": "market", "aktywnosc-botow": "bot_activity", "wiadomosci": "world_feed"}
 
 _cache = {"key": None, "guides": {}}
 
