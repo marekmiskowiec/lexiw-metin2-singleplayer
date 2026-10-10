@@ -1,0 +1,50 @@
+{% extends 'base.html' %}{% block title %}Osobowości botów · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+{%- macro card(item) -%}
+<article class="wiki-personality" id="{{ item.anchor }}">
+  <header><h3 style="color:{{ item.color }}">{{ item.name }}</h3><span class="wiki-count" title="Ilu botów ma to teraz">{{ item.count }} online</span></header>
+  <p><b>{{ item.summary }}</b></p>
+  <ul>{% for line in item.get('does') or item.get('how') %}<li>{{ line }}</li>{% endfor %}</ul>
+</article>
+{%- endmacro -%}
+<p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · BOTY</p>
+<h1>Osobowości botów</h1>
+<p class="muted">Każdy bot ma dwie warstwy osobowości, które panel pokazuje osobno. <b>Charakter</b> jest losowany przy tworzeniu bota i przechyla szanse na stałe (np. kto częściej jeździ na dalekie mapy). <b>Persona</b> to „system osobowości v2.0” Iwakury: bot ma ją <i>teraz</i>, zależnie od sytuacji — pełny plecak robi z niego handlarza, Metin w zasięgu pogromcę metinów, a ciężka sakiewka perfekcjonistę lub hazardzistę. Opisy powstały z kodu rdzenia gry; liczby przy nazwach to boty online w tej chwili ({{ online }}).</p>
+<nav class="item-types wiki-toc"><a href="#charaktery">Charaktery</a>{% for g in groups %}<a href="#persony-{{ g.kind }}">{{ g.title }}</a>{% endfor %}<a href="#nastroje">Nastroje</a><a href="#blokady">Blokady poziomu i Prawo Awansu</a></nav>
+
+<section class="panel" id="charaktery">
+  <h2>Charaktery</h2>
+  <p class="muted">Nazwa jak w panelu w kolumnie „Osobowość”. Pierwsze siedem to ogólni gracze, pozostałe („Dropek …”) to boty z jednym zadaniem dla rynku: farmią jedną rzecz i zatrzymują się na wyznaczonym poziomie.</p>
+  <div class="wiki-personalities">{% for c in characters %}{% set _ = c.update(anchor='charakter-' ~ c.id) %}{{ card(c) }}{% endfor %}</div>
+</section>
+
+{% for g in groups %}
+<section class="panel" id="persony-{{ g.kind }}">
+  <h2>{{ g.title }}</h2>
+  <p class="muted">{{ g.intro }}{% if not persona_on %} System person jest teraz wyłączony w wagach AI, więc żaden bot ich nie ma.{% endif %}</p>
+  <div class="wiki-personalities">{% for p in g['items'] %}{% set _ = p.update(anchor='persona-' ~ p.id) %}{{ card(p) }}{% endfor %}</div>
+</section>
+{% endfor %}
+
+<section class="panel" id="nastroje">
+  <h2>Nastroje</h2>
+  <p class="muted">Nastrój (Bot Mood System) wpływa na to, jak bot się zachowuje. Ma go każdy bot, gdy system person jest włączony.</p>
+  <table><thead><tr><th>Nastrój</th><th>Co robi</th></tr></thead><tbody>
+  {% for name, text in moods %}<tr><td><b>{{ name }}</b></td><td>{{ text }}</td></tr>{% endfor %}
+  </tbody></table>
+  <ul class="wiki-stats">{% for rule in mood_rules %}<li>{{ rule }}</li>{% endfor %}</ul>
+</section>
+
+<section class="panel" id="blokady">
+  <h2>Blokady poziomu i Prawo Awansu</h2>
+  <p>Grinder (persona zwykłego expienia) nie leci po poziomach bez końca. W każdym <b>tierze</b> losuje poziom blokady z podanego zakresu i po jego osiągnięciu przestaje zdobywać exp, dopóki nie spełni <b>Prawa Awansu</b>: nie ma szczęścia, tylko sprzęt. Gdy Prawo jest spełnione, bot idzie do kolejnego tieru. 25% botów pomija blokadę 13 poziomu i idzie od razu na M3.</p>
+  <table><thead><tr><th>Tier</th><th>Miejsce</th><th>Poziomy tieru</th><th>Blokada losowana z</th></tr></thead><tbody>
+  {% for tier, place, band, lock in tiers %}<tr><td>{{ tier }}</td><td>{{ place }}</td><td>{{ band }}</td><td>{{ lock }}</td></tr>{% endfor %}
+  </tbody></table>
+  <h3>Prawo Awansu — czego żąda sprzęt</h3>
+  <table><thead><tr><th>Poziom bota</th><th>Broń</th><th>Zbroja</th><th>Tarcza</th><th>Hełm</th></tr></thead><tbody>
+  {% for row in law %}<tr><td>{{ row[0] }}</td><td>{{ row[1] }}</td><td>{{ row[2] }}</td><td>{{ row[3] }}</td><td>{{ row[4] }}</td></tr>{% endfor %}
+  </tbody></table>
+  <p class="muted wiki-note">To wartości domyślne. Tiery i Prawo ustawia się w panelu na stronie <a href="{{ url_for('bot_progression') }}">Progresja botów</a>, więc u Ciebie mogą być inne. Część przedmiotu musi też być „aktualna” — jego poziom nie może być o więcej niż 20 poziomów niższy niż poziom bota (30 dla specjalnych broni 30 poziomu).</p>
+</section>
+{% endblock %}

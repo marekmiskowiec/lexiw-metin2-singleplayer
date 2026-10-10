@@ -1,0 +1,19 @@
+/* Lexiw: "Aktywność botów" -- bar lists and the 24-hour stacked history. */
+.act-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:14px 0}
+.act-grid .panel{margin:0}
+.act-sub{margin-top:18px}
+.act-bars{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.act-bars li{display:grid;grid-template-columns:minmax(110px,40%) 1fr auto;align-items:center;gap:10px;font-size:13px}
+.act-bars .act-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act-track{height:8px;border-radius:4px;background:color-mix(in srgb,var(--edge) 60%,transparent);overflow:hidden}
+.act-track i{display:block;height:100%;border-radius:4px;min-width:2px}
+.act-bars b{min-width:34px;text-align:right}
+.act-history{display:flex;align-items:flex-end;gap:3px;height:150px;margin-top:10px}
+.act-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+.act-stack{display:flex;flex-direction:column-reverse;height:128px;border-radius:3px;overflow:hidden}
+.act-stack i{display:block;width:100%}
+.act-col small{height:18px;line-height:18px;text-align:center;font-size:11px;color:var(--muted);white-space:nowrap}
+.act-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 0;font-size:12px;color:var(--muted)}
+.act-legend span{display:inline-flex;align-items:center;gap:6px}
+.act-legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+@media(max-width:900px){.act-grid{grid-template-columns:1fr}}

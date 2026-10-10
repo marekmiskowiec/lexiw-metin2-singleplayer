@@ -2,6 +2,7 @@
 <link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
 <p class="eyebrow">WIKI SERWERA</p><h1>Wiki</h1>
 <p class="muted">Przedmioty i potwory tego serwera, prosto z jego danych: {{ '{:,}'.format(item_count).replace(',', ' ') }} przedmiotów, {{ '{:,}'.format(mob_count).replace(',', ' ') }} potworów i NPC; {{ '{:,}'.format(dropped_items).replace(',', ' ') }} przedmiotów ma źródło w tabelach dropu i szkatułek. Drop i szkatułki są te, które działają w grze — także po Twoich zmianach w edytorach.</p>
+<p class="wiki-links"><a href="{{ url_for('wiki_maps') }}">Mapy →</a> · <a href="{{ url_for('wiki_bots') }}">Osobowości botów →</a></p>
 <form class="wiki-search" action="{{ url_for('wiki') }}" method="get" role="search">
   <input id="wikiQuery" name="q" value="{{ query }}" placeholder="Nazwa przedmiotu lub potwora albo VNUM, np. Sejmitar, Dziki Pies, 50011" autocomplete="off" autofocus>
 </form>

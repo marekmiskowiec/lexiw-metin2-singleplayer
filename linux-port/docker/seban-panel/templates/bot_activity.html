@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Aktywność botów · {{ panel_brand }}{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('bot-activity.css') }}">
+{%- macro bars(items, colors=none) -%}
+<ul class="act-bars">{% for item in items %}
+  <li title="{{ item.label }}: {{ item.count }} ({{ item.percent|string|replace('.', ',') }}%)">
+    <span class="act-name">{{ item.label }}</span>
+    <span class="act-track"><i style="width:{{ item.percent }}%;background:{{ colors[item.id % colors|length] if colors else 'var(--accent, #69a6ff)' }}"></i></span>
+    <b>{{ item.count }}</b>
+  </li>{% else %}<li class="muted">Brak danych.</li>{% endfor %}
+</ul>
+{%- endmacro -%}
+<p class="eyebrow">GRACZE I BOTY</p><h1>Aktywność botów</h1>
+<p class="muted">Co robią teraz boty zalogowane do gry — czynność, cel i ambicja są odczytywane na żywo ze statusu rdzeni, a historia z migawek co 5 minut.</p>
+
+<div class="trend-grid">
+  <article class="trend-card"><span>Boty online</span><strong>{{ total }}</strong></article>
+  <article class="trend-card"><span>W drużynach</span><strong>{{ in_party }}</strong><small>{{ (in_party * 100 / total)|round|int if total else 0 }}% botów</small></article>
+  <article class="trend-card"><span>Stoją w miejscu</span><strong>{{ stuck_total }}</strong><small>poza postojem w wioskach i łowieniem</small></article>
+  <article class="trend-card"><span>Najczęstsza czynność</span><strong>{{ actions[0].label if actions else '—' }}</strong><small>{{ actions[0].percent|string|replace('.', ',') ~ '% botów' if actions else '' }}</small></article>
+</div>
+
+<section class="panel">
+  <h2>Czynności w ciągu doby</h2>
+  {% if history|length >= 2 %}
+  <div class="act-history" role="img" aria-label="Udział czynności botów w ciągu ostatniej doby">
+    {% for col in history %}
+    <div class="act-col" title="{{ col.label }} · {{ col.total }} botów">
+      <div class="act-stack">{% for part in col.parts %}<i style="height:{{ part.percent }}%;background:{{ action_colors[part.id % action_colors|length] }}" title="{{ col.label }} · {{ part.label }}: {{ part.count }}"></i>{% endfor %}</div>
+      <small>{{ col.label if loop.index0 % 3 == 0 else '' }}</small>
+    </div>{% endfor %}
+  </div>
+  <p class="act-legend">{% for action in actions %}<span><i style="background:{{ action_colors[action.id % action_colors|length] }}"></i>{{ action.label }}</span>{% endfor %}</p>
+  {% else %}
+  <p class="muted">Historia zbiera się od teraz — pierwsze kolumny pojawią się po kilku migawkach (co 5 minut, najpierw godzinami).</p>
+  {% endif %}
+</section>
+
+<div class="act-grid">
+  <section class="panel"><h2>Czynności teraz</h2>{{ bars(actions, action_colors) }}</section>
+  <section class="panel"><h2>Cele</h2>{{ bars(goals) }}</section>
+  <section class="panel"><h2>Ambicje</h2>{{ bars(ambitions) }}</section>
+  <section class="panel"><h2>Persony</h2>{{ bars(personas) }}<h2 class="act-sub">Nastroje</h2>{{ bars(moods) }}</section>
+</div>
+
+<section class="panel table-wrap">
+  <h2>Gdzie są boty</h2>
+  <table><thead><tr><th>Mapa</th><th>Boty</th><th>Poziomy</th><th>Najczęstsza czynność</th></tr></thead><tbody>
+  {% for m in maps %}<tr><td>{{ m.name }}</td><td data-sort="{{ m.bots }}">{{ m.bots }}</td><td data-sort="{{ m.level_min }}">{{ m.level_min }}–{{ m.level_max }}</td><td>{{ m.top_action }} <small class="muted">({{ m.top_percent }}%)</small></td></tr>
+  {% else %}<tr><td colspan="4" class="muted">Żaden bot nie jest teraz w grze.</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="panel table-wrap">
+  <h2>Stoją w miejscu ({{ stuck_total }})</h2>
+  <p class="muted">Boty, które od kilku minut nie ruszyły się z miejsca, choć nie łowią ani nie handlują. Próg ustawia się w ustawieniach panelu.</p>
+  <table><thead><tr><th>Bot</th><th>Poziom</th><th>Mapa</th><th>Czynność</th><th>Cel</th><th>Status</th></tr></thead><tbody>
+  {% for bot in stuck %}<tr><td><a href="{{ url_for('player', pid=bot.id) }}">{{ bot.name }}</a></td><td>{{ bot.level }}</td><td>{{ bot.map_display }}</td><td>{{ bot.action_label }}</td><td>{{ bot.goal_label }}</td><td class="muted">{{ bot.status }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Żaden bot nie stoi w miejscu.</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endblock %}
