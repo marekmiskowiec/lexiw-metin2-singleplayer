@@ -1,5 +1,14 @@
 # Launcher, updates and support bundles
 
+> **Lexiw fork:** the update and manifest sections below describe the author's
+> channel, which is off here (`authorUpdates: false`). What the fork added:
+> a database backup after every stop (`autoBackup`, `autoBackupKeep`,
+> `autoBackupLog` in `launcher.config.json`), a clean-shutdown report (exit code
+> 137 = Docker killed the game), the bot count and core CPU in the server
+> status (panel endpoint `/api/launcher-status`), panel shortcuts on the
+> "World & bots" page, live PL/EN switching, and `hideCoop` / `hideVps` in
+> `launcher\branding.json`. Layout test: `-UiSelfTest -UiTestOutput <folder>`.
+
 `Metin2-Launcher-GUI.bat` is the recommended entry point for Windows testers.
 It opens a native graphical window with large Polish buttons and no additional
 runtime to install. `Metin2-Launcher.bat` remains available as the text-mode
