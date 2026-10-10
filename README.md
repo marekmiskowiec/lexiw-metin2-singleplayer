@@ -31,7 +31,7 @@ wgrywamy przez Gita (gałąź `upstream`, potem scalenie do `main`).
   raportem, czy gra zamknęła się czysto; status serwera pokazuje liczbę botów i
   obciążenie rdzenia; skróty do stron panelu; język zmienia się od razu.
 - Test stron panelu: `docker compose exec seban-panel python smoke_test.py`;
-  test układu launchera: `Metin2-Launcher-GUI.ps1 -UiSelfTest -UiTestOutput <folder>`.
+  test launchera: `powershell -File tools/Test-Launcher.ps1`.
 
 ## 💬 Społeczność
 

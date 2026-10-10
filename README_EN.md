@@ -32,7 +32,7 @@ brought in through Git (the `upstream` branch, then merged into `main`).
   report on whether the game shut down cleanly; the server status shows the bot
   count and core load; shortcuts to panel pages; live language switch.
 - Panel page test: `docker compose exec seban-panel python smoke_test.py`;
-  launcher layout test: `Metin2-Launcher-GUI.ps1 -UiSelfTest -UiTestOutput <folder>`.
+  launcher test: `powershell -File tools/Test-Launcher.ps1`.
 
 ## 💬 Community
 
