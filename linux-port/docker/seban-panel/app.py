@@ -3025,10 +3025,25 @@ def check_daily_summary():
         pass
 
 
+def check_collector_alive():
+    """Lexiw: the collector is a process of its own, so only the panel can say it
+    has stopped - when the newest snapshot is over 15 minutes old. One entry per
+    stall (the newest snapshot's time is its ref_id, so repeats are ignored)."""
+    try:
+        latest = one("SELECT MAX(captured_at) AS at FROM player.web_seban_system_snapshot").get("at")
+        if latest and (datetime.now() - latest).total_seconds() > 900:
+            create_notification("alert_collector", "Collector przestał zbierać dane",
+                                f"Ostatnia migawka jest z {latest.strftime('%d.%m %H:%M')}. Statystyki, Giełda i wykresy nie będą się odświeżać; "
+                                "sprawdź kontener collectora.", "/system/cores", int(latest.timestamp()))
+    except pymysql.MySQLError:
+        pass
+
+
 def check_all_notifications():
     check_finished_events()
     check_version_notification()
     check_daily_summary()
+    check_collector_alive()
 
 
 def read_ai_weights():
