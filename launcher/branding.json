@@ -13,5 +13,7 @@
   "communityUrl": "https://github.com/marekmiskowiec/lexiw-metin2-singleplayer",
   "supportUrl": "",
   "reportMode": "local",
-  "authorUpdates": false
+  "authorUpdates": false,
+  "hideCoop": true,
+  "hideVps": true
 }

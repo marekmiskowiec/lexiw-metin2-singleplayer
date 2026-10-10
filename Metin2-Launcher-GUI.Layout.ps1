@@ -174,7 +174,7 @@ function UI-Page([string]$Id, [string]$Heading, [string]$Description) {
     $page.Add_SizeChanged({
         $entry = $script:ui.Pages[$this.Tag]
         if ($entry) {
-            if ($this.Tag -eq 'home') { $entry.Grid.Height = 368 }
+            if ($this.Tag -eq 'home') { $entry.Grid.Height = $(if ($script:HomeGridHeight) { $script:HomeGridHeight } else { 368 }) }
             else { $entry.Grid.Height = [Math]::Max(276, [Math]::Min(348, $this.ClientSize.Height - 114)) }
         }
     })
@@ -476,7 +476,16 @@ $sections = @(
     @('database', '04', (UI-Text 'Baza danych' 'Database'), (UI-Text 'Zarządzanie bazą danych' 'Database management'), (UI-Text 'Dostęp, import i kopie Twojego świata.' 'Connection details, imports and backups of your world.')),
     @('logs', '05', (UI-Text 'Logi i diagnostyka' 'Logs & diagnostics'), (UI-Text 'Sprawdź, co się dzieje' 'See what is happening'), (UI-Text 'Diagnostyka i materiały potrzebne do zgłoszenia problemu.' 'Diagnostics and the information needed to report a problem.'))
 )
+# Lexiw: launcher\branding.json "hideCoop" / "hideVps" - the pages and cards for
+# playing with friends and for a rented server are not made at all, and the
+# menu is numbered from what is left.
+$script:HideCoop = [bool](Get-M2BrandValue -Name 'hideCoop' -Default $false)
+$script:HideVps = [bool](Get-M2BrandValue -Name 'hideVps' -Default $false)
+if ($script:HideCoop) { $sections = @($sections | Where-Object { $_[0] -ne 'coop' }) }
+$sectionNumber = 0
 foreach ($section in $sections) {
+    $sectionNumber++
+    $section[1] = '{0:00}' -f $sectionNumber
     UI-Page $section[0] $section[3] $section[4]
     $nav = New-Button ($section[1] + '   ' + $section[2]) 0 0 232 48
     UI-ButtonStyle $nav; $nav.TextAlign = 'MiddleLeft'
@@ -503,9 +512,13 @@ foreach ($uiLocale in @('pl', 'en')) {
 Update-PlayButtonLabel
 $dockerButton.Visible = $false
 $homeGrid = $script:ui.Pages.home.Grid
-$homeGrid.RowCount = 4; $homeGrid.RowStyles.Clear(); $homeGrid.Height = 368
-for ($i = 0; $i -lt 4; $i++) {
-    [void]$homeGrid.RowStyles.Add([Windows.Forms.RowStyle]::new([Windows.Forms.SizeType]::Percent, 25))
+# Lexiw: with the author's updates off the two cards for them are not made,
+# so the overview is three rows, not four.
+$homeRows = if (Test-M2AuthorUpdatesEnabled) { 4 } else { 3 }
+$script:HomeGridHeight = if ($homeRows -eq 4) { 368 } else { 290 }
+$homeGrid.RowCount = $homeRows; $homeGrid.RowStyles.Clear(); $homeGrid.Height = $script:HomeGridHeight
+for ($i = 0; $i -lt $homeRows; $i++) {
+    [void]$homeGrid.RowStyles.Add([Windows.Forms.RowStyle]::new([Windows.Forms.SizeType]::Percent, (100 / $homeRows)))
 }
 $script:ui.Pages.home.Heading.Height = 40
 $script:ui.Pages.home.Description.Height = 36
@@ -520,7 +533,7 @@ $script:launchClientCheck.Font = [Drawing.Font]::new('Segoe UI', 10)
 $script:launchClientCheck.ForeColor = $script:ui.Text
 $script:launchClientCheck.BackColor = [Drawing.Color]::FromArgb(230, 18, 26, 30)
 $launchPanel.Controls.Add($script:launchClientCheck)
-$script:ui.Pages.home.Grid.Controls.Add($launchPanel, 1, 3)
+$script:ui.Pages.home.Grid.Controls.Add($launchPanel, 1, ($homeRows - 1))
 
 UI-Card 'world' $botCountButton (UI-Text 'Liczba botów, królestwa i tempo zaludniania.' 'Bot count, kingdoms and population pace.')
 UI-Card 'world' $difficultyButton (UI-Text 'Dostosuj rozwój postaci do swojego tempa.' 'Adjust character progression to your own pace.')
@@ -531,8 +544,11 @@ $ratesButton.Add_Click({
     Start-Process $ratesUrl
 })
 UI-Card 'world' $ratesButton (UI-Text 'Edytuj mnożniki w panelu WWW. Serwer musi działać.' 'Edit multipliers in the web panel. The server must be running.')
-# For everybody, like the COOP page.
-UI-Card 'world' $vpsButton (UI-Text 'Postaw ten świat na wynajętym serwerze Linux (VPS).' 'Put this world on a rented Linux server (VPS).')
+# For everybody, like the COOP page (Lexiw: "hideVps" / "hideCoop" turn them off).
+if ($script:HideVps) { if ($vpsButton) { $vpsButton.Visible = $false } }
+else { UI-Card 'world' $vpsButton (UI-Text 'Postaw ten świat na wynajętym serwerze Linux (VPS).' 'Put this world on a rented Linux server (VPS).') }
+if ($script:HideCoop) { if ($coopButton) { $coopButton.Visible = $false } }
+else {
 UI-Card 'coop' $coopButton (UI-Text 'Zaproś znajomych do wspólnej rozgrywki.' 'Invite friends to play together.')
 $coopInfo = [Windows.Forms.Panel]::new()
 $coopInfo.Dock = 'Fill'; $coopInfo.BackColor = [Drawing.Color]::FromArgb(235, 18, 26, 30)
@@ -570,6 +586,7 @@ $script:ui.Pages.coop.Grid.SetRowSpan($coopInfo, 2)
 if (-not $coopButton) {
     $null = UI-Label $script:ui.Pages.coop.Grid (UI-Text 'Moduł COOP nie jest zainstalowany.' 'The COOP module is not installed.') 10 $script:ui.Muted 60
 }
+}
 
 UI-Card 'home' $installButton (UI-Text 'Przygotuj pliki i zależności serwera.' 'Prepare server files and dependencies.')
 UI-Card 'home' $clientButton (UI-Text 'Wskaż plik uruchamiający klienta gry.' 'Select the game client executable.')
@@ -578,9 +595,10 @@ if (Test-M2AuthorUpdatesEnabled) {
     UI-Card 'home' $gmPanelButton (UI-Text 'Pobierz pakiet klienta dla tej wersji serwera.' 'Get the client package for this server version.')
 }
 else {
-    # Lexiw: launcher\branding.json "authorUpdates": false.
-    UI-Card 'home' $updateButton (UI-Text 'Wyłączone - wersje autora wgrywamy przez Gita.' 'Off - the author''s versions go in through Git.')
-    UI-Card 'home' $gmPanelButton (UI-Text 'Wyłączone - klient zostaje, jaki jest.' 'Off - the client stays as it is.')
+    # Lexiw: launcher\branding.json "authorUpdates": false - the two buttons
+    # for the author's updates are dead ends, so they are not shown at all.
+    if ($updateButton) { $updateButton.Visible = $false }
+    if ($gmPanelButton) { $gmPanelButton.Visible = $false }
 }
 
 UI-Card 'database' $dbAccessButton (UI-Text 'Dane połączenia dla Navicat i innych narzędzi.' 'Connection details for Navicat and other tools.')
@@ -589,7 +607,7 @@ UI-Card 'database' $importDbButton (UI-Text 'Przenieś bazę z innej instalacji.
 UI-Card 'database' $worldBackupButton (UI-Text 'Utwórz kopię, przywróć zapis lub nowy świat.' 'Back up, restore a save or create a new world.')
 
 UI-Card 'logs' $diagnosticsButton (UI-Text 'Sprawdź środowisko i możliwe przyczyny błędów.' 'Check the environment and possible causes of errors.')
-UI-Card 'logs' $bundleButton (UI-Text 'Przygotuj paczkę logów do zgłoszenia.' 'Prepare a log bundle for a support request.')
+UI-Card 'logs' $bundleButton $(if ((Get-M2BrandValue -Name 'reportMode' -Default '') -eq 'local') { UI-Text 'Zapisz paczkę logów w pliku ZIP na dysku.' 'Save a log bundle as a ZIP file on disk.' } else { UI-Text 'Przygotuj paczkę logów do zgłoszenia.' 'Prepare a log bundle for a support request.' })
 UI-Card 'logs' $openLogButton (UI-Text 'Otwórz bieżący dziennik w edytorze.' 'Open the current log in an editor.')
 UI-Card 'logs' $folderButton (UI-Text 'Przejdź do wszystkich zapisanych logów.' 'Browse all saved log files.')
 # ZGLOS / REPORT, when its module is there (Metin2-Launcher-GUI.ps1 makes the button).
@@ -631,7 +649,9 @@ function Invoke-LayoutSelfTest([string]$OutputDirectory) {
     $script:form.ShowInTaskbar = $false
     $script:dockerStatus.Text = UI-Text 'Docker: podgląd UI' 'Docker: UI preview'
     $script:serverStatus.Text = UI-Text 'Serwer: podgląd UI' 'Server: UI preview'
-    $script:versionLabel.Text = "Serwer: 2.0.96   |   najnowszy: 2.0.96`r`nLauncher: 2.0.96   |   najnowszy: 2.0.96`r`nKlient: 2.0.25   |   najnowszy: 2.0.25"
+    # Lexiw: with the author's channel off the box is the real one (the fork's version, commit, package, client).
+    if (Test-M2AuthorUpdatesEnabled) { $script:versionLabel.Text = "Serwer: 2.0.96   |   najnowszy: 2.0.96`r`nLauncher: 2.0.96   |   najnowszy: 2.0.96`r`nKlient: 2.0.25   |   najnowszy: 2.0.25" }
+    else { Update-VersionFooter }
     $script:logBox.Text = UI-Text "[Test] Podgląd układu launchera.`r`n[Test] Akcje serwera nie zostały uruchomione." "[Test] Launcher layout preview.`r`n[Test] No server actions have been started."
     $previewLog = $script:logBox.Text
     $script:logBox.Text = ((1..100 | ForEach-Object { 'Scroll test line ' + $_ }) -join "`r`n")
@@ -668,7 +688,7 @@ function Invoke-LayoutSelfTest([string]$OutputDirectory) {
     $results = @()
     foreach ($dimensions in @(@(1280, 820), @(1120, 820), @(1004, 741))) {
         $script:form.ClientSize = [Drawing.Size]::new($dimensions[0], $dimensions[1])
-        foreach ($id in @('home', 'world', 'coop', 'database', 'logs')) {
+        foreach ($id in @('home', 'world', 'coop', 'database', 'logs') | Where-Object { $script:ui.Nav.ContainsKey($_) }) {
             $script:ui.Nav[$id].PerformClick()
             [Windows.Forms.Application]::DoEvents()
             if ($script:ui.CurrentPage -ne $id) { throw "Navigation failed: $id" }
@@ -707,11 +727,15 @@ function Invoke-LayoutSelfTest([string]$OutputDirectory) {
     if ($script:logBox.SelectionStart -ne $script:logBox.TextLength) { throw 'Log caret did not follow expansion' }
     if (([Uri](Get-UIRatesUrl)).AbsolutePath -ne '/rates') { throw 'Incorrect rates route' }
     if (-not $coffeeButton.Visible) { throw 'Coffee link is not visible' }
-    $expected = @($installButton, $playButton, $stopButton, $panelButton, $clientButton, $updateButton,
+    $expected = @($installButton, $playButton, $stopButton, $panelButton, $clientButton,
         $bundleButton, $diagnosticsButton, $openLogButton, $folderButton, $botCountButton, $importDbButton,
-        $repairDbButton, $dbAccessButton, $gmPanelButton, $worldBackupButton, $difficultyButton, $languageButton, $ratesButton)
-    if ($coopButton) { $expected += $coopButton }
-    if ($vpsButton) { $expected += $vpsButton }
+        $repairDbButton, $dbAccessButton, $worldBackupButton, $difficultyButton, $languageButton, $ratesButton)
+    if (Test-M2AuthorUpdatesEnabled) { $expected += $updateButton; $expected += $gmPanelButton }
+    elseif ($updateButton.Visible -or $gmPanelButton.Visible) { throw 'Author update buttons are still displayed' }
+    if ($coopButton -and -not $script:HideCoop) { $expected += $coopButton }
+    if ($vpsButton -and -not $script:HideVps) { $expected += $vpsButton }
+    if ($script:HideCoop -and $script:ui.Nav.ContainsKey('coop')) { throw 'COOP page still in the menu' }
+    if ($vpsButton -and $script:HideVps -and $vpsButton.Visible) { throw 'VPS button is still displayed' }
     if ($reportButton) { $expected += $reportButton }
     foreach ($button in $expected) {
         if (@($script:ui.Cards | Where-Object { $_.Button -eq $button }).Count -ne 1) { throw "Missing/duplicate action: $($button.Text)" }

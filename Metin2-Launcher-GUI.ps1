@@ -303,7 +303,7 @@ $script:Strings = @{
         panel        = 'OTWORZ PANEL WWW'
         client       = 'WYBIERZ KLIENTA'
         update       = 'SPRAWDZ AKTUALIZACJE'
-        bundle       = 'ZBIERZ / WYSLIJ LOGI'
+        bundle       = 'ZBIERZ LOGI (ZIP)'
         diagnostics  = 'DIAGNOSTYKA'
         openLog      = 'OTWORZ LOG'
         logFolder    = 'FOLDER LOGOW'
@@ -383,7 +383,7 @@ $script:Strings = @{
         panel        = 'OPEN WEB PANEL'
         client       = 'CHOOSE CLIENT'
         update       = 'CHECK FOR UPDATES'
-        bundle       = 'COLLECT / SEND LOGS'
+        bundle       = 'COLLECT LOGS (ZIP)'
         diagnostics  = 'DIAGNOSTICS'
         openLog      = 'OPEN LOG'
         logFolder    = 'LOG FOLDER'
@@ -2909,7 +2909,48 @@ function Set-LatestVersionsFromManifest {
     }
 }
 
+$script:lexiwVersionInfo = $null
+function Get-LexiwVersionInfo {
+    # Lexiw: what this copy is - the fork's own version (the newest heading of
+    # CHANGELOG-LEXIW.md), the author's package it stands on (VERSION) and the
+    # commit, when git is there. Read once per session.
+    if ($script:lexiwVersionInfo) { return $script:lexiwVersionInfo }
+    $info = @{ Lexiw = 'nieznana'; Package = ''; Commit = '' }
+    try {
+        $root = $PSScriptRoot
+        $changelog = Join-Path $root 'CHANGELOG-LEXIW.md'
+        if (Test-Path -LiteralPath $changelog) {
+            $heading = Select-String -LiteralPath $changelog -Pattern '^##\s+(\d+\.\d+\.\d+-lexiw\.\d+)' | Select-Object -First 1
+            if ($heading) { $info.Lexiw = $heading.Matches[0].Groups[1].Value }
+        }
+        $versionFile = Join-Path $root 'VERSION'
+        if (Test-Path -LiteralPath $versionFile) { $info.Package = ([string](Get-Content -LiteralPath $versionFile -TotalCount 1)).Trim() }
+        if ((Test-Path -LiteralPath (Join-Path $root '.git')) -and (Get-Command git -ErrorAction SilentlyContinue)) {
+            $commit = & git -C $root rev-parse --short HEAD 2>$null
+            if ($commit) { $info.Commit = ([string]$commit).Trim() }
+        }
+    }
+    catch { }
+    $script:lexiwVersionInfo = $info
+    return $info
+}
+
 function Update-VersionFooter {
+    if (-not (Test-M2AuthorUpdatesEnabled)) {
+        # Lexiw: the author's channel is off, so there is no "newest" to show -
+        # the box says which copy of the fork this is.
+        $info = Get-LexiwVersionInfo
+        $client = Get-InstalledClientVersion
+        $lines = @("Lexiw: $($info.Lexiw)")
+        if ($info.Commit) { $lines += "Commit: $($info.Commit)" }
+        if ($info.Package) { $lines += "Paczka MT2009: $($info.Package)" }
+        $lines += "Klient: $(if ($client -and $client -ne 'unknown') { $client } else { 'nieznana' })"
+        $script:versionLabel.Text = $lines -join "`r`n"
+        $script:updateAvailable = $false
+        $script:versionBaseColor = [Drawing.Color]::Silver
+        $script:versionLabel.ForeColor = $script:versionBaseColor
+        return
+    }
     # The manifest lives behind GitHub's anonymous per-IP budget, so it is read
     # once per session and whenever the player asks for a check - never on the
     # 8-second status timer, which would spend that budget for nothing.
