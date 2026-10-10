@@ -1,0 +1,43 @@
+{% extends 'base.html' %}{% block title %}Pętle śmierci · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('bot-activity.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('observe.css') }}">
+{%- macro num(n) -%}{{ '{:,}'.format((n or 0)|int).replace(',', ' ') }}{%- endmacro -%}
+{%- macro dec(x) -%}{{ ('%.2f'|format(x))|replace('.', ',') if x is not none else '—' }}{%- endmacro -%}
+<p class="eyebrow"><a href="{{ url_for('bot_deaths') }}">ŚMIERCI BOTÓW</a> · GRACZE I BOTY</p><h1>Pętle śmierci</h1>
+{% if not data %}<p class="muted">Brak danych: potrzebny jest log zgonów i godzinne migawki postępu botów.</p>{% else %}
+<p class="muted">Boty, które w ciągu 24 godzin zginęły od potworów co najmniej {{ data.threshold }} razy, czyli wracają w to samo miejsce i giną w kółko. Poniżej widać, ile ich jest, gdzie utknęły i jak bardzo wolniej awansują. Tempo to poziomy zdobyte na dobę, przeliczone z godzinnych migawek postępu z ostatnich {{ data.window }} godz. (mediana); poziom bota jest z chwili obecnej. Im krótsze okno pomiaru, tym mniej wiarygodne przeliczenie na dobę.</p>
+
+<div class="trend-grid">
+  <article class="trend-card"><span>Boty w pętli śmierci</span><strong>{{ num(data.trapped) }}</strong><small>z {{ num(data.bots_died) }}, które zginęły w ciągu doby</small></article>
+  <article class="trend-card"><span>Ich udział w zgonach</span><strong>{{ (100 * data.trapped_deaths / data.total_deaths)|round|int if data.total_deaths else 0 }}%</strong><small>{{ num(data.trapped_deaths) }} z {{ num(data.total_deaths) }} zgonów</small></article>
+  <article class="trend-card"><span>Awans w pętli</span><strong>{{ dec(data.trapped_median) }}</strong><small>poziomów na dobę (mediana)</small></article>
+  <article class="trend-card"><span>Awans pozostałych</span><strong>{{ dec(data.calm_median) }}</strong><small>poziomów na dobę (mediana)</small></article>
+</div>
+
+<section class="panel table-wrap">
+  <h2>Zgony a tempo awansu</h2>
+  <p class="muted">Boty pogrupowane według liczby zgonów w ciągu ostatniej doby. „Stoją w miejscu” to boty, które w tym czasie nie zyskały nawet ułamka poziomu.</p>
+  <table><thead><tr><th>Zgonów na dobę</th><th>Botów</th><th>Awans (poziomów na dobę, mediana)</th><th>Stoją w miejscu</th></tr></thead><tbody>
+  {% for b in data.brackets %}<tr><td>{{ b.label }}</td><td>{{ num(b.bots) }}</td><td>{{ dec(b.median) }}</td><td>{{ num(b.stuck) }}{% if b.bots %} <small class="muted">({{ (100 * b.stuck / b.bots)|round|int }}%)</small>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="panel table-wrap">
+  <h2>Gdzie utknęły</h2>
+  <p class="muted">Główny zabójca każdego bota w pętli, zebrany po miejscu: ilu botów tam wraca i ile razy giną.</p>
+  <table><thead><tr><th>Potwór</th><th>Poziom potwora</th><th>Mapa</th><th>Botów w pętli</th><th>Zgonów</th><th>Poziomy botów</th></tr></thead><tbody>
+  {% for s in data.spots %}<tr><td><a href="{{ url_for('wiki_mob', vnum=s.vnum) }}">{{ s.mob }}</a></td><td>{{ s.mob_level if s.mob_level is not none else '—' }}</td><td>{{ s.map }}</td><td><b>{{ num(s.bots) }}</b></td><td data-sort="{{ s.deaths }}">{{ num(s.deaths) }}</td><td>{{ s.level_range }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Żaden bot nie przekroczył progu w ostatniej dobie.</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="panel table-wrap">
+  <h2>Boty najczęściej wpadające w pętlę <small class="muted">· 40 najgorszych</small></h2>
+  <table><thead><tr><th>Bot</th><th>Poziom</th><th>Zgonów</th><th>Główny zabójca</th><th>Mapa</th><th>Awans (poz./dobę)</th></tr></thead><tbody>
+  {% for r in data.rows %}<tr><td><a href="{{ url_for('player', pid=r.pid) }}">{{ r.name }}</a></td><td>{{ r.level }}</td><td data-sort="{{ r.deaths }}"><b>{{ num(r.deaths) }}</b></td><td><a href="{{ url_for('wiki_mob', vnum=r.vnum) }}">{{ r.mob }}</a> <small class="muted">{{ r.share }}% zgonów</small></td><td>{{ r.map }}</td><td>{{ dec(r.per_day) }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Brak botów powyżej progu.</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endif %}
+{% endblock %}

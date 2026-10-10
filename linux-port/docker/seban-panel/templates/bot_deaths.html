@@ -6,7 +6,7 @@
 {%- macro num(n) -%}{{ '{:,}'.format((n or 0)|int).replace(',', ' ') }}{%- endmacro -%}
 <p class="eyebrow">GRACZE I BOTY</p><h1>Śmierci botów</h1>
 <p class="muted">Co zabija boty, gdzie i na jakich poziomach — z logu zgonów. Mapę cieplną miejsc śmierci każdej mapy znajdziesz w <a href="{{ url_for('maps') }}">Aktywności map</a>. Poziom ofiary to jej poziom teraz, nie w chwili śmierci.</p>
-<nav class="item-types market-tabs">{% for h, label in ((6, '6 godzin'), (24, '24 godziny'), (168, '7 dni')) %}<a class="{{ 'active' if hours == h }}" href="{{ url_for('bot_deaths', h=h) }}">{{ label }}</a>{% endfor %}</nav>
+<nav class="item-types market-tabs">{% for h, label in ((6, '6 godzin'), (24, '24 godziny'), (168, '7 dni')) %}<a class="{{ 'active' if hours == h }}" href="{{ url_for('bot_deaths', h=h) }}">{{ label }}</a>{% endfor %}<a href="{{ url_for('bot_traps') }}" title="Boty, które giną w kółko w tym samym miejscu">🔁 Pętle śmierci</a></nav>
 
 <div class="trend-grid">
   <article class="trend-card"><span>Śmierci od potworów</span><strong>{{ num(total.npc) }}</strong></article>

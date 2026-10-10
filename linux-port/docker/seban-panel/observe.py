@@ -107,16 +107,19 @@ def install_observe(m):
 
     _progress_cache = {"at": 0.0, "data": None}
 
-    @app.route("/players/progress")
-    @m.login_required
-    def bot_progress():
+    def progress_cached():
         if _progress_cache["data"] is None or time.time() - _progress_cache["at"] > 300:
             try:
                 by_bot, stamps, measured = progress_data()
             except pymysql.MySQLError:
                 by_bot, stamps, measured = {}, [], []
             _progress_cache.update(at=time.time(), data=(by_bot, stamps, measured))
-        by_bot, stamps, measured = _progress_cache["data"]
+        return _progress_cache["data"]
+
+    @app.route("/players/progress")
+    @m.login_required
+    def bot_progress():
+        by_bot, stamps, measured = progress_cached()
         # Levels right now, from the latest snapshot.
         histogram = {}
         for points in by_bot.values():
@@ -223,6 +226,80 @@ def install_observe(m):
         if cache["data"] is None or time.time() - cache["at"] > 300:
             cache.update(at=time.time(), data=deaths_data(hours))
         return render_template("bot_deaths.html", hours=hours, **cache["data"])
+
+    # ------------------------------------------------------------ death traps
+
+    TRAP_DEATHS = 20  # monster deaths in 24 hours from which a bot counts as stuck in a loop
+    DEATH_BRACKETS = ((0, 0, "0"), (1, 4, "1–4"), (5, 19, "5–19"), (20, 49, "20–49"), (50, 10**6, "50 i więcej"))
+    _trap_cache = {"at": 0.0, "data": None}
+
+    def traps_data():
+        """Which bots die over and over, where, and what that does to how fast
+        they level - the deaths of the last 24 hours against the progress
+        snapshots (levels gained per day)."""
+        deaths = {int(r["pid"]): int(r["n"]) for r in m.rows(
+            "SELECT l.who AS pid, COUNT(*) AS n FROM log.log l WHERE l.type='CHARACTER' AND l.how='DEAD_BY_NPC' "
+            "AND l.time >= NOW() - INTERVAL 24 HOUR GROUP BY l.who")}
+        total_deaths = sum(deaths.values())
+        _by_bot, stamps, measured = progress_cached()
+        rate = {item["pid"]: item for item in measured}
+        # Levels per day of every bot we could measure, by how often it died.
+        brackets = []
+        for low, high, label in DEATH_BRACKETS:
+            members = [item for pid, item in rate.items() if low <= deaths.get(pid, 0) <= high]
+            brackets.append({"label": label, "bots": len(members), "median": round(24 * median([i["rate"] for i in members]), 2) if members else None,
+                             "stuck": sum(1 for i in members if i["rate"] <= 0.001)})
+        trapped = sorted((pid for pid, n in deaths.items() if n >= TRAP_DEATHS), key=lambda pid: -deaths[pid])
+        spots, rows = {}, []
+        if trapped:
+            marks = ",".join(["%s"] * len(trapped))
+            info = {int(r["id"]): r for r in m.rows(f"SELECT id, name, level FROM player.player WHERE id IN ({marks})", trapped)}
+            main = {}
+            for r in m.rows(f"SELECT l.who AS pid, l.what AS vnum, {map_case()} AS map_index, COUNT(*) AS n FROM log.log l "
+                            f"WHERE l.type='CHARACTER' AND l.how='DEAD_BY_NPC' AND l.time >= NOW() - INTERVAL 24 HOUR "
+                            f"AND l.who IN ({marks}) GROUP BY l.who, l.what, map_index", trapped):
+                pid = int(r["pid"])
+                if pid not in main or int(r["n"]) > main[pid]["n"]:
+                    main[pid] = {"vnum": int(r["vnum"]), "map_index": int(r["map_index"]), "n": int(r["n"])}
+            wanted = sorted({v["vnum"] for v in main.values()})
+            mob_names = {int(r["vnum"]): (m.game_text(r["locale_name"] or r["name"]), int(r["level"])) for r in m.rows(
+                "SELECT vnum, name, locale_name, level FROM player.mob_proto WHERE vnum IN (" + ",".join(["%s"] * len(wanted)) + ")", wanted)} if wanted else {}
+            for pid in trapped:
+                person, top = info.get(pid), main.get(pid)
+                if not person or not top:
+                    continue
+                name, mob_level = mob_names.get(top["vnum"], (f"VNUM {top['vnum']}", None))
+                speed = rate.get(pid)
+                row = {"pid": pid, "name": person["name"], "level": int(person["level"]), "deaths": deaths[pid],
+                       "vnum": top["vnum"], "mob": name, "mob_level": mob_level, "share": round(100 * top["n"] / deaths[pid]),
+                       "map": m.map_name(top["map_index"]) if top["map_index"] else "gdzie indziej",
+                       "per_day": round(24 * speed["rate"], 2) if speed else None}
+                rows.append(row)
+                spot = spots.setdefault((top["vnum"], top["map_index"]), {"vnum": top["vnum"], "mob": name, "mob_level": mob_level,
+                                                                          "map": row["map"], "bots": 0, "deaths": 0, "levels": []})
+                spot["bots"] += 1
+                spot["deaths"] += deaths[pid]
+                spot["levels"].append(row["level"])
+        spot_rows = sorted(spots.values(), key=lambda s: -s["deaths"])[:12]
+        for spot in spot_rows:
+            spot["level_range"] = f"{min(spot['levels'])}–{max(spot['levels'])}"
+        trapped_speed = [rate[p]["rate"] for p in trapped if p in rate]
+        calm_speed = [i["rate"] for p, i in rate.items() if deaths.get(p, 0) < TRAP_DEATHS]
+        return {"threshold": TRAP_DEATHS, "window": round((stamps[-1] - stamps[0]) / 3600, 1) if len(stamps) > 1 else 0, "bots_died": len(deaths), "trapped": len(trapped), "total_deaths": total_deaths,
+                "trapped_deaths": sum(deaths[p] for p in trapped), "brackets": brackets, "rows": rows[:40], "spots": spot_rows,
+                "trapped_median": round(24 * median(trapped_speed), 2) if trapped_speed else None,
+                "calm_median": round(24 * median(calm_speed), 2) if calm_speed else None}
+
+    @app.route("/players/traps")
+    @m.login_required
+    def bot_traps():
+        if _trap_cache["data"] is None or time.time() - _trap_cache["at"] > 300:
+            try:
+                _trap_cache.update(at=time.time(), data=traps_data())
+            except pymysql.MySQLError:
+                app.logger.exception("Pętle śmierci: no data yet")
+                return render_template("bot_traps.html", data=None)
+        return render_template("bot_traps.html", data=_trap_cache["data"])
 
     @app.route("/api/player/<int:pid>/deaths")
     @m.login_required
