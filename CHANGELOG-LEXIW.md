@@ -12,6 +12,12 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
+## 2.21.1-lexiw.11 — 2026-10-10 — Giełda: jedna strona rynku; Wiki: poradniki
+
+- [panel] Stary „Rynek (sklepy offline)” połączony z Giełdą: powstała karta „🧾 Obrót i sprzedaże” (Giełda → /market/sales) z liczbą sklepów, ofert i wartością rynku (te same liczby co na liście ofert), sklepami na mapach, wartością rynku w czasie, najszybciej sprzedającymi się przedmiotami, księgami i feedem ostatnich sprzedaży. Adres /economy/shops przekierowuje na nią, pozycja zniknęła z menu, a wszystkie karty Giełdy mają wspólny pasek kart.
+
+---
+
 ## 2.21.1-lexiw.10 — 2026-10-10 — Giełda: bonusy, okazje, ceny i indeks; Wiki: ulepszanie u kowala
 
 - [panel] Giełda → Okazje: przycisk „🔥 Okazje” (oferty co najmniej 30% poniżej mediany, od największego zysku) i filtr „Taniej od mediany o (%)”; sortowanie po zysku z odsprzedaży i po zniżce. Mediana jest liczona w grupie tych samych przedmiotów z tą samą liczbą dodanych bonusów (kolczyki z pięcioma liniami nie są porównywane z gołymi) i dla Księgi Umiejętności osobno dla każdej umiejętności; wymaga co najmniej 3 ofert. Przy ofercie widać różnicę względem mediany i zysk z odsprzedaży stosu.

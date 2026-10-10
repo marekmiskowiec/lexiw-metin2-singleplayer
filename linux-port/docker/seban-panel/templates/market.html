@@ -9,7 +9,7 @@
 {% if not ready %}<p class="muted">Giełda będzie gotowa po pierwszej migawce collectora (do 5 minut od startu panelu). Odśwież stronę za chwilę.</p>{% else %}
 <p class="muted">Wszystkie oferty ze sklepów offline serwera w jednym miejscu. Cena „za sztukę” to cena stosu podzielona przez ilość; „vs rynek” porównuje ją z medianą tego przedmiotu wśród wszystkich ofert (tylko gdy ofert jest co najmniej 3). Wiek oferty liczy się od chwili, gdy panel zobaczył ją po raz pierwszy z obecną ceną. Dane są ze zrzutu z {{ overview.snapshot.strftime('%H:%M') if overview.snapshot else '—' }} (odświeżane co 5 minut).</p>
 
-<nav class="item-types market-tabs"><a class="{{ 'active' if not asked.dmin }}" href="{{ url_for('market') }}">Wszystkie oferty</a><a class="{{ 'active' if asked.dmin }}" href="{{ url_for('market', dmin=30, sort='profit') }}" title="Oferty co najmniej 30% poniżej mediany, od największego zysku z odsprzedaży">🔥 Okazje</a><a href="{{ url_for('market_index') }}">📈 Indeks cen i obieg yang</a></nav>
+{% with tab = "deals" if asked.dmin else "offers" %}{% include "_market_tabs.html" %}{% endwith %}
 <div class="trend-grid market-kpi">
   <article class="trend-card"><span>Oferty</span><strong>{{ yang(overview.offers) }}</strong><small>{{ yang(overview.pieces) }} sztuk</small></article>
   <article class="trend-card"><span>Sklepy</span><strong>{{ yang(overview.shops) }}</strong></article>
