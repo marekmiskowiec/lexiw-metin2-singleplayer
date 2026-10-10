@@ -22,3 +22,10 @@
 .market-diff.dear{color:#e0786b;border-color:#e0786b}
 .market-lists{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
 @media(max-width:1000px){.market-layout{grid-template-columns:1fr}.market-cats{position:static;display:flex;flex-wrap:wrap;gap:4px}.market-cats h3{width:100%}.market-lists{grid-template-columns:1fr}}
+/* The in-game style tooltip over the icon (same markup as the character card's). */
+.market-icon{position:relative;display:block;flex:0 0 32px;width:32px;height:32px}
+.market-icon img{width:32px;height:32px;object-fit:contain}
+.market-icon i{font-size:10px;color:var(--muted)}
+.market-icon .item-tip{left:calc(100% + 10px)!important;bottom:auto!important;top:-6px;transform:none!important;width:260px;text-align:center}
+.market-icon:hover .item-tip,.market-icon:focus .item-tip{display:block}
+@media(min-width:1001px){.market-main .table-wrap{overflow:visible}}
