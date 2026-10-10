@@ -6338,6 +6338,9 @@ def player(pid):
     live = live_statuses().get(pid)
     if live:
         character.update(live)
+        # The ids too, for the links to the wiki's page about personalities.
+        character["personality_id"] = live.get("personality")
+        character["persona_id"] = live.get("persona")
         character["personality"] = live_label("personality", live.get("personality"))
         character["ambition"] = live_label("ambition", live.get("ambition"))
         character["goal"] = live_label("goal", live.get("goal"))
@@ -11163,6 +11166,8 @@ from wiki import install_wiki  # noqa: E402
 install_wiki(sys.modules[__name__])
 from market import install_market  # noqa: E402
 install_market(sys.modules[__name__])
+from observe import install_observe  # noqa: E402
+install_observe(sys.modules[__name__])
 
 
 if __name__ == "__main__":

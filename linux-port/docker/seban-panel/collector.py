@@ -326,6 +326,16 @@ def init(cur):
       captured_at DATETIME NOT NULL, vnum INT UNSIGNED NOT NULL, variant INT NOT NULL, offers INT UNSIGNED NOT NULL,
       min_unit DOUBLE NOT NULL, median_unit DOUBLE NOT NULL, max_unit DOUBLE NOT NULL, avg_unit DOUBLE NOT NULL,
       PRIMARY KEY(vnum, variant, captured_at), KEY(captured_at)) ENGINE=InnoDB""")
+    # Per game process each snapshot (the Rdzenie page): CPU share of one
+    # processor, memory, the bots the core runs and how old its status file is.
+    cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_core_snapshot (
+      captured_at DATETIME NOT NULL, core VARCHAR(40) NOT NULL, cpu_percent DECIMAL(6,1) NULL, rss_mb INT UNSIGNED NOT NULL,
+      bots INT UNSIGNED NOT NULL DEFAULT 0, status_age INT UNSIGNED NULL,
+      PRIMARY KEY(captured_at, core), KEY(core, captured_at)) ENGINE=InnoDB""")
+    # Hourly level and experience of every online bot (the Rozwój botów page and the bot card's chart).
+    cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_bot_progress (
+      captured_at DATETIME NOT NULL, pid INT UNSIGNED NOT NULL, level TINYINT UNSIGNED NOT NULL, exp BIGINT UNSIGNED NOT NULL,
+      PRIMARY KEY(captured_at, pid), KEY(pid, captured_at)) ENGINE=InnoDB""")
     cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_bot_position_snapshot (
       captured_at DATETIME NOT NULL, pid INT UNSIGNED NOT NULL, map_index INT UNSIGNED NOT NULL,
       x INT NOT NULL, y INT NOT NULL, PRIMARY KEY(captured_at,pid), KEY(pid,captured_at)) ENGINE=InnoDB""")
@@ -472,6 +482,71 @@ def live_map_counts():
     return counts
 
 
+_core_previous = {"at": 0.0, "jiffies": {}}
+
+
+def core_metrics():
+    """CPU and memory of every game process (db, auth and the cores), by name:
+    the cores run in the game container, but the host's /proc is mounted here
+    (host_metrics reads it too). A core's own pid file holds its pid inside
+    that container; /proc/<host pid>/status carries it as the last NSpid, so
+    the two are matched. CPU is the share of one processor over the time since
+    the last snapshot (100 = one core fully busy; the cores are single-threaded,
+    so near 100 is a core at its limit)."""
+    by_inner = {}
+    try:
+        for entry in os.scandir("/host/proc"):
+            if not entry.name.isdigit():
+                continue
+            try:
+                comm = Path(entry.path, "comm").read_text().strip()
+                if comm not in ("game", "db", "auth"):
+                    continue
+                nspid = next(line for line in Path(entry.path, "status").read_text().splitlines() if line.startswith("NSpid")).split()[1:]
+                stat = Path(entry.path, "stat").read_text().rsplit(")", 1)[1].split()
+                by_inner[int(nspid[-1])] = (comm, int(stat[11]) + int(stat[12]), int(stat[21]) * os.sysconf("SC_PAGE_SIZE") // 1048576)
+            except (OSError, StopIteration, ValueError, IndexError):
+                continue
+    except OSError:
+        return []
+    names = {}
+    for channel in discovered_channels():
+        try:
+            for path in CHANNEL_VAR_ROOT.glob(f"channel{channel}/*/pid"):
+                try:
+                    names[int(path.read_text().strip())] = f"ch{channel}-{path.parent.name}"
+                except (OSError, ValueError):
+                    continue
+        except OSError:
+            continue
+    now = time.time()
+    elapsed = now - _core_previous["at"] if _core_previous["at"] else 0
+    result, jiffies = [], {}
+    for inner, (comm, ticks, rss) in by_inner.items():
+        name = names.get(inner) or comm
+        if comm in ("db", "auth") and name == comm:
+            name = comm
+        jiffies[inner] = ticks
+        before = _core_previous["jiffies"].get(inner)
+        cpu = round(100 * (ticks - before) / (elapsed * os.sysconf("SC_CLK_TCK")), 1) if before is not None and elapsed > 5 else None
+        result.append({"core": name, "cpu": cpu, "rss": rss})
+    _core_previous.update(at=now, jiffies=jiffies)
+    return result
+
+
+def core_bot_counts():
+    """Online bots per core and how old each core's status file is."""
+    counts = {}
+    for channel, path in status_paths():
+        try:
+            text = path.read_text(encoding="cp1250", errors="replace")
+            bots = sum(1 for _n, _s in parse_status_rows(text))
+            counts[f"ch{channel}-{path.parent.name}"] = (bots, int(time.time() - path.stat().st_mtime))
+        except OSError:
+            continue
+    return counts
+
+
 def collect(con, previous):
     now = datetime.now().replace(second=0, microsecond=0)
     previous, cpu, used, total, disk_used, disk_total = host_metrics(previous)
@@ -489,6 +564,20 @@ def collect(con, previous):
         for (channel, map_index), count in live_map_counts().items():
             cur.execute("INSERT IGNORE INTO player.web_seban_map_snapshot (captured_at,channel,map_index,character_count) VALUES (%s,%s,%s,%s)", (now, channel, map_index, count))
         positions = live_positions()
+        counts = core_bot_counts()
+        for core in core_metrics():
+            bots, age = counts.get(core["core"], (0, None))
+            cur.execute("INSERT IGNORE INTO player.web_seban_core_snapshot (captured_at, core, cpu_percent, rss_mb, bots, status_age) "
+                        "VALUES (%s,%s,%s,%s,%s,%s)", (now, core["core"], core["cpu"], core["rss"], bots, age))
+        cur.execute("DELETE FROM player.web_seban_core_snapshot WHERE captured_at < %s - INTERVAL 30 DAY", (now,))
+        # Once an hour: where every online bot stands in levels. INSERT IGNORE keeps the first look of the hour.
+        hour = now.replace(minute=0)
+        cur.execute("SELECT 1 FROM player.web_seban_bot_progress WHERE captured_at=%s LIMIT 1", (hour,))
+        if positions and not cur.fetchone():
+            marks = ",".join(["%s"] * len(positions))
+            cur.execute(f"INSERT IGNORE INTO player.web_seban_bot_progress (captured_at, pid, level, exp) "
+                        f"SELECT %s, id, level, exp FROM player.player WHERE id IN ({marks})", (hour, *positions.keys()))
+            cur.execute("DELETE FROM player.web_seban_bot_progress WHERE captured_at < %s - INTERVAL 30 DAY", (now,))
         for pid, (map_index, x, y, channel) in positions.items():
             cur.execute("INSERT IGNORE INTO player.web_seban_bot_position_snapshot (captured_at,pid,channel,map_index,x,y) VALUES (%s,%s,%s,%s,%s,%s)", (now, pid, channel, map_index, x, y))
         # Split by socket0 only for vnum 50300 (the generic Skill Book -- see

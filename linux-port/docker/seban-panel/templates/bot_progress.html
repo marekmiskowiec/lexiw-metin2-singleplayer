@@ -1,0 +1,58 @@
+{% extends 'base.html' %}{% block title %}Rozwój botów · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('bot-activity.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('observe.css') }}">
+{% set axis = "{ticks:{color:'#8fa5c1',maxTicksLimit:10}}" %}
+{%- macro num(n) -%}{{ '{:,}'.format(n|int).replace(',', ' ') }}{%- endmacro -%}
+<p class="eyebrow">GRACZE I BOTY</p><h1>Rozwój botów</h1>
+<p class="muted">Na jakich poziomach są boty, jak szybko awansują i które stoją w miejscu. Poziom i exp każdego bota panel zapisuje raz na godzinę; „poziom ułamkowy” to poziom plus postęp w nim (20,5 = pół drogi z 20 do 21, liczone tabelą expa silnika).</p>
+
+<div class="trend-grid">
+  <article class="trend-card"><span>Boty w ostatniej migawce</span><strong>{{ num(total) }}</strong></article>
+  <article class="trend-card"><span>Migawek godzinnych</span><strong>{{ snapshots }}</strong><small>{% if since %}od {{ since.strftime('%d.%m %H:%M') }}{% endif %}</small></article>
+  <article class="trend-card"><span>Boty z mierzonym tempem</span><strong>{{ num(measured) }}</strong><small>co najmniej 50 min obserwacji</small></article>
+  <article class="trend-card"><span>Najwyższy poziom</span><strong>{{ levels_now[-1].level if levels_now else '—' }}</strong></article>
+</div>
+
+<section class="panel">
+  <h2>Poziomy teraz</h2>
+  {% if levels_now %}<canvas id="lvlnow" height="90"></canvas>
+  <script>new Chart(document.getElementById('lvlnow'),{type:'bar',data:{labels:{{ levels_now|map(attribute='level')|list|tojson }},datasets:[{label:'Boty',data:{{ levels_now|map(attribute='count')|list|tojson }},backgroundColor:'#f2c34dcc',borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{x:{{ axis|safe }},y:{ticks:{color:'#8fa5c1'}}}}});</script>
+  {% else %}<p class="muted">Brak danych — pierwsza migawka pojawi się po pełnej godzinie działania collectora.</p>{% endif %}
+</section>
+
+<section class="panel">
+  <h2>Przedziały poziomów · 7 dni</h2>
+  {% if band_labels|length >= 2 %}<canvas id="bands" height="100"></canvas>
+  <script>
+  const bandColours=['#60a5fa','#63c993','#f2c34d','#e0786b','#c084fc','#38bdf8','#fb923c','#2dd4bf'];
+  new Chart(document.getElementById('bands'),{type:'line',data:{labels:{{ band_labels|tojson }},datasets:{{ band_series|map('first')|list|tojson }}.map((name,n)=>({label:name,data:{{ band_series|map('last')|list|tojson }}[n],borderColor:bandColours[n%bandColours.length],backgroundColor:bandColours[n%bandColours.length]+'55',fill:true,tension:.25,pointRadius:0}))},options:{interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#cfe0f7'}}},scales:{x:{{ axis|safe }},y:{stacked:true,ticks:{color:'#8fa5c1'}}}}});
+  </script>
+  {% else %}<p class="muted">Za mało danych.</p>{% endif %}
+</section>
+
+<section class="panel table-wrap">
+  <h2>Tempo awansu według poziomu</h2>
+  {% if speed %}
+  <table><thead><tr><th>Poziom</th><th>Boty</th><th title="Mediana wzrostu poziomu ułamkowego na godzinę">Tempo na godzinę</th><th>Na dobę</th><th title="Ile godzin do następnego poziomu przy tym tempie (mediana)">Do następnego poziomu</th><th title="Boty, które w ogóle nie awansowały">Stoją</th></tr></thead><tbody>
+  {% for s in speed %}<tr><td><b>{{ s.level }}</b></td><td>{{ s.bots }}</td><td data-sort="{{ s.rate }}">{{ ('%.3f'|format(s.rate)).replace('.', ',') }}</td><td>{{ ('%.2f'|format(s.per_day)).replace('.', ',') }} poz.</td>
+    <td data-sort="{{ s.eta if s.eta is not none else 9999 }}">{% if s.eta is none %}<span class="muted">—</span>{% elif s.eta < 48 %}{{ ('%.1f'|format(s.eta)).replace('.', ',') }} godz.{% else %}{{ ('%.1f'|format(s.eta / 24)).replace('.', ',') }} dni{% endif %}</td>
+    <td>{{ s.still }}{% if s.bots %} <small class="muted">({{ (s.still * 100 / s.bots)|round|int }}%)</small>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+  <p class="muted wiki-note">Tempo to różnica poziomu ułamkowego między pierwszą a ostatnią migawką z ostatnich 48 godzin; poziomy z mniej niż 3 botami są pominięte. Śmierć odbierająca exp obniża tempo.</p>
+  {% else %}<p class="muted">Tempo pojawi się po dwóch migawkach godzinnych (ok. dwie godziny po starcie collectora) i będzie coraz dokładniejsze.</p>{% endif %}
+</section>
+
+{% if fast %}
+<div class="act-grid">
+  <section class="panel table-wrap"><h2>Najszybciej awansują</h2>
+    <table><thead><tr><th>Bot</th><th>Poziom</th><th>Na dobę</th></tr></thead><tbody>
+    {% for b in fast %}<tr><td><a href="{{ url_for('player', pid=b.pid) }}">{{ b.name }}</a></td><td>{{ b.level }}</td><td>{{ ('%.2f'|format(b.rate * 24)).replace('.', ',') }}</td></tr>{% endfor %}
+    </tbody></table></section>
+  <section class="panel table-wrap"><h2>Najwolniej / stoją</h2>
+    <table><thead><tr><th>Bot</th><th>Poziom</th><th>Na dobę</th></tr></thead><tbody>
+    {% for b in slow %}<tr><td><a href="{{ url_for('player', pid=b.pid) }}">{{ b.name }}</a></td><td>{{ b.level }}</td><td>{{ ('%.2f'|format(b.rate * 24)).replace('.', ',') }}</td></tr>{% endfor %}
+    </tbody></table></section>
+</div>
+{% endif %}
+{% endblock %}

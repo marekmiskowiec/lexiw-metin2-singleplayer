@@ -1,0 +1,49 @@
+{% extends 'base.html' %}{% block title %}Śmierci botów · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('bot-activity.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('observe.css') }}">
+{% set axis = "{ticks:{color:'#8fa5c1',maxTicksLimit:10}}" %}
+{%- macro num(n) -%}{{ '{:,}'.format((n or 0)|int).replace(',', ' ') }}{%- endmacro -%}
+<p class="eyebrow">GRACZE I BOTY</p><h1>Śmierci botów</h1>
+<p class="muted">Co zabija boty, gdzie i na jakich poziomach — z logu zgonów. Mapę cieplną miejsc śmierci każdej mapy znajdziesz w <a href="{{ url_for('maps') }}">Aktywności map</a>. Poziom ofiary to jej poziom teraz, nie w chwili śmierci.</p>
+<nav class="item-types market-tabs">{% for h, label in ((6, '6 godzin'), (24, '24 godziny'), (168, '7 dni')) %}<a class="{{ 'active' if hours == h }}" href="{{ url_for('bot_deaths', h=h) }}">{{ label }}</a>{% endfor %}</nav>
+
+<div class="trend-grid">
+  <article class="trend-card"><span>Śmierci od potworów</span><strong>{{ num(total.npc) }}</strong></article>
+  <article class="trend-card"><span>Śmierci od graczy i botów</span><strong>{{ num(total.pc) }}</strong></article>
+  <article class="trend-card"><span>Boty, które zginęły</span><strong>{{ num(total.bots) }}</strong></article>
+  <article class="trend-card"><span>Średnio na bota</span><strong>{{ (((total.npc or 0) + (total.pc or 0)) / total.bots)|round(1)|string|replace('.', ',') if total.bots else '—' }}</strong></article>
+</div>
+
+<section class="panel">
+  <h2>Śmierci w czasie</h2>
+  {% if hourly|length >= 2 %}<canvas id="dh" height="80"></canvas>
+  <script>new Chart(document.getElementById('dh'),{type:'bar',data:{labels:{{ hourly|map(attribute='label')|list|tojson }},datasets:[{label:'Od potworów',data:{{ hourly|map(attribute='npc')|map('int')|list|tojson }},backgroundColor:'#e0786bcc'},{label:'Od graczy',data:{{ hourly|map(attribute='pc')|map('int')|list|tojson }},backgroundColor:'#c084fccc'}]},options:{plugins:{legend:{labels:{color:'#cfe0f7'}}},scales:{x:{stacked:true,ticks:{color:'#8fa5c1',maxTicksLimit:12}},y:{stacked:true,ticks:{color:'#8fa5c1'}}}}});</script>
+  {% else %}<p class="muted">Za mało danych w tym oknie.</p>{% endif %}
+</section>
+
+<section class="panel table-wrap">
+  <h2>Co zabija najczęściej</h2>
+  <table><thead><tr><th>Potwór</th><th>Poziom potwora</th><th>Zgonów</th><th>Różnych botów</th><th>Zgonów na bota</th><th>Średni poziom ofiar</th></tr></thead><tbody>
+  {% for k in killers %}<tr><td><a href="{{ url_for('wiki_mob', vnum=k.vnum) }}">{{ k.name }}</a></td><td>{{ k.mob_level if k.mob_level is not none else '—' }}</td><td data-sort="{{ k.n }}"><b>{{ num(k.n) }}</b></td><td>{{ num(k.victims) }}</td><td>{{ ('%.1f'|format(k.deaths_each)).replace('.', ',') }}</td><td>{{ ('%.1f'|format(k.avg_level)).replace('.', ',') }} <small class="muted">({{ k.lo }}–{{ k.hi }})</small></td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Brak zgonów w tym oknie.</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<div class="act-grid">
+  <section class="panel table-wrap"><h2>Gdzie giną</h2>
+    <table><thead><tr><th>Mapa</th><th>Zgonów</th><th>Botów</th></tr></thead><tbody>
+    {% for w in where %}<tr><td>{{ w.name }}</td><td data-sort="{{ w.n }}"><b>{{ num(w.n) }}</b></td><td>{{ num(w.victims) }}</td></tr>{% endfor %}
+    </tbody></table></section>
+  <section class="panel"><h2>Według poziomu ofiary</h2>
+    {% if levels %}<canvas id="dl" height="150"></canvas>
+    <script>new Chart(document.getElementById('dl'),{type:'bar',data:{labels:{{ levels|map(attribute='label')|list|tojson }},datasets:[{label:'Zgonów',data:{{ levels|map(attribute='n')|map('int')|list|tojson }},backgroundColor:'#f2c34dcc',borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8fa5c1'}},y:{ticks:{color:'#8fa5c1'}}}}});</script>
+    {% else %}<p class="muted">Brak danych.</p>{% endif %}</section>
+</div>
+
+<section class="panel table-wrap"><h2>Boty, które giną najczęściej</h2>
+  <table><thead><tr><th>Bot</th><th>Poziom</th><th>Zgonów od potworów</th></tr></thead><tbody>
+  {% for v in victims %}<tr><td><a href="{{ url_for('player', pid=v.pid) }}">{{ v.name }}</a></td><td>{{ v.level }}</td><td><b>{{ v.n }}</b></td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endblock %}
