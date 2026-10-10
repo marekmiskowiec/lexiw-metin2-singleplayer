@@ -1,3 +1,4 @@
+import copy
 import json
 import hashlib
 import logging
@@ -2026,6 +2027,38 @@ def live_bots():
 
 
 
+def cached_for(seconds):
+    """Keeps a function's answer for `seconds` per arguments, handing every
+    caller its own copy (callers add fields to what they get). For the pages
+    whose numbers come from a pass over the game's log - it has no index on
+    time and may not get one (the operator's rule), so a week of events costs
+    seconds; the answer is the same for minutes."""
+    def decorate(function):
+        store = {}
+
+        @wraps(function)
+        def inner(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            hit = store.get(key)
+            if hit and time.time() - hit[0] < seconds:
+                return copy.deepcopy(hit[1])
+            result = function(*args, **kwargs)
+            store[key] = (time.time(), result)
+            if len(store) > 64:
+                store.pop(min(store, key=lambda k: store[k][0]))
+            return copy.deepcopy(result)
+        return inner
+    return decorate
+
+
+@cached_for(600)
+def _fish_log_events():
+    """How many fishing lines the game's log holds: a LIKE over the whole
+    table, 0.8 s, and the number moves slowly."""
+    found = one("SELECT COUNT(*) AS total FROM log.log WHERE how LIKE %s OR hint LIKE %s", ("%FISH%", "%FISH%"))
+    return int(found.get("total") or 0) if found else 0
+
+
 def fishing_diagnostics():
     bots = live_bots()
     anglers = [bot for bot in bots if int(bot.get("action") or 0) == 14]
@@ -2042,8 +2075,7 @@ def fishing_diagnostics():
                 matches.append({"core": f"ch{channel}/{path.parent.name}", "line": line[-300:]})
     database_events = 0
     try:
-        found = one("SELECT COUNT(*) AS total FROM log.log WHERE how LIKE %s OR hint LIKE %s", ("%FISH%", "%FISH%"))
-        database_events = int(found.get("total") or 0) if found else 0
+        database_events = _fish_log_events()
     except pymysql.MySQLError:
         pass
     return {"weights": read_ai_weights(), "online": len(bots), "anglers": anglers,
@@ -2786,6 +2818,9 @@ def _daily_leader(query, params):
     return result
 
 
+# A day's summary no longer changes once the day is over; an hour is plenty
+# (the page was 3 s of log queries on every visit).
+@cached_for(3600)
 def daily_summary_details(summary_date):
     """Live reconstruction of a finished day's achievements for old and new summaries."""
     day_start = datetime.combine(summary_date, datetime.min.time())
@@ -7481,7 +7516,9 @@ def items_database():
         params.append(int(item_type))
     predicate = " WHERE " + " AND ".join(where) if where else ""
     total = one("SELECT COUNT(*) AS count FROM player.item_proto p" + predicate, params).get("count", 0)
-    records = rows("SELECT p.vnum,p.name,p.locale_name,p.type,p.subtype,p.size,p.gold,p.shop_buy_price FROM player.item_proto p" + predicate + " ORDER BY p.vnum", params)
+    # The first 500, like the search the page runs as you type (/api/items):
+    # rendering all 28 000 items took 1-3 s and built a page of 28 000 cards.
+    records = rows("SELECT p.vnum,p.name,p.locale_name,p.type,p.subtype,p.size,p.gold,p.shop_buy_price FROM player.item_proto p" + predicate + " ORDER BY p.vnum LIMIT 500", params)
     for item in records:
         item["name"] = game_text(item.get("locale_name") or item.get("name"))
     types = rows("SELECT type,COUNT(*) AS count,MIN(vnum) AS icon_vnum FROM player.item_proto GROUP BY type ORDER BY type")
@@ -7625,10 +7662,29 @@ def player_chat_identities(pids):
 
 
 CHAT_SCAN_BACKFILL_BYTES = 384_000
-CHAT_SCAN_MAX_READ_BYTES = 4_000_000
+CHAT_SCAN_MAX_READ_BYTES = 1_500_000  # was 4 MB; the scan runs every few seconds, so this still outpaces the cores
+
+
+_chat_scan_gate = {"at": 0.0}
+_chat_scan_lock = threading.Lock()
 
 
 def scan_bot_chat_logs():
+    """At most one scan every three seconds per worker, and never two at once:
+    /live-chat, /api/live-chat, /world-feed and /api/world-feed all call it,
+    and each call read up to 4 MB of syslog and matched every line (0.7 s a
+    request when the page had been closed for a while). The scan continues
+    where the last one stopped, so skipping a call loses nothing."""
+    if time.time() - _chat_scan_gate["at"] < 3 or not _chat_scan_lock.acquire(blocking=False):
+        return
+    try:
+        _scan_bot_chat_logs()
+    finally:
+        _chat_scan_gate["at"] = time.time()
+        _chat_scan_lock.release()
+
+
+def _scan_bot_chat_logs():
     """Incrementally append new PLAYERBOT_TRADE/PLAYERBOT_SHOUT lines from
     every core's syslog into a persistent table, so a message stays visible
     on /live-chat for as long as the feed wants it to -- not just for as
@@ -11172,3 +11228,28 @@ install_observe(sys.modules[__name__])
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=7789)
+
+
+# Lexiw: pages that answer from a pass over the game's log (it has no index on
+# time and may not get one) keep their answer for minutes; this thread makes
+# the answer before it runs out, so no visitor waits for it. Each gunicorn
+# worker has its own caches and so its own warmer.
+def _warm_slow_pages():
+    time.sleep(25)
+    while True:
+        try:
+            if time.time() - _season_cache["at"] > 480:
+                _season_cache["at"] = 0.0
+                _season_week_rows()
+            if time.time() - _dashboard_trends_cache["at"] > 210:
+                _dashboard_trends_cache.update(data=_dashboard_trends(), at=time.time())
+            _fish_log_events()
+            # The newest daily summaries - the ones a notification links to.
+            for row in rows("SELECT summary_date FROM player.web_seban_daily_summary ORDER BY summary_date DESC LIMIT 2"):
+                daily_summary_details(row["summary_date"])
+        except Exception:
+            app.logger.exception("Warming the slow pages failed")
+        time.sleep(120)
+
+
+threading.Thread(target=_warm_slow_pages, name="warm-slow-pages", daemon=True).start()

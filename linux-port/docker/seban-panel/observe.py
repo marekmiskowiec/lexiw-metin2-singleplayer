@@ -228,3 +228,73 @@ def install_observe(m):
                 "npc7": int(counts.get("npc7") or 0), "pc7": int(counts.get("pc7") or 0),
                 "killers": [{"vnum": int(r["vnum"]), "name": names.get(int(r["vnum"]), f"VNUM {r['vnum']}"), "n": int(r["n"]),
                              "url": url_for("wiki_mob", vnum=int(r["vnum"]))} for r in killers]}
+
+    # ----------------------------------------------------------------- wealth
+
+    WEALTH_EDGES = [(0, 1, "0"), (1, 10_000, "poniżej 10 tys."), (10_000, 50_000, "10–50 tys."), (50_000, 100_000, "50–100 tys."),
+                    (100_000, 500_000, "100–500 tys."), (500_000, 1_000_000, "0,5–1 mln"), (1_000_000, 5_000_000, "1–5 mln"),
+                    (5_000_000, 10**12, "powyżej 5 mln")]
+
+    WEALTH_MIN_LEVEL = 10
+
+    def gini(values):
+        values = sorted(values)
+        n, total = len(values), sum(values)
+        if not n or not total:
+            return 0.0
+        weighted = sum((index + 1) * value for index, value in enumerate(values))
+        return (2 * weighted) / (n * total) - (n + 1) / n
+
+    def wealth_data():
+        everyone = m.rows("SELECT p.id, p.name, p.level, p.gold FROM player.player p JOIN account.account a ON a.id=p.account_id "
+                          "WHERE LEFT(a.login,10)='playerbot_'")
+        # The bots that have started playing: a bot of level 0-4 is an identity that never entered the
+        # world and still has its starting purse, which would be most of the "median".
+        bots = [b for b in everyone if int(b["level"]) >= WEALTH_MIN_LEVEL]
+        try:
+            shops = {int(r["owner"]): (int(r["value"]), int(r["offers"])) for r in m.rows(
+                "SELECT owner_id AS owner, SUM(price) AS value, COUNT(*) AS offers FROM player.web_seban_offer_flat GROUP BY owner_id")}
+        except pymysql.MySQLError:
+            shops = {}
+        gold = [int(b["gold"] or 0) for b in bots]
+        total_gold, shop_total = sum(gold), sum(v for v, _ in shops.values())
+        ordered = sorted(gold, reverse=True)
+        top1 = sum(ordered[:max(1, len(ordered) // 100)])
+        top10 = sum(ordered[:max(1, len(ordered) // 10)])
+        brackets = []
+        for low, high, label in WEALTH_EDGES:
+            members = [g for g in gold if low <= g < high]
+            brackets.append({"label": label, "bots": len(members), "bots_pct": round(100 * len(members) / len(gold), 1) if gold else 0,
+                             "yang": sum(members), "yang_pct": round(100 * sum(members) / total_gold, 1) if total_gold else 0})
+        bands = {}
+        for b in bots:
+            bands.setdefault(int(b["level"]) // 5 * 5, []).append(int(b["gold"] or 0))
+        by_level = [{"label": f"{band}–{band + 4}", "bots": len(values), "median": median(values), "mean": round(sum(values) / len(values)),
+                     "total": sum(values)} for band, values in sorted(bands.items()) if len(values) >= 5]
+        richest = sorted(bots, key=lambda b: -(int(b["gold"] or 0) + shops.get(int(b["id"]), (0, 0))[0]))[:20]
+        richest = [{"id": int(b["id"]), "name": b["name"], "level": int(b["level"]), "gold": int(b["gold"] or 0),
+                    "shop": shops.get(int(b["id"]), (0, 0))[0], "offers": shops.get(int(b["id"]), (0, 0))[1]} for b in richest]
+        sellers = {}
+        for r in m.rows("SELECT l.who AS pid, l.hint FROM log.log l WHERE l.how='PLAYERBOT_STALL_SOLD' AND l.time >= NOW() - INTERVAL 7 DAY"):
+            hit = m.SALE_HINT_RE.match(m.game_text(r["hint"]))
+            if hit:
+                entry = sellers.setdefault(int(r["pid"]), [0, 0])
+                entry[0] += 1
+                entry[1] += int(hit.group(3))
+        names = {int(b["id"]): (b["name"], int(b["level"])) for b in bots}
+        top_sellers = [{"id": pid, "name": names.get(pid, (f"#{pid}", 0))[0], "level": names.get(pid, ("", 0))[1], "sales": v[0], "yang": v[1]}
+                       for pid, v in sorted(sellers.items(), key=lambda kv: -kv[1][1])[:15]]
+        return {"bots": len(bots), "idle": len(everyone) - len(bots), "min_level": WEALTH_MIN_LEVEL, "total_gold": total_gold, "mean": round(total_gold / len(gold)) if gold else 0, "median": median(gold),
+                "max": ordered[0] if ordered else 0, "zero": sum(1 for g in gold if g == 0), "top1_pct": round(100 * top1 / total_gold, 1) if total_gold else 0,
+                "top10_pct": round(100 * top10 / total_gold, 1) if total_gold else 0, "gini": round(gini(gold), 3),
+                "shop_total": shop_total, "shops": len(shops), "brackets": brackets, "by_level": by_level, "richest": richest,
+                "sellers": top_sellers, "sales_total": sum(v[0] for v in sellers.values()), "sales_yang": sum(v[1] for v in sellers.values())}
+
+    _wealth_cache = {"at": 0.0, "data": None}
+
+    @app.route("/economy/wealth")
+    @m.login_required
+    def economy_wealth():
+        if _wealth_cache["data"] is None or time.time() - _wealth_cache["at"] > 180:
+            _wealth_cache.update(at=time.time(), data=wealth_data())
+        return render_template("economy_wealth.html", w=_wealth_cache["data"])
