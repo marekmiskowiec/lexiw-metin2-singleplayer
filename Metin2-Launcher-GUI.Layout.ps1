@@ -566,7 +566,7 @@ for ($i = 0; $i -lt $homeRows; $i++) {
 $script:ui.Pages.home.Heading.Height = 40
 $script:ui.Pages.home.Description.Height = 36
 UI-Card 'home' $playButton (UI-Text 'Uruchom serwer i rozpocznij przygodę.' 'Start the server and begin your adventure.') '#21694F'
-UI-Card 'home' $stopButton (UI-Text 'Bezpieczne zatrzymanie z zachowaniem postępu.' 'Stop safely and keep your progress.') '#6A3C39'
+UI-Card 'home' $stopButton (UI-Text 'Bezpieczne zatrzymanie, potem kopia bazy.' 'Stop safely, then back up the database.') '#6A3C39'
 UI-Card 'home' $panelButton (UI-Text 'Statystyki, rankingi i panel zarządzania.' 'Statistics, rankings and management panel.')
 $launchPanel = [Windows.Forms.Panel]::new(); $launchPanel.Dock = 'Fill'
 $launchPanel.BackColor = [Drawing.Color]::Transparent

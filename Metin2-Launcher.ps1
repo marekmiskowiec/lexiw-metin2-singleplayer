@@ -394,6 +394,64 @@ function Stop-Server {
     }
     finally { $ErrorActionPreference = $previousPreference }
     if ($stopExit -ne 0) { throw "Zatrzymywanie serwera zakończyło się kodem $stopExit." }
+    Test-GameStoppedCleanly -ComposeDir $composeDir -ComposeFile $composeFile
+}
+
+function Test-GameStoppedCleanly {
+    # Lexiw: compose gives the game 90 s to close (stop_grace_period), then Docker
+    # kills it (exit 137). A world with 2 500 bots needs most of that to hand
+    # its characters to the database, so the word is said: closed cleanly, or
+    # killed - in which case the last minutes of progress may not be in it.
+    param([string]$ComposeDir, [string]$ComposeFile)
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $id = @(docker compose --project-directory $ComposeDir -f $ComposeFile ps -a -q game 2>$null | Select-Object -First 1)
+        if ($id.Count -eq 0 -or -not [string]$id[0]) { return }
+        $state = (docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' ([string]$id[0]) 2>$null | Select-Object -First 1)
+        $parts = ([string]$state).Trim() -split '\s+'
+        if ($parts.Count -lt 2 -or $parts[0] -ne 'false') { return }
+        if ($parts[1] -eq '137') {
+            Write-Host 'UWAGA: gra nie zdążyła się zamknąć w czasie (90 s) i została zatrzymana siłą (kod 137).' -ForegroundColor Yellow
+            Write-Host '       Ostatnie minuty postępu botów mogły nie trafić do bazy. Następnym razem poczekaj dłużej albo zmniejsz liczbę botów.' -ForegroundColor Yellow
+        }
+        else {
+            Write-Host 'Gra zamknęła się czysto: postacie i boty zapisane w bazie.' -ForegroundColor Green
+        }
+    }
+    catch { }
+    finally { $ErrorActionPreference = $previousPreference }
+}
+
+function Invoke-AutoBackup {
+    # Lexiw: a copy of the database right after the stop - the one moment the
+    # volume is closed and complete (New-M2DatabaseBackup opens it with a
+    # throwaway container). Off with "autoBackup": false in
+    # launcher.config.json; a failure only warns, because the world itself is
+    # safe in its Docker volume either way.
+    $config = Get-Config
+    if ($null -ne $config.PSObject.Properties['autoBackup'] -and -not [bool]$config.autoBackup) {
+        Write-Host 'Kopia po zatrzymaniu jest wyłączona (autoBackup w launcher.config.json).' -ForegroundColor Gray
+        return
+    }
+    if (-not (Test-M2DockerRunning)) { return }
+    $target = Get-CurrentInstallTargetVolume
+    if (-not $target -or -not (Test-M2VolumeInitialized -Volume $target)) { return }
+    $backupRoot = Join-Path $serverRoot 'backups'
+    Write-Host 'Zapisuję kopię bazy po zatrzymaniu serwera (to może potrwać kilka minut)...' -ForegroundColor Cyan
+    try {
+        $skip = if ($null -ne $config.PSObject.Properties['autoBackupLog'] -and -not [bool]$config.autoBackupLog) { @('log') } else { @() }
+        $keep = if ($null -ne $config.PSObject.Properties['autoBackupKeep']) { [int]$config.autoBackupKeep } else { 5 }
+        $result = New-M2DatabaseBackup -Volume $target -BackupRoot $backupRoot -Label 'auto' -SkipDatabases $skip -ZipOnly
+        Write-Host ("Kopia gotowa: {0} postaci, najwyższy poziom {1}, {2:N0} MB." -f $result.Players, $result.MaxLevel, ($result.ZipBytes / 1MB)) -ForegroundColor Green
+        Write-Host ("  Plik: {0}" -f $result.Zip) -ForegroundColor Gray
+        $removed = @(Remove-M2OldAutoBackups -BackupRoot $backupRoot -Keep $keep)
+        if ($removed.Count -gt 0) { Write-Host ("  Usunięto starsze kopie automatyczne: {0} (zostaje {1} najnowszych)." -f $removed.Count, $keep) -ForegroundColor Gray }
+    }
+    catch {
+        Write-Host ("UWAGA: kopia bazy po zatrzymaniu nie powiodła się: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+        Write-Host '       Świat jest bezpieczny w wolumenie Dockera, serwer jest zatrzymany. Kopię zrobisz ręcznie: Baza danych -> Kopia / nowy świat.' -ForegroundColor Gray
+    }
 }
 
 # Another installation of this same server, sitting on the ports this one
@@ -444,6 +502,7 @@ function Start-Docker {
 
 function Stop-DockerAndServer {
     Stop-Server
+    Invoke-AutoBackup
     Stop-DockerDesktop
     Write-Host 'Serwer i Docker Desktop zatrzymane. Dane pozostają zapisane w wolumenach.' -ForegroundColor Green
 }
@@ -2935,6 +2994,7 @@ function Invoke-Action {
         'Start' { Start-Server }
         'Stop' {
             Stop-Server
+            Invoke-AutoBackup
             if (Test-M2DockerRunning) {
                 Write-Host 'Serwer zatrzymany, Docker Desktop działa dalej. Dane pozostają zapisane w wolumenach.' -ForegroundColor Green
             }
