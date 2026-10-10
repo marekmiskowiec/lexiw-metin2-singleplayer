@@ -586,7 +586,27 @@ $ratesButton.Add_Click({
     Write-LocalLog (UI-Text 'Otwieram edytor rat serwera w panelu WWW.' 'Opening server rates in the web panel.')
     Start-Process $ratesUrl
 })
-UI-Card 'world' $ratesButton (UI-Text 'Edytuj mnożniki w panelu WWW. Serwer musi działać.' 'Edit multipliers in the web panel. The server must be running.')
+UI-Card 'world' $ratesButton (UI-Text 'Mnożniki w panelu WWW (serwer musi działać).' 'Multipliers in the web panel (server must run).')
+# Lexiw: shortcuts straight to the panel pages for watching the bots. The grid
+# holds six cards, so with the VPS card showing the last shortcut is left out.
+$panelShortcuts = @(
+    @{ Path = '/players/activity'; Pl = 'AKTYWNOŚĆ BOTÓW'; En = 'BOT ACTIVITY'; DescPl = 'Co boty robią teraz i w ciągu doby.'; DescEn = 'What the bots do now and over the day.' },
+    @{ Path = '/market'; Pl = 'GIEŁDA'; En = 'MARKET'; DescPl = 'Oferty ze wszystkich sklepów, ceny i okazje.'; DescEn = 'Offers from every shop, prices and deals.' },
+    @{ Path = '/system/cores'; Pl = 'RDZENIE GRY'; En = 'GAME CORES'; DescPl = 'Obciążenie procesorów gry i liczba botów.'; DescEn = 'Game process load and bots per core.' }
+)
+if (-not $script:HideVps) { $panelShortcuts = $panelShortcuts[0..1] }
+foreach ($shortcut in $panelShortcuts) {
+    $shortcutButton = New-Button (UI-Text $shortcut.Pl $shortcut.En) 0 0 280 36
+    $shortcutButton.Tag = $shortcut.Path
+    $shortcutButton.Add_Click({
+        param($sender, $eventArgs)
+        $addresses = Get-M2PanelAddresses -ServerRoot $root
+        $url = ([Uri]::new([Uri]$addresses.ClassicUrl, [string]$sender.Tag)).AbsoluteUri
+        Write-LocalLog (UI-Text "Otwieram w panelu WWW: $url" "Opening in the web panel: $url")
+        Start-Process $url
+    })
+    UI-Card 'world' $shortcutButton (UI-Text $shortcut.DescPl $shortcut.DescEn)
+}
 # For everybody, like the COOP page (Lexiw: "hideVps" / "hideCoop" turn them off).
 if ($script:HideVps) { if ($vpsButton) { $vpsButton.Visible = $false } }
 else { UI-Card 'world' $vpsButton (UI-Text 'Postaw ten świat na wynajętym serwerze Linux (VPS).' 'Put this world on a rented Linux server (VPS).') }
