@@ -12,6 +12,11 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
+## 2.21.1-lexiw.10 — 2026-10-10 — Giełda: kolorowe bonusy; Wiki: ulepszanie u kowala
+
+- [panel] Wiki, strona przedmiotu → Poziomy ulepszeń: przy każdym plusie szansa ulepszenia na następny plus, koszt u kowala (yang) i potrzebne materiały (z linkami do ich stron) — z tabeli ulepszeń serwera; „U botów” to rzeczywiste wyniki botów na tym przedmiocie z logu ulepszeń (od 20 prób, np. Miecz+5: 56% z 312 prób przy 60% w tabeli); „Bez porażki od +0” to szansa dojścia do danego plusa bez jednej porażki.
+- [panel] Giełda: bonusy przedmiotu jako kolorowe „pigułki” w wierszu oferty — kolor zależy od rodzaju bonusu: niebieski obrona i odporności, zielononiebieski atak (Silny przeciw, obrażenia, cios krytyczny), fioletowy życie i statystyki (Maks. PŻ, Siła, regeneracja, kradzież), pomarańczowy szybkość i bonusy (yang, exp, drop), szary reszta; czerwone dla wartości ujemnych. Bonusy wbudowane w przedmiot są tylko obrysowane, dodane — wypełnione.
+
 ## 2.21.1-lexiw.9 — 2026-10-10 — Giełda: oferty ze wszystkich sklepów
 
 - [panel] Gospodarka → Giełda (oferty): wszystkie oferty ze sklepów offline w jednej liście — ikona, nazwa z plusem, bonusy, ilość, cena za sztukę i stosu, sprzedawca z linkiem do karty, mapa i nazwa sklepu. Kategorie po lewej (miecze, sztylety, łuki, zbroje, hełmy, buty, kamienie, księgi, materiały…) z liczbą ofert; filtry: nazwa/VNUM, klasa, poziom, plus, bonus (i jego minimalna wartość), cena za sztukę; sortowanie po cenie i wieku; 50 ofert na stronę.

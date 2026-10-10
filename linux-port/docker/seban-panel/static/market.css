@@ -29,3 +29,13 @@
 .market-icon .item-tip{left:calc(100% + 10px)!important;bottom:auto!important;top:-6px;transform:none!important;width:260px;text-align:center}
 .market-icon:hover .item-tip,.market-icon:focus .item-tip{display:block}
 @media(min-width:1001px){.market-main .table-wrap{overflow:visible}}
+/* Bonus pills: colour by what the bonus does; built-in ones are outlined, added ones filled. */
+.market-pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;max-width:420px}
+.pill{padding:1px 8px;border-radius:5px;font-size:12px;line-height:1.5;border:1px solid transparent;color:#fff;white-space:nowrap}
+.pill--defence{background:#2f46a8;border-color:#4a63d6}
+.pill--attack{background:#0e7c70;border-color:#17a899}
+.pill--vital{background:#6b21a8;border-color:#9333ea}
+.pill--utility{background:#8a5a0c;border-color:#c98a1a}
+.pill--other{background:#3a4560;border-color:#56637f}
+.pill.native{background:transparent;color:color-mix(in srgb,var(--text) 80%,var(--muted))}
+.pill.negative{background:#7a2230;border-color:#b3394c;color:#ffd9de}

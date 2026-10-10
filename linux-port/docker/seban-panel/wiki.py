@@ -15,6 +15,7 @@ install_wiki(module) is called at the end of app.py with app.py itself, the
 way item_grants.py is: the helpers stay where they are, in one place.
 """
 import re
+import time
 from collections import defaultdict
 
 from flask import abort, jsonify, render_template, request
@@ -245,6 +246,8 @@ def install_wiki(m):
             out.append(m.apply_text(apply_type, value))
         return out
 
+    _refine_tally_cache = {}
+
     def refine_chain(row):
         """Every level of the item: back through the items that refine into
         it, forward through refined_vnum - each level its own vnum."""
@@ -266,10 +269,56 @@ def install_wiki(m):
         if len(chain) < 2:
             return []
         marks = ",".join(["%s"] * len(chain))
-        names = {int(r["vnum"]): m.game_text(r["locale_name"] or r["name"])
-                 for r in m.rows(f"SELECT vnum,name,locale_name FROM player.item_proto WHERE vnum IN ({marks})", chain)}
-        return [{"vnum": v, "name": names.get(v, f"VNUM {v}"), "icon": m.item_icon_url(v), "current": v == vnum,
-                 "stats": [s for s in m.item_base_stats(v) if not s.startswith("Wymagany poziom:")]} for v in chain]
+        protos = {int(r["vnum"]): r for r in m.rows(
+            f"SELECT i.vnum,i.name,i.locale_name,i.refine_set,r.cost,r.prob,"
+            f"r.vnum0,r.count0,r.vnum1,r.count1,r.vnum2,r.count2,r.vnum3,r.count3,r.vnum4,r.count4 "
+            f"FROM player.item_proto i LEFT JOIN world.refine_proto r ON r.id=i.refine_set WHERE i.vnum IN ({marks})", chain)}
+        names = {v: m.game_text(r["locale_name"] or r["name"]) for v, r in protos.items()}
+        # What the bots really got at each step of this very item (the
+        # refinelog keeps the name of the item before the step and its +N).
+        observed = {}
+        try:
+            raw = [(v, (protos[v]["locale_name"] or protos[v]["name"] or "")[:24]) for v in chain if v in protos]
+            if raw:
+                key, now = tuple(name for _v, name in raw), time.time()
+                cached = _refine_tally_cache.get(key)
+                if not cached or now - cached[0] > 600:
+                    # The log has hundreds of thousands of rows and no index on the name.
+                    cached = (now, {r["item_name"]: r for r in m.rows(
+                        "SELECT item_name, COUNT(*) AS tries, SUM(is_success) AS wins FROM log.refinelog WHERE item_name IN ("
+                        + ",".join(["%s"] * len(raw)) + ") GROUP BY item_name", list(key))})
+                    _refine_tally_cache[key] = cached
+                tally = cached[1]
+                for v, name in raw:
+                    if name in tally and int(tally[name]["tries"]) >= 20:
+                        observed[v] = {"tries": int(tally[name]["tries"]), "pct": round(100 * int(tally[name]["wins"] or 0) / int(tally[name]["tries"]))}
+        except m.pymysql.MySQLError:
+            pass
+        material_vnums = {int(p[f"vnum{i}"]) for p in protos.values() for i in range(5) if p.get(f"vnum{i}")}
+        material_names = {}
+        if material_vnums:
+            for r in m.rows("SELECT vnum,name,locale_name FROM player.item_proto WHERE vnum IN (" + ",".join(["%s"] * len(material_vnums)) + ")",
+                            sorted(material_vnums)):
+                material_names[int(r["vnum"])] = m.game_text(r["locale_name"] or r["name"])
+        levels, chance = [], 1.0
+        for v in chain:
+            p = protos.get(v, {})
+            step = None
+            if p.get("prob") is not None and int(p.get("refine_set") or 0):
+                step = {"chance": int(p["prob"]), "cost": int(p["cost"] or 0),
+                        "materials": [{"vnum": int(p[f"vnum{i}"]), "name": material_names.get(int(p[f"vnum{i}"]), f"VNUM {p[f'vnum{i}']}"),
+                                       "icon": m.item_icon_url(p[f"vnum{i}"]), "count": int(p[f"count{i}"])}
+                                      for i in range(5) if p.get(f"vnum{i}")]}
+            levels.append({"vnum": v, "name": names.get(v, f"VNUM {v}"), "icon": m.item_icon_url(v), "current": v == vnum,
+                           "stats": [s for s in m.item_base_stats(v) if not s.startswith("Wymagany poziom:")],
+                           "step": step, "observed": observed.get(v), "reach": None})
+        # The chance of arriving at each level from the first one without a
+        # single failure: the product of the steps before it.
+        for level in levels:
+            level["reach"] = round(chance * 100, 1)
+            if level["step"]:
+                chance *= level["step"]["chance"] / 100
+        return levels
 
     def npc_sale(row):
         """What an NPC pays for one, as CShopManager::Sell counts it: the

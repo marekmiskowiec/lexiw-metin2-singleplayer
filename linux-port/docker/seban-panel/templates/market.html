@@ -43,7 +43,7 @@
       <table class="market-table"><thead><tr><th>Przedmiot</th><th>Ilość</th><th>Za sztukę</th><th>Cena stosu</th><th>vs rynek</th><th>Wiek</th><th>Sprzedawca</th></tr></thead><tbody>
       {% for o in offers %}<tr>
         <td class="market-item"><span class="market-icon" tabindex="0">{% if o.icon_url %}<img src="{{ o.icon_url }}" alt="" loading="lazy">{% else %}<i>{{ o.vnum }}</i>{% endif %}{{ tooltip(o, o.price) }}</span><div><a href="{{ url_for('economy_item', vnum=o.vnum) }}"><b>{{ o.item_name }}</b></a>
-          {% if o.bonuses %}<ul class="market-bonus">{% for b in o.bonuses %}<li class="{{ b.source }}">{{ b.text }}</li>{% endfor %}</ul>{% endif %}</div></td>
+          {% if o.bonuses %}<div class="market-pills">{% for b in o.bonuses %}<span class="pill pill--{{ b.kind }} {{ b.source }}{{ ' negative' if b.negative }}">{{ b.text }}</span>{% endfor %}</div>{% endif %}</div></td>
         <td data-sort="{{ o.count }}">{{ o.count }}</td>
         <td data-sort="{{ o.unit }}"><b>{{ yang(o.unit) }}</b>{% if o.unit >= 1000 %}<small class="muted"> {{ short(o.unit) }}</small>{% endif %}</td>
         <td data-sort="{{ o.price }}">{{ yang(o.price) }}</td>

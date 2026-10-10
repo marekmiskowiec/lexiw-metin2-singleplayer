@@ -45,3 +45,5 @@
 .wiki-count{font-size:12px;color:var(--muted);white-space:nowrap}
 .wiki-toc{margin:12px 0}
 @media(max-width:900px){.wiki-personalities{grid-template-columns:1fr}}
+.wiki-mats a{display:inline-flex;align-items:center;gap:4px;margin-right:10px;white-space:nowrap}
+.wiki-mats img{width:20px;height:20px;object-fit:contain}

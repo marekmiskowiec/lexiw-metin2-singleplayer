@@ -35,9 +35,13 @@
 {% if chain %}
 <section class="panel">
   <h2>Poziomy ulepszeń</h2>
-  <table data-table-tools="off" class="wiki-chain"><thead><tr><th>Poziom</th><th>Statystyki</th></tr></thead><tbody>
-  {% for level in chain %}<tr class="{{ 'current' if level.current else '' }}"><td class="item-cell">{% if level.current %}{% if level.icon %}<img src="{{ level.icon }}" alt="" loading="lazy">{% endif %}<b>{{ level.name }}</b>{% else %}<a href="{{ url_for('wiki_item', vnum=level.vnum) }}">{% if level.icon %}<img src="{{ level.icon }}" alt="" loading="lazy">{% endif %}{{ level.name }}</a>{% endif %}</td><td>{{ level.stats|join(' · ') or '—' }}</td></tr>{% endfor %}
-  </tbody></table>
+  <div class="table-wrap"><table data-table-tools="off" class="wiki-chain"><thead><tr><th>Poziom</th><th>Statystyki</th><th title="Do następnego plusa, u kowala">Szansa</th><th>Koszt</th><th>Materiały</th><th title="Wyniki botów na tym przedmiocie, od 20 prób">U botów</th><th title="Szansa dojścia z najniższego plusa bez żadnej porażki">Bez porażki od +0</th></tr></thead><tbody>
+  {% for level in chain %}<tr class="{{ 'current' if level.current else '' }}"><td class="item-cell">{% if level.current %}{% if level.icon %}<img src="{{ level.icon }}" alt="" loading="lazy">{% endif %}<b>{{ level.name }}</b>{% else %}<a href="{{ url_for('wiki_item', vnum=level.vnum) }}">{% if level.icon %}<img src="{{ level.icon }}" alt="" loading="lazy">{% endif %}{{ level.name }}</a>{% endif %}</td><td>{{ level.stats|join(' · ') or '—' }}</td>
+    {% if level.step %}<td><b>{{ level.step.chance }}%</b></td><td>{{ '{:,}'.format(level.step.cost).replace(',', ' ') }}</td><td class="wiki-mats">{% for mat in level.step.materials %}<a href="{{ url_for('wiki_item', vnum=mat.vnum) }}">{% if mat.icon %}<img src="{{ mat.icon }}" alt="" loading="lazy">{% endif %}{{ mat.name }}{% if mat.count > 1 %} ×{{ mat.count }}{% endif %}</a>{% else %}<span class="muted">—</span>{% endfor %}</td><td>{% if level.observed %}{{ level.observed.pct }}% <small class="muted">({{ '{:,}'.format(level.observed.tries).replace(',', ' ') }} prób)</small>{% else %}<span class="muted">—</span>{% endif %}</td>
+    {% else %}<td class="muted" colspan="4">najwyższy poziom</td>{% endif %}
+    <td>{{ ('%.1f'|format(level.reach)).replace('.', ',').replace(',0', '') }}%</td></tr>{% endfor %}
+  </tbody></table></div>
+  <p class="muted wiki-note">Szansa, koszt (yang) i materiały są z tabeli ulepszeń serwera dla przedmiotu o tym poziomie i dotyczą ulepszenia go u kowala na następny plus. Zwoje (np. Błogosławieństwa) działają osobno. „U botów” to ich rzeczywiste wyniki z logu ulepszeń.</p>
 </section>
 {% endif %}
 

@@ -14,6 +14,7 @@ of the last snapshot, like the Rynek page does.
 
 install_market(module) is called from app.py the way install_wiki is.
 """
+import re
 from datetime import datetime
 
 import pymysql
@@ -72,6 +73,23 @@ def median(values):
         return 0
     middle = len(values) // 2
     return values[middle] if len(values) % 2 else (values[middle - 1] + values[middle]) / 2
+
+
+# A bonus's colour by what it does, from the words of its label. First match wins.
+BONUS_KINDS = (
+    ("defence", ("Odporność", "Odbicie", "blok", "unik", "Pochłanianie", "Wartość obrony", "obrażenia niższe")),
+    ("attack", ("Silny przeciw", "Obrażenia umiejętności", "Średnie obrażenia", "Wartość ataku", "Magiczny atak",
+                "cios krytyczny", "przeszywający", "Szansa na otrucie", "omdlenie", "spowolnienie", "Zasięg")),
+    ("vital", ("Maks.", "Regeneracja", "Kradzież", "Witalność", "Siła", "Zręczność", "Inteligencja", "PŻ", "PM", "PE")),
+    ("utility", ("Szybkość", "Bonus", "Czas trwania", "Szansa na zdobycie", "Energia")),
+)
+
+
+def bonus_kind(text):
+    for kind, words in BONUS_KINDS:
+        if any(word in text for word in words):
+            return kind
+    return "other"
 
 
 def age_text(first_seen, now):
@@ -209,6 +227,10 @@ def install_market(m):
           FROM {FLAT} LEFT JOIN player.item_proto p ON p.vnum = f.vnum
           WHERE {where} ORDER BY {order}, f.item_id LIMIT %s OFFSET %s""", params + [PER_PAGE, (page - 1) * PER_PAGE]))
         m._enrich_items(offers)
+        for offer in offers:
+            for bonus in offer["bonuses"]:
+                bonus["kind"] = bonus_kind(bonus["text"])
+                bonus["negative"] = bool(re.search(r"[−-]\d", bonus["text"]))
         # The market's median per piece of every item on this page: what
         # "cheap" and "dear" mean for it.
         medians = {}
