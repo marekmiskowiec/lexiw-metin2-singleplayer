@@ -1,0 +1,47 @@
+{% extends 'base.html' %}{% block title %}Majątek botów · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('bot-activity.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('observe.css') }}">
+{% set axis = "{ticks:{color:'#8fa5c1',maxTicksLimit:10}}" %}
+{%- macro fmt(n) -%}{{ '{:,}'.format((n or 0)|int).replace(',', ' ') }}{%- endmacro -%}
+{%- macro short(n) -%}{% if n >= 1000000 %}{{ ('%.2f'|format(n / 1000000)).rstrip('0').rstrip('.').replace('.', ',') }} mln{% elif n >= 1000 %}{{ ('%.1f'|format(n / 1000)).rstrip('0').rstrip('.').replace('.', ',') }} tys.{% else %}{{ n|round|int }}{% endif %}{%- endmacro -%}
+<p class="eyebrow">GOSPODARKA</p><h1>Majątek botów</h1>
+<p class="muted">Ile yang mają boty, jak jest rozłożone i kto najwięcej sprzedaje. Dotyczy {{ fmt(w.bots) }} botów od {{ w.min_level }}. poziomu (także tych, które akurat nie są online); pominięto {{ fmt(w.idle) }} tożsamości, które nie zaczęły grać i mają jeszcze startową sakiewkę. Wartość ofert to ceny z ich straganów, liczone ze zrzutu sprzed kilku minut. Wskaźnik Giniego: 0 = wszyscy mają tyle samo, 1 = jeden ma wszystko.</p>
+
+<div class="trend-grid">
+  <article class="trend-card"><span>Yang w rękach botów</span><strong>{{ short(w.total_gold) }}</strong><small>{{ fmt(w.total_gold) }} yang</small></article>
+  <article class="trend-card"><span>Mediana bota</span><strong>{{ fmt(w.median) }}</strong><small>średnia {{ fmt(w.mean) }}, rekord {{ fmt(w.max) }}</small></article>
+  <article class="trend-card"><span>Nierówność (Gini)</span><strong>{{ ('%.2f'|format(w.gini)).replace('.', ',') }}</strong><small>najbogatsze 1%: {{ w.top1_pct|string|replace('.', ',') }}% · 10%: {{ w.top10_pct|string|replace('.', ',') }}%</small></article>
+  <article class="trend-card"><span>Wystawione na straganach</span><strong>{{ short(w.shop_total) }}</strong><small>{{ fmt(w.shops) }} sklepów{% if (w.total_gold + w.shop_total) %} · {{ (w.shop_total * 100 / (w.total_gold + w.shop_total))|round(1)|string|replace('.', ',') }}% majątku w ofertach{% endif %}</small></article>
+</div>
+
+<div class="act-grid">
+  <section class="panel"><h2>Ilu botów ma ile yang</h2>
+    <canvas id="wb" height="150"></canvas>
+    <script>new Chart(document.getElementById('wb'),{type:'bar',data:{labels:{{ w.brackets|map(attribute='label')|list|tojson }},datasets:[{label:'Boty',data:{{ w.brackets|map(attribute='bots')|list|tojson }},backgroundColor:'#f2c34dcc',borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{x:{{ axis|safe }},y:{ticks:{color:'#8fa5c1'}}}}});</script>
+  </section>
+  <section class="panel table-wrap"><h2>Kto ma jaką część yang</h2>
+    <table><thead><tr><th>Przedział</th><th>Boty</th><th>% botów</th><th>Yang</th><th>% yang</th></tr></thead><tbody>
+    {% for b in w.brackets %}<tr><td>{{ b.label }}</td><td>{{ fmt(b.bots) }}</td><td>{{ b.bots_pct|string|replace('.', ',') }}%</td><td>{{ short(b.yang) }}</td><td><b>{{ b.yang_pct|string|replace('.', ',') }}%</b></td></tr>{% endfor %}
+    </tbody></table></section>
+</div>
+
+<section class="panel table-wrap"><h2>Majątek według poziomu</h2>
+  <table><thead><tr><th>Poziom</th><th>Boty</th><th>Mediana yang</th><th>Średnio yang</th><th>Razem</th></tr></thead><tbody>
+  {% for r in w.by_level %}<tr><td>{{ r.label }}</td><td>{{ r.bots }}</td><td data-sort="{{ r.median }}">{{ fmt(r.median) }}</td><td data-sort="{{ r.mean }}">{{ fmt(r.mean) }}</td><td data-sort="{{ r.total }}">{{ short(r.total) }}</td></tr>{% endfor %}
+  </tbody></table>
+  <p class="muted wiki-note">Przedziały z mniej niż 5 botami są pominięte.</p></section>
+
+<div class="act-grid">
+  <section class="panel table-wrap"><h2>Najbogatsze boty</h2>
+    <table><thead><tr><th>Bot</th><th>Poziom</th><th>Yang</th><th>W ofertach</th><th>Razem</th></tr></thead><tbody>
+    {% for b in w.richest %}<tr><td><a href="{{ url_for('player', pid=b.id) }}">{{ b.name }}</a></td><td>{{ b.level }}</td><td>{{ fmt(b.gold) }}</td><td>{% if b.offers %}{{ short(b.shop) }} <small class="muted">({{ b.offers }})</small>{% else %}<span class="muted">—</span>{% endif %}</td><td><b>{{ short(b.gold + b.shop) }}</b></td></tr>{% endfor %}
+    </tbody></table></section>
+  <section class="panel table-wrap"><h2>Najwięcej sprzedają · 7 dni</h2>
+    <table><thead><tr><th>Sprzedawca</th><th>Poziom</th><th>Sprzedaży</th><th>Obrót</th></tr></thead><tbody>
+    {% for s in w.sellers %}<tr><td><a href="{{ url_for('player', pid=s.id) }}">{{ s.name }}</a></td><td>{{ s.level or '—' }}</td><td>{{ s.sales }}</td><td><b>{{ fmt(s.yang) }}</b></td></tr>
+    {% else %}<tr><td colspan="4" class="muted">Brak sprzedaży w tym czasie.</td></tr>{% endfor %}
+    </tbody></table>
+    <p class="muted wiki-note">Z logu zakupów botów na straganach: razem {{ fmt(w.sales_total) }} sprzedaży za {{ short(w.sales_yang) }} yang.</p></section>
+</div>
+{% endblock %}

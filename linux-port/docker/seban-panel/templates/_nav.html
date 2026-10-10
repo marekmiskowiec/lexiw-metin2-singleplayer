@@ -27,6 +27,8 @@
     {'ep': 'accounts', 'label': 'Konta', 'desc': 'konta serwera, zakładanie kont', 'kw': 'login konto rejestracja'},
     {'ep': 'bot_personalities', 'label': 'Osobowości botów', 'desc': 'charaktery zalogowanych botów', 'kw': 'osobowosc charakter'},
     {'ep': 'bot_activity', 'label': 'Aktywność botów', 'desc': 'co robią boty teraz i w ciągu doby: czynności, cele, mapy, postoje', 'kw': 'aktywnosc czynnosc cel ambicja statystyki zachowan stoi postoj'},
+    {'ep': 'bot_progress', 'label': 'Rozwój botów', 'desc': 'poziomy botów, tempo awansu, kto stoi w miejscu', 'kw': 'rozwoj poziomy tempo awans exp levelowanie ile godzin ściana'},
+    {'ep': 'bot_deaths', 'label': 'Śmierci botów', 'desc': 'co i gdzie zabija boty, na jakich poziomach', 'kw': 'smierci zgony ginie zabija potwory niebezpieczne'},
     {'ep': 'bot_progression', 'index': 1, 'label': 'Progresja botów', 'desc': 'kto stoi i dlaczego, checklista, postoje w wioskach', 'kw': 'postoj checklista wedkowanie przejscia mapy grinder'},
     {'ep': 'bot_names', 'index': 1, 'label': 'Nazwy botów', 'desc': 'kolejka nicków, blokady, priorytety', 'kw': 'nick nazwy kolejka'},
     {'ep': 'retired_bots', 'index': 1, 'label': 'Emerytury botów', 'desc': 'boty, które zakończyły grę', 'kw': 'emerytura zakonczenie gry retired'},
@@ -42,6 +44,8 @@
   {'id': 'gospodarka', 'icon': '◇', 'label': 'Gospodarka', 'items': [
     {'ep': 'economy', 'label': 'Przedmioty w obiegu', 'desc': 'yang w obiegu, najczęstsze przedmioty', 'kw': 'gospodarka yang balans stan przedmiotow'},
     {'ep': 'market', 'label': 'Giełda (oferty)', 'desc': 'wszystkie oferty ze sklepów: kategorie, filtry, ceny i okazje', 'kw': 'gielda oferty rynek ceny sklepy szukaj okazje tanie filtr bonus'},
+    {'ep': 'economy_wealth', 'label': 'Majątek botów', 'desc': 'ile yang mają boty, nierówność, najbogatsi, najwięksi sprzedawcy', 'kw': 'majatek bogaci yang gini nierownosc sprzedawcy obrot'},
+    {'ep': 'market_index', 'label': 'Indeks cen i obieg yang', 'desc': 'jak zmieniają się ceny i ile yang krąży', 'kw': 'indeks cen inflacja obieg yang obrot koszyk'},
     {'ep': 'economy_shops', 'label': 'Rynek (sklepy offline)', 'desc': 'stragany, ceny, sprzedaże', 'kw': 'sklepy stragan ceny rynek handel'},
     {'ep': 'economy_itemshop', 'label': 'ItemShop i Smocze Monety', 'desc': 'waluty kont i zakupy', 'kw': 'itemshop sm smocze monety znaki'},
     {'ep': 'drops', 'label': 'Drop z potworów', 'desc': 'edytor dropu potworów', 'kw': 'drop potwory mob loot'},
@@ -57,6 +61,7 @@
   {'id': 'narzedzia', 'icon': '🛠', 'label': 'Narzędzia', 'items': [
     {'ep': 'character_creator', 'label': 'Kreator postaci', 'desc': 'nowa postać na wybranym koncie', 'kw': 'stworz postac'},
     {'ep': 'gm_commands', 'label': 'Komendy GM', 'desc': 'ściąga komend GM', 'kw': 'gm komendy'},
+    {'ep': 'system_cores', 'label': 'Rdzenie gry', 'desc': 'CPU, pamięć i boty każdego rdzenia, wiek statusu', 'kw': 'rdzenie rdzen core cpu obciazenie boty kanal game1 limit'},
     {'ep': 'system', 'label': 'Wydajność serwera', 'desc': 'CPU, pamięć i dysk', 'kw': 'cpu ram dysk obciazenie'},
     {'ep': 'diagnostics', 'label': 'Diagnostyka wędkowania', 'desc': 'boty łowiące i wpisy z logów', 'kw': 'wedkowanie lowienie ryby'},
     {'ep': 'panel_logs', 'label': 'Logi panelu', 'desc': 'ostatnie wpisy panelu, pobieranie', 'kw': 'logi bledy'},
@@ -73,7 +78,7 @@
   'player': 'players', 'account_detail': 'accounts', 'guild': 'guilds',
   'economy_item': 'economy', 'chest_edit': 'chests', 'drop_edit': 'drops',
   'daily_summary': 'dashboard',
-  'wiki_item': 'wiki', 'wiki_mob': 'wiki', 'wiki_map': 'wiki_maps', 'wiki_region': 'wiki_maps',
+  'market_item': 'market', 'wiki_item': 'wiki', 'wiki_mob': 'wiki', 'wiki_map': 'wiki_maps', 'wiki_region': 'wiki_maps',
 } -%}
 {%- set nav_sections = [
   {'ep': 'manage', 'anchor': 'raty-i-restart', 'label': 'Raty, liczba botów, ustawienia z restartem', 'short': 'Raty i restart', 'part': 'Serwer'},

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}{% block title %}Rdzenie gry · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('bot-activity.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('observe.css') }}">
+{% set axis = "{ticks:{color:'#8fa5c1',maxTicksLimit:10}}" %}
+<p class="eyebrow">NARZĘDZIA</p><h1>Rdzenie gry</h1>
+<p class="muted">Każdy proces gry z liczbą botów, obciążeniem procesora i pamięcią. Rdzenie są jednowątkowe: <b>100% to jeden procesor zajęty w pełni</b>, więc rdzeń przy 90% i więcej jest na granicy — dalsze boty na nim zwolnią całą grę. Wiek pliku statusu to czas od ostatniego zapisu rdzenia (powyżej 25 s rdzeń uznajemy za zawieszony).</p>
+{% if not cores %}<p class="muted">Collector nie zapisał jeszcze migawki rdzeni (do 5 minut od startu).</p>{% else %}
+<p class="muted">Stan z {{ latest.strftime('%H:%M') }}, odświeżany co 5 minut.</p>
+<section class="panel table-wrap">
+  <table><thead><tr><th>Proces</th><th>Boty</th><th>CPU</th><th>Pamięć</th><th>Status rdzenia</th></tr></thead><tbody>
+  {% for c in cores %}<tr class="core-{{ c.state }}">
+    <td><b>{{ c.core }}</b>{% if not c.is_core %} <small class="muted">{{ 'baza danych' if c.core == 'db' else 'logowanie' if c.core == 'auth' else '' }}</small>{% endif %}</td>
+    <td>{{ c.bots if c.is_core else '—' }}</td>
+    <td data-sort="{{ c.cpu or 0 }}">{% if c.cpu is none %}<span class="muted">—</span>{% else %}<span class="core-bar"><i style="width:{{ [c.cpu, 100]|min }}%"></i></span> <b>{{ ('%.1f'|format(c.cpu)).replace('.', ',') }}%</b>{% endif %}</td>
+    <td>{{ c.rss }} MB</td>
+    <td>{% if c.age is none %}<span class="muted">—</span>{% elif c.state == 'stale' %}<span class="core-flag bad">nieaktualny · {{ c.age }} s</span>{% else %}<span class="core-flag ok">{{ c.age }} s temu</span>{% endif %}{% if c.state == 'limit' %} <span class="core-flag bad">na granicy</span>{% elif c.state == 'busy' %} <span class="core-flag warn">obciążony</span>{% endif %}</td>
+  </tr>{% endfor %}
+  </tbody></table>
+</section>
+{% if cpu_series %}
+<div class="act-grid">
+  <section class="panel"><h2>CPU rdzeni · 24 godziny</h2><canvas id="cpuc" height="150"></canvas></section>
+  <section class="panel"><h2>Boty na rdzeniach · 24 godziny</h2><canvas id="botc" height="150"></canvas></section>
+</div>
+<script>
+const colours=['#60a5fa','#63c993','#f2c34d','#e0786b','#c084fc','#38bdf8'];
+const labels={{ labels|tojson }};
+const line=(id,series,max)=>new Chart(document.getElementById(id),{type:'line',data:{labels,datasets:series.map((s,n)=>({label:s.core,data:s.data,borderColor:colours[n%colours.length],tension:.25,pointRadius:0,spanGaps:true}))},options:{interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#cfe0f7'}}},scales:{x:{{ axis|safe }},y:{beginAtZero:true,max:max,ticks:{color:'#8fa5c1'}}}}});
+line('cpuc',{{ cpu_series|tojson }},110);
+line('botc',{{ bot_series|tojson }});
+</script>
+{% endif %}{% endif %}
+{% endblock %}

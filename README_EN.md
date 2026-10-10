@@ -18,6 +18,22 @@ and in parties, loot, refine gear at the Blacksmith, hunt Metin stones and
 trade with each other. This pack adds new items and systems to that world,
 plus a few bot improvements.
 
+## 🔱 This copy: the Lexiw fork
+
+This repository is the **Lexiw fork** of the MT2009 Classic 2.21.1 pack,
+developed on its own without updates from the pack's author (the update channel
+is off: `authorUpdates` in `launcher\branding.json`). New upstream versions are
+brought in through Git (the `upstream` branch, then merged into `main`).
+
+- **Fork changelog:** [CHANGELOG-LEXIW.md](CHANGELOG-LEXIW.md) (versions `2.21.1-lexiw.N`; in Polish).
+- **Panel** (`http://127.0.0.1:7794`): bot activity, progress and deaths, the
+  Market (offers from every shop, prices, deals), game cores, bot wealth, server wiki.
+- **Launcher:** stopping ends with a database backup (`backups\`, last 5) and a
+  report on whether the game shut down cleanly; the server status shows the bot
+  count and core load; shortcuts to panel pages; live language switch.
+- Panel page test: `docker compose exec seban-panel python smoke_test.py`;
+  launcher test: `powershell -File tools/Test-Launcher.ps1`.
+
 ## 💬 Community
 
 - **[Discord](https://discord.com/invite/vGE3T9gpm)** — help, bug reports, ideas and news about the pack.

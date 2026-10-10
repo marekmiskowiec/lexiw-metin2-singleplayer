@@ -303,7 +303,7 @@ $script:Strings = @{
         panel        = 'OTWORZ PANEL WWW'
         client       = 'WYBIERZ KLIENTA'
         update       = 'SPRAWDZ AKTUALIZACJE'
-        bundle       = 'ZBIERZ / WYSLIJ LOGI'
+        bundle       = 'ZBIERZ LOGI (ZIP)'
         diagnostics  = 'DIAGNOSTYKA'
         openLog      = 'OTWORZ LOG'
         logFolder    = 'FOLDER LOGOW'
@@ -364,7 +364,7 @@ $script:Strings = @{
         patcherStarted = 'Uruchomiono patcher klienta (MT2009-Patcher.exe) - sprawdzi i pobierze pliki klienta, a grę uruchomisz jego przyciskiem GRAJ.'
         patcherStartFailed = 'Nie udało się uruchomić patchera klienta'
         stopAskTitle = 'Bezpieczne zatrzymanie'
-        stopAsk = "Zatrzymać serwer? Postacie, baza i postęp botów zostaną zachowane.`r`n`r`nTak - serwer i Docker Desktop (Docker zwalnia wtedy pamięć RAM).`r`nNie - sam serwer; Docker zostaje włączony dla innych programów.`r`nAnuluj - nic nie zatrzymuj."
+        stopAsk = "Zatrzymać serwer? Postacie, baza i postęp botów zostaną zachowane.`r`n`r`nTak - serwer i Docker Desktop (Docker zwalnia wtedy pamięć RAM).`r`nNie - sam serwer; Docker zostaje włączony dla innych programów.`r`nAnuluj - nic nie zatrzymuj.`r`n`r`nPo zatrzymaniu zapisze się kopia bazy (kilka minut; wyłączysz to w launcher.config.json: autoBackup)."
         clientBlockedTitle = 'Windows zablokował klienta'
         clientBlockedPolicy = "Windows nie pozwolił uruchomić klienta gry (metin2client.exe). Zrobiła to Inteligentna kontrola aplikacji (Smart App Control): blokuje programy bez podpisu cyfrowego, których Microsoft nie zna, a klient gry takiego podpisu nie ma.`r`n`r`nTa funkcja nie ma listy wyjątków. Klient uruchomi się dopiero po jej wyłączeniu: Ustawienia > Prywatność i zabezpieczenia > Zabezpieczenia Windows > Kontrola aplikacji i przeglądarki > Ustawienia inteligentnej kontroli aplikacji > Wyłączone. Windows może potem nie pozwolić włączyć jej z powrotem bez ponownej instalacji systemu, więc zdecyduj sam.`r`n`r`nKlienta bierz tylko z pełnej paczki z Discorda projektu albo z aktualizacji w launcherze."
         clientBlockedVirus = "Program antywirusowy zablokował klienta gry (metin2client.exe). Windows Defender potrafi uznać go za zagrożenie (np. Trojan:Script/Wacatac). To fałszywy alarm: plik nie ma podpisu cyfrowego, więc ocenia go heurystyka.`r`n`r`nCo zrobić: Zabezpieczenia Windows > Ochrona przed wirusami i zagrożeniami > Historia ochrony > wpis z metin2client.exe > Akcje > Przywróć. Potem dodaj folder klienta do wykluczeń: Ochrona przed wirusami i zagrożeniami > Zarządzaj ustawieniami > Wykluczenia > Dodaj wykluczenie > Folder.`r`n`r`nWyjątek dodawaj tylko dla klienta z pełnej paczki z Discorda projektu albo z aktualizacji w launcherze."
@@ -383,7 +383,7 @@ $script:Strings = @{
         panel        = 'OPEN WEB PANEL'
         client       = 'CHOOSE CLIENT'
         update       = 'CHECK FOR UPDATES'
-        bundle       = 'COLLECT / SEND LOGS'
+        bundle       = 'COLLECT LOGS (ZIP)'
         diagnostics  = 'DIAGNOSTICS'
         openLog      = 'OPEN LOG'
         logFolder    = 'LOG FOLDER'
@@ -444,7 +444,7 @@ $script:Strings = @{
         patcherStarted = 'Started the client patcher (MT2009-Patcher.exe) - it checks and downloads the client files; start the game with its PLAY button.'
         patcherStartFailed = 'Could not start the client patcher'
         stopAskTitle = 'Safe stop'
-        stopAsk = "Stop the server? Characters, the database and the bots' progress are kept.`r`n`r`nYes - the server and Docker Desktop (Docker then frees its RAM).`r`nNo - the server only; Docker stays on for other programs.`r`nCancel - stop nothing."
+        stopAsk = "Stop the server? Characters, the database and the bots' progress are kept.`r`n`r`nYes - the server and Docker Desktop (Docker then frees its RAM).`r`nNo - the server only; Docker stays on for other programs.`r`nCancel - stop nothing.`r`n`r`nAfter the stop a copy of the database is saved (a few minutes; turn it off with autoBackup in launcher.config.json)."
         clientBlockedTitle = 'Windows blocked the client'
         clientBlockedPolicy = "Windows would not start the game client (metin2client.exe). Smart App Control did it: it blocks programs without a digital signature that Microsoft does not know, and the game client has no such signature.`r`n`r`nIt has no list of exceptions. The client starts only once it is off: Settings > Privacy & security > Windows Security > App & browser control > Smart App Control settings > Off. Windows may not let you turn it back on without reinstalling the system, so decide for yourself.`r`n`r`nOnly take the client from the project's full package on Discord or from an update in the launcher."
         clientBlockedVirus = "An antivirus blocked the game client (metin2client.exe). Windows Defender can take it for a threat (e.g. Trojan:Script/Wacatac). It is a false alarm: the file has no digital signature, so a heuristic judges it.`r`n`r`nWhat to do: Windows Security > Virus & threat protection > Protection history > the entry for metin2client.exe > Actions > Restore. Then exclude the client folder: Virus & threat protection > Manage settings > Exclusions > Add an exclusion > Folder.`r`n`r`nOnly make that exception for the client from the project's full package on Discord or from an update in the launcher."
@@ -474,6 +474,12 @@ function Switch-LauncherLanguage {
     Save-M2LauncherConfig -Config $config -ConfigPath $configPath
     $script:Lang = $config.language
     Write-LocalLog ("Language: {0}" -f $config.language)
+    # Lexiw: the window changes at once (Layout.ps1); the restart message is
+    # only for a copy without that function.
+    if (Get-Command Update-LauncherLanguageLive -ErrorAction SilentlyContinue) {
+        Update-LauncherLanguageLive
+        return
+    }
     [Windows.Forms.MessageBox]::Show((T 'langSwitched'), (T 'formTitle'),
         [Windows.Forms.MessageBoxButtons]::OK,
         [Windows.Forms.MessageBoxIcon]::Information) | Out-Null
@@ -781,7 +787,22 @@ function Refresh-Status {
             'compose --project-directory "{0}" -f "{1}" ps --services --status running' -f $composeDirectory, $composeFile) -TimeoutMs 1800
         $serverRunning = $result.ExitCode -eq 0 -and $result.Output -match '(?m)^game\s*$'
     }
-    $script:serverStatus.Text = if ($serverRunning) { 'Serwer: DZIAŁA' } else { 'Serwer: ZATRZYMANY' }
+    # Lexiw: while the game runs, the panel says how many bots are in the world
+    # and how hard the busiest core works (/api/launcher-status; silent if the
+    # panel is not up yet).
+    $liveText = ''
+    if ($serverRunning) {
+        try {
+            $live = Invoke-RestMethod -Uri 'http://127.0.0.1:7794/api/launcher-status' -TimeoutSec 1 -ErrorAction Stop
+            if ($live.bots -gt 0) {
+                $liveText = if ($script:Lang -eq 'en') { " · $($live.bots) bots" } else { " · $($live.bots) botów" }
+                $cpus = @($live.cores | Where-Object { $null -ne $_.cpu } | ForEach-Object { [double]$_.cpu })
+                if ($cpus.Count -gt 0) { $liveText += (' · CPU {0:N0}%' -f ($cpus | Measure-Object -Maximum).Maximum) }
+            }
+        }
+        catch { }
+    }
+    $script:serverStatus.Text = if ($serverRunning) { "Serwer: DZIAŁA$liveText" } else { 'Serwer: ZATRZYMANY' }
     $script:serverStatus.ForeColor = if ($serverRunning) { [Drawing.Color]::LightGreen } else { [Drawing.Color]::Silver }
 
     if ($script:versionLabel) { Update-VersionFooter }
@@ -2909,7 +2930,52 @@ function Set-LatestVersionsFromManifest {
     }
 }
 
+$script:lexiwVersionInfo = $null
+function Get-LexiwVersionInfo {
+    # Lexiw: what this copy is - the fork's own version (the newest heading of
+    # CHANGELOG-LEXIW.md), the author's package it stands on (VERSION) and the
+    # commit, when git is there. Read once per session.
+    if ($script:lexiwVersionInfo) { return $script:lexiwVersionInfo }
+    $info = @{ Lexiw = 'nieznana'; Package = ''; Commit = '' }
+    try {
+        $root = $PSScriptRoot
+        $changelog = Join-Path $root 'CHANGELOG-LEXIW.md'
+        if (Test-Path -LiteralPath $changelog) {
+            $heading = Select-String -LiteralPath $changelog -Pattern '^##\s+(\d+\.\d+\.\d+-lexiw\.\d+)' | Select-Object -First 1
+            if ($heading) { $info.Lexiw = $heading.Matches[0].Groups[1].Value }
+        }
+        $versionFile = Join-Path $root 'VERSION'
+        if (Test-Path -LiteralPath $versionFile) { $info.Package = ([string](Get-Content -LiteralPath $versionFile -TotalCount 1)).Trim() }
+        if ((Test-Path -LiteralPath (Join-Path $root '.git')) -and (Get-Command git -ErrorAction SilentlyContinue)) {
+            $commit = & git -C $root rev-parse --short HEAD 2>$null
+            if ($commit) { $info.Commit = ([string]$commit).Trim() }
+        }
+    }
+    catch { }
+    $script:lexiwVersionInfo = $info
+    return $info
+}
+
 function Update-VersionFooter {
+    if (-not (Test-M2AuthorUpdatesEnabled)) {
+        # Lexiw: the author's channel is off, so there is no "newest" to show -
+        # the box says which copy of the fork this is.
+        $info = Get-LexiwVersionInfo
+        $client = Get-InstalledClientVersion
+        $en = $script:Lang -eq 'en'
+        $lines = @("Lexiw: $($info.Lexiw)")
+        if ($info.Commit) { $lines += "Commit: $($info.Commit)" }
+        if ($info.Package) { $lines += "$(if ($en) { 'MT2009 package' } else { 'Paczka MT2009' }): $($info.Package)" }
+        $lines += "$(if ($en) { 'Client' } else { 'Klient' }): $(if ($client -and $client -ne 'unknown') { $client } elseif ($en) { 'unknown' } else { 'nieznana' })"
+        $backup = $null
+        try { $backup = Get-M2LastBackup -BackupRoot (Join-Path $root 'backups') } catch { }
+        $lines += "$(if ($en) { 'Last backup' } else { 'Ostatnia kopia' }): $(if ($backup) { '{0} ({1:N0} MB)' -f $backup.When.ToString('dd.MM HH:mm'), ($backup.Bytes / 1MB) } elseif ($en) { 'none yet' } else { 'brak' })"
+        $script:versionLabel.Text = $lines -join "`r`n"
+        $script:updateAvailable = $false
+        $script:versionBaseColor = [Drawing.Color]::Silver
+        $script:versionLabel.ForeColor = $script:versionBaseColor
+        return
+    }
     # The manifest lives behind GitHub's anonymous per-IP budget, so it is read
     # once per session and whenever the player asks for a check - never on the
     # 8-second status timer, which would spend that budget for nothing.

@@ -17,3 +17,4 @@
 .act-legend span{display:inline-flex;align-items:center;gap:6px}
 .act-legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
 @media(max-width:900px){.act-grid{grid-template-columns:1fr}}
+.act-col{max-width:56px}

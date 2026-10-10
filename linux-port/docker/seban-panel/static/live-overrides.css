@@ -342,3 +342,17 @@ body[data-theme="empire"]{--live-surface:#241a12;--live-surface-strong:#1a1109;-
 .world-map[data-map-index="366"]{background-image:linear-gradient(#00000012,#00000012),url('maps/arezzo-ancient-jungle.png')}
 .world-map[data-map-index="209"],.world-map[data-map-index="360"],.world-map[data-map-index="361"],.world-map[data-map-index="362"],.world-map[data-map-index="363"],.world-map[data-map-index="364"],.world-map[data-map-index="365"],.world-map[data-map-index="366"]{aspect-ratio:1!important}
 @media(min-width:1351px) and (max-width:2199px){.world-map[data-map-index="209"],.world-map[data-map-index="360"],.world-map[data-map-index="361"],.world-map[data-map-index="362"],.world-map[data-map-index="363"],.world-map[data-map-index="364"],.world-map[data-map-index="365"],.world-map[data-map-index="366"]{max-width:min(520px,100%)!important}}
+
+/* Lexiw: the dashboard's live map on a phone (found by measuring what leaves the screen at 280-430 px):
+   the filter buttons, the "N botów" badge and the mode select were wider than the screen, and the
+   300 px sidebar column kept the map from shrinking. */
+@media(max-width:640px){
+  .live-grid,.live-dashboard-grid{grid-template-columns:minmax(0,1fr)!important}
+  .live-grid>.live-sidebar{grid-column:1!important;grid-row:auto!important}
+  .level-filter{display:flex!important;flex-wrap:wrap;max-width:100%}
+  .live-badge{display:block;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+  .live-filters{flex-wrap:wrap}
+  .live-filters select,.live-filters label,.live-filters input{max-width:100%;min-width:0}
+  .dashboard-widgets article>header{flex-wrap:wrap}
+  .ranking-carousel-controls{flex-wrap:wrap;max-width:100%}
+}

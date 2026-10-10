@@ -13,10 +13,16 @@
     <div class="page-tabs" data-tabs role="tablist" aria-label="Karta postaci"><a href="#karta-przeglad" role="tab" data-tab="przeglad">📋 Przegląd</a><a href="#karta-statystyki" role="tab" data-tab="statystyki">📊 Statystyki i umiejętności</a>{% if offline_shop %}<a href="#karta-sklep" role="tab" data-tab="sklep">🏪 Sklep offline</a>{% endif %}<a href="#karta-historia" role="tab" data-tab="historia">📜 Historia i logi</a><a href="#karta-nagrody" role="tab" data-tab="nagrody">🎁 Przedmioty, Yang, VIP, SM</a><a href="#karta-postac" role="tab" data-tab="postac">🛠 Zarządzanie postacią</a>{% if takeover_bot %}<a href="#karta-przejecie" role="tab" data-tab="przejecie">🎮 Przejmij bota</a>{% endif %}</div>
     <div class="tab-panel" id="karta-przeglad" data-tab-panel="przeglad" role="tabpanel">
     <div class="vital-bars" aria-label="Stan postaci"><div class="vital hp"><span>❤ PŻ</span><div class="bar"><i style="width:{{character.hp_percent}}%"></i></div><b>{{character.hp_percent}}%</b></div><div class="vital mp"><span>✦ PM</span><div class="bar"><i style="width:{{character.mp_percent}}%"></i></div><b>{{character.mp_percent}}%</b></div><div class="vital exp"><span>⚡ EXP</span><div class="bar"><i style="width:{{character.experience.percent}}%"></i></div><b>{{character.experience.percent}}% · {{'{:,}'.format(character.experience.current).replace(',', ' ')}} / {{'{:,}'.format(character.experience.required).replace(',', ' ')}}</b></div></div>
-    <dl class="bot-live-details"><div><dt>Pozycja</dt><dd>{{character.x}}, {{character.y}}</dd></div><div><dt>Ranga</dt><dd><span class="honor {{character.honor.css}}">{{character.honor.title}}</span> · {{'{:,}'.format(character.honor.points).replace(',', ' ')}} pkt</dd></div><div><dt>Osobowość</dt><dd>{{character.personality}}</dd></div>{% if character.persona %}<div><dt>Persona</dt><dd>{{character.persona}}</dd></div><div><dt>Nastrój</dt><dd>{{character.mood}}{% if character.hold %} · {{character.hold}}{% endif %}{% if character.mood_lock %} <small class="muted">({{character.mood_lock}})</small>{% endif %}</dd></div>{% endif %}<div><dt>Ambicja</dt><dd>{{character.ambition}}</dd></div><div><dt>Aktualny cel</dt><dd>{{character.goal}}</dd></div><div><dt>Akcja</dt><dd>{{character.action}}</dd></div><div><dt>Koń</dt><dd>Lv {{character.horse_level}}</dd></div></dl>
+    <dl class="bot-live-details"><div><dt>Pozycja</dt><dd>{{character.x}}, {{character.y}}</dd></div><div><dt>Ranga</dt><dd><span class="honor {{character.honor.css}}">{{character.honor.title}}</span> · {{'{:,}'.format(character.honor.points).replace(',', ' ')}} pkt</dd></div><div><dt>Osobowość</dt><dd>{% if character.personality_id is defined and character.personality_id is not none %}<a href="{{url_for('wiki_bots')}}#charakter-{{character.personality_id}}" title="Co to znaczy — opis w wiki">{{character.personality}}</a>{% else %}{{character.personality}}{% endif %}</dd></div>{% if character.persona %}<div><dt>Persona</dt><dd>{% if character.persona_id is defined and character.persona_id is not none %}<a href="{{url_for('wiki_bots')}}#persona-{{character.persona_id}}" title="Co to znaczy — opis w wiki">{{character.persona}}</a>{% else %}{{character.persona}}{% endif %}</dd></div><div><dt>Nastrój</dt><dd>{{character.mood}}{% if character.hold %} · {{character.hold}}{% endif %}{% if character.mood_lock %} <small class="muted">({{character.mood_lock}})</small>{% endif %}</dd></div>{% endif %}<div><dt>Ambicja</dt><dd>{{character.ambition}}</dd></div><div><dt>Aktualny cel</dt><dd>{{character.goal}}</dd></div><div><dt>Akcja</dt><dd>{{character.action}}</dd></div><div><dt>Koń</dt><dd>Lv {{character.horse_level}}</dd></div></dl>
     {% if mission_progress %}<section class="panel mission-panel"><h2>📋 Kartoteka misji</h2><div class="mission-bars">{% for m in mission_progress %}<div class="mission"><div class="mission-head"><span>{{m.label}}</span><b>{{m.current}} / {{m.target}} {{m.unit}}</b></div>{% if m.detail %}<small class="mission-detail">{{m.detail}}</small>{% endif %}<div class="bar"><i style="width:{{m.percent}}%"></i></div></div>{% endfor %}</div></section>{% endif %}
     </div>
     <div class="tab-panel" id="karta-statystyki" data-tab-panel="statystyki" role="tabpanel">
+    <section class="panel" id="bot-development"><h2>📈 Rozwój i zgony</h2>
+      <p id="bot-dev-summary" class="muted">Ładowanie…</p>
+      <canvas id="bot-dev-chart" height="80" hidden></canvas>
+      <div id="bot-deaths-box"></div>
+      <p class="muted wiki-note">Poziom ułamkowy to poziom plus postęp w nim (20,5 = pół drogi z 20 do 21). Punkt co godzinę; wykres rośnie z czasem działania serwera. <a href="{{url_for('bot_progress')}}">Rozwój wszystkich botów →</a> · <a href="{{url_for('bot_deaths')}}">Śmierci botów →</a></p>
+    </section>
     <div class="profile-sections"><section><h2>📊 Statystyki</h2><div class="stat-cells"><div>STR<b>{{character.st}}</b></div><div>VIT<b>{{character.ht}}</b></div><div>DEX<b>{{character.dx}}</b></div><div>INT<b>{{character.iq}}</b></div></div><p class="muted">Nierozdane: {{character.stat_point or 0}} pkt statystyk · {{character.skill_point or 0}} pkt umiejętności</p></section><section><h2>✨ Umiejętności</h2><div class="skill-icons">{% for skill in character.skills %}<div class="skill-slot"><img src="{{url_for('static',filename='skill_icons/'+skill.vnum|string+skill.icon_suffix+'.png')}}" alt="{{skill.name}}" onerror="this.style.display='none'"><b>{{skill.rank}}</b><div class="item-tip"><b>{{skill.name}}</b><span>Ranga: {{skill.rank}}</span></div></div>{% else %}<p class="muted">Postać nie wybrała jeszcze profesji.</p>{% endfor %}{% for skill in character.passive_skills %}<div class="skill-slot skill-slot--passive"><img src="{{url_for('static',filename='skill_icons/passive_'+skill.vnum|string+skill.icon_suffix+'.png')}}" alt="{{skill.name}}" onerror="this.style.display='none'"><b>{{skill.rank}}</b><div class="item-tip"><b>{{skill.name}}</b><span>Ranga: {{skill.rank}} · poziom {{skill.level}}</span></div></div>{% endfor %}</div></section></div>
     <section class="panel"><h2>🏆 Statystyki postaci (panel Y)</h2><table><tbody>
         <tr><td>Zabite potwory (ogółem)</td><td>{{'{:,}'.format(character_stats.monsters).replace(',', ' ')}}</td></tr>
@@ -245,6 +251,28 @@ async function searchAdminItems(){
 document.getElementById('admin-item-search')?.addEventListener('input',()=>{clearTimeout(itemSearchTimer);itemSearchTimer=setTimeout(searchAdminItems,250)});
 document.getElementById('admin-item-category')?.addEventListener('change',searchAdminItems);
 searchAdminItems();
+})();
+</script>
+<script>
+(function(){
+  const root=(window.SEBAN_ROOT||''),pid={{character.id}};
+  const summary=document.getElementById('bot-dev-summary'),box=document.getElementById('bot-deaths-box');
+  if(!summary)return;
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  fetch(root+'/api/player/'+pid+'/progress',{cache:'no-store'}).then(r=>r.json()).then(data=>{
+    const pts=data.points||[];
+    if(pts.length<2){summary.textContent=pts.length?('Poziom '+pts[0].level+' (pierwszy zapis '+pts[0].label+'). Wykres pojawi się po następnej godzinie.'):'Brak zapisów — bot nie był online przy pełnej godzinie.';return;}
+    const gain=pts[pts.length-1].value-pts[0].value,hours=pts.length-1;
+    summary.textContent='Od '+pts[0].label+': poziom ułamkowy '+pts[0].value.toFixed(2).replace('.',',')+' → '+pts[pts.length-1].value.toFixed(2).replace('.',',')+' ('+(gain>=0?'+':'')+gain.toFixed(2).replace('.',',')+', ok. '+(gain/hours*24).toFixed(2).replace('.',',')+' poziomu na dobę).';
+    const canvas=document.getElementById('bot-dev-chart');canvas.hidden=false;
+    new Chart(canvas,{type:'line',data:{labels:pts.map(p=>p.label),datasets:[{label:'Poziom ułamkowy',data:pts.map(p=>p.value),borderColor:'#f2c34d',backgroundColor:'#f2c34d22',fill:true,tension:.25,pointRadius:2}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8fa5c1',maxTicksLimit:10}},y:{ticks:{color:'#8fa5c1'}}}}});
+  }).catch(()=>{summary.textContent='Nie udało się wczytać rozwoju.'});
+  fetch(root+'/api/player/'+pid+'/deaths',{cache:'no-store'}).then(r=>r.json()).then(d=>{
+    if(!d.ok)return;
+    let html='<p><b>Zgony:</b> 24 godz.: '+d.npc24+' od potworów'+(d.pc24?', '+d.pc24+' od graczy':'')+' · 7 dni: '+d.npc7+(d.pc7?' + '+d.pc7+' od graczy':'')+'</p>';
+    if(d.killers.length)html+='<p class="muted">Najczęściej zabija (7 dni): '+d.killers.map(k=>'<a href="'+esc(k.url)+'">'+esc(k.name)+'</a> ×'+k.n).join(' · ')+'</p>';
+    box.innerHTML=html;
+  });
 })();
 </script>
 {% endblock %}

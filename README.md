@@ -17,6 +17,22 @@ solo i w party, zbierają łup, ulepszają ekwipunek u Kowala, polują na Metiny
 i handlują między sobą. Ta paczka dokłada do tego świata nowe przedmioty
 i systemy oraz kilka poprawek botów.
 
+## 🔱 Ta kopia: fork Lexiw
+
+To repozytorium to **fork Lexiw** paczki MT2009 Classic 2.21.1 — rozwijany
+samodzielnie, bez aktualizacji od autora paczki (kanał aktualizacji jest
+wyłączony: `authorUpdates` w `launcher\branding.json`). Nowe wersje autora
+wgrywamy przez Gita (gałąź `upstream`, potem scalenie do `main`).
+
+- **Lista zmian forka:** [CHANGELOG-LEXIW.md](CHANGELOG-LEXIW.md) (wersje `2.21.1-lexiw.N`).
+- **Panel** (`http://127.0.0.1:7794`): aktywność, rozwój i zgony botów, Giełda
+  (oferty ze wszystkich sklepów, ceny, okazje), rdzenie gry, majątek botów, wiki serwera.
+- **Launcher:** zatrzymanie kończy się kopią bazy (`backups\`, ostatnie 5) i
+  raportem, czy gra zamknęła się czysto; status serwera pokazuje liczbę botów i
+  obciążenie rdzenia; skróty do stron panelu; język zmienia się od razu.
+- Test stron panelu: `docker compose exec seban-panel python smoke_test.py`;
+  test launchera: `powershell -File tools/Test-Launcher.ps1`.
+
 ## 💬 Społeczność
 
 - **[Discord](https://discord.com/invite/metin2singleplauer)** — pomoc, zgłoszenia błędów, pomysły i nowości o paczce.

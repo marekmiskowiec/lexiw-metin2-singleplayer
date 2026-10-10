@@ -1,0 +1,10 @@
+/* Lexiw: Rdzenie gry, Rozwój botów, Śmierci botów. */
+.core-bar{display:inline-block;width:110px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--edge) 60%,transparent);overflow:hidden;vertical-align:middle;margin-right:6px}
+.core-bar i{display:block;height:100%;background:#63c993;border-radius:4px}
+tr.core-busy .core-bar i{background:#f2c34d}
+tr.core-limit .core-bar i,tr.core-stale .core-bar i{background:#e0786b}
+.core-flag{padding:1px 8px;border-radius:999px;font-size:12px;border:1px solid var(--edge)}
+.core-flag.ok{color:#63c993;border-color:#63c993}
+.core-flag.warn{color:#f2c34d;border-color:#f2c34d}
+.core-flag.bad{color:#e0786b;border-color:#e0786b}
+.market-tabs{margin:6px 0 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}

@@ -208,6 +208,13 @@ function Get-M2DefaultLauncherConfig {
         # most people want; an operator who only keeps the world running for
         # other people turns it off and stops having a client open itself.
         launchClientOnPlay = $true
+        # Lexiw: a copy of the database after every stop ("Zatrzymaj i zapisz"),
+        # the newest autoBackupKeep of them kept (the ones made by hand never
+        # go); autoBackupLog false leaves the log database (history only,
+        # the biggest of them) out, which makes the stop quicker.
+        autoBackup = $true
+        autoBackupKeep = 5
+        autoBackupLog = $true
         serverRoot = [IO.Path]::GetFullPath($ServerRoot)
     }
 }
@@ -239,6 +246,13 @@ function Get-M2LauncherConfig {
     if ($null -ne $loaded.PSObject.Properties['launchClientOnPlay']) {
         $defaults.launchClientOnPlay = [bool]$loaded.launchClientOnPlay
     }
+    foreach ($name in @('autoBackup', 'autoBackupLog')) {
+        if ($null -ne $loaded.PSObject.Properties[$name]) { $defaults.$name = [bool]$loaded.$name }
+    }
+    if ($null -ne $loaded.PSObject.Properties['autoBackupKeep']) {
+        $keep = 0
+        if ([int]::TryParse([string]$loaded.autoBackupKeep, [ref]$keep)) { $defaults.autoBackupKeep = [Math]::Max(1, [Math]::Min(100, $keep)) }
+    }
     # A config saved before the client was unpacked beside the server, or
     # pointing at a client that has since moved, still gets the sibling.
     if (-not [string]$defaults.clientExecutable -or
@@ -258,7 +272,7 @@ function Save-M2LauncherConfig {
         [Parameter(Mandatory = $true)][string]$ConfigPath
     )
 
-    $Config | Select-Object schema, manifestUrl, clientRoot, clientExecutable, supportUploadUrl, reportUrl, language, launchClientOnPlay |
+    $Config | Select-Object schema, manifestUrl, clientRoot, clientExecutable, supportUploadUrl, reportUrl, language, launchClientOnPlay, autoBackup, autoBackupKeep, autoBackupLog |
         ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $ConfigPath -Encoding UTF8
 }
 
@@ -3193,7 +3207,12 @@ function New-M2DatabaseBackup {
     param(
         [Parameter(Mandatory = $true)][string]$Volume,
         [Parameter(Mandatory = $true)][string]$BackupRoot,
-        [string]$Label = ''
+        [string]$Label = '',
+        # Lexiw: databases to leave out ('log' - history only), and ZipOnly,
+        # which deletes the folder of SQL files once the zip is made, so an
+        # automatic copy after every stop does not take the disk twice.
+        [string[]]$SkipDatabases = @(),
+        [switch]$ZipOnly
     )
     $previous = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -3207,6 +3226,7 @@ function New-M2DatabaseBackup {
         $sizes = @()
         $skipped = @()
         foreach ($db in $script:M2_DB_LIST) {
+            if ($SkipDatabases -contains $db) { $skipped += "$db (pominieta na zyczenie)"; continue }
             # See the note in Invoke-M2DatabaseImport: no double quote inside a
             # command handed to docker from PowerShell.
             $exists = & docker exec $container mariadb -uroot -N -B -e "SHOW DATABASES LIKE '$db'" 2>$null
@@ -3282,6 +3302,7 @@ function New-M2DatabaseBackup {
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         [System.IO.Compression.ZipFile]::CreateFromDirectory($dir, $zip,
             [System.IO.Compression.CompressionLevel]::Optimal, $false)
+        if ($ZipOnly) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
         return [pscustomobject]@{
             Folder   = $dir
             Zip      = $zip
@@ -3292,6 +3313,35 @@ function New-M2DatabaseBackup {
         }
     }
     finally { Stop-M2ThrowawayDb -Container $container; $ErrorActionPreference = $previous }
+}
+
+function Get-M2LastBackup {
+    # The newest copy of the database in the backup folder - made by hand or
+    # by the stop - for the version box: when, how big, which kind.
+    param([Parameter(Mandatory = $true)][string]$BackupRoot)
+    if (-not (Test-Path -LiteralPath $BackupRoot -PathType Container)) { return $null }
+    $newest = Get-ChildItem -LiteralPath $BackupRoot -Filter 'db-backup-*.zip' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $newest) { return $null }
+    [pscustomobject]@{ Name = $newest.Name; When = $newest.LastWriteTime; Bytes = $newest.Length; Auto = ($newest.Name -like '*-auto.zip') }
+}
+
+function Remove-M2OldAutoBackups {
+    # Keeps the newest $Keep of the copies the stop made (db-backup-*-auto.zip)
+    # and removes the rest. Copies made by hand have no "-auto" in the name and
+    # are never touched. Returns what it removed.
+    param(
+        [Parameter(Mandatory = $true)][string]$BackupRoot,
+        [int]$Keep = 5
+    )
+    $removed = @()
+    if (-not (Test-Path -LiteralPath $BackupRoot -PathType Container)) { return $removed }
+    $old = @(Get-ChildItem -LiteralPath $BackupRoot -Filter 'db-backup-*-auto.zip' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -Skip ([Math]::Max(1, $Keep)))
+    foreach ($file in $old) {
+        try { Remove-Item -LiteralPath $file.FullName -Force; $removed += $file.Name } catch { }
+    }
+    return $removed
 }
 
 function Restore-M2DatabaseBackup {
@@ -3468,6 +3518,8 @@ Export-ModuleMember -Function @(
     'Get-M2VolumeWorldStats',
     'Invoke-M2DatabaseImport',
     'New-M2DatabaseBackup',
+    'Get-M2LastBackup',
+    'Remove-M2OldAutoBackups',
     'Restore-M2DatabaseBackup',
     'Reset-M2WorldToFreshInstall',
     'Repair-M2GameDbUser',

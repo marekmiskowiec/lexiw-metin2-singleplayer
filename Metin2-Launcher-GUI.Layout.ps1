@@ -117,7 +117,12 @@ public class M2LauncherArtPanel2 : Panel {
     }
 }
 
+$script:UiTextPairs = @{}
 function UI-Text([string]$Pl, [string]$En) {
+    # Lexiw: every pair is remembered, so Update-LauncherLanguageLive can turn a
+    # control showing either text into the other without restarting.
+    $script:UiTextPairs[$Pl] = @($Pl, $En)
+    $script:UiTextPairs[$En] = @($Pl, $En)
     if ($script:Lang -eq 'en') { return $En }
     return $Pl
 }
@@ -174,7 +179,7 @@ function UI-Page([string]$Id, [string]$Heading, [string]$Description) {
     $page.Add_SizeChanged({
         $entry = $script:ui.Pages[$this.Tag]
         if ($entry) {
-            if ($this.Tag -eq 'home') { $entry.Grid.Height = 368 }
+            if ($this.Tag -eq 'home') { $entry.Grid.Height = $(if ($script:HomeGridHeight) { $script:HomeGridHeight } else { 368 }) }
             else { $entry.Grid.Height = [Math]::Max(276, [Math]::Min(348, $this.ClientSize.Height - 114)) }
         }
     })
@@ -245,7 +250,9 @@ $header = [Windows.Forms.Panel]::new(); $header.Dock = 'Top'; $header.Height = 9
 $header.BackColor = UI-Color '#0D141A'; $header.Padding = [Windows.Forms.Padding]::new(26, 14, 26, 10)
 $script:form.Controls.Add($header)
 $brand = [Windows.Forms.Panel]::new(); $brand.Dock = 'Fill'; $header.Controls.Add($brand)
-$subtitle.Text = Get-M2BrandValue -Name 'subtitle' -Default $(if ($script:M2LauncherClassic) { 'SINGLEPLAYER  /  MT2009 CLASSIC  /  BY ZAXEP' } else { 'SINGLEPLAYER  /  MT2009 PLUS  /  BY ZAXEP' })
+$subtitlePl = Get-M2BrandValue -Name 'subtitle' -Default $(if ($script:M2LauncherClassic) { 'SINGLEPLAYER  /  MT2009 CLASSIC  /  BY ZAXEP' } else { 'SINGLEPLAYER  /  MT2009 PLUS  /  BY ZAXEP' })
+# Lexiw: "subtitleEn" in launcher\branding.json, for the English window.
+$subtitle.Text = UI-Text $subtitlePl (Get-M2BrandValue -Name 'subtitleEn' -Default $subtitlePl)
 $subtitle.Dock = 'Top'; $subtitle.Height = 24
 $subtitle.Font = [Drawing.Font]::new('Segoe UI', 9); $subtitle.ForeColor = $script:ui.Muted
 $brand.Controls.Add($subtitle)
@@ -469,6 +476,42 @@ $footer.Text = Get-UIFooterText
 $footer.ForeColor = $script:ui.Muted; $footer.Padding = [Windows.Forms.Padding]::new(28, 6, 0, 0)
 $main.Controls.Add($footer)
 
+function Update-LauncherLanguageLive {
+    # Lexiw: a language change without a restart. The texts that were made from
+    # a pair (UI-Text) or from a table entry (T) are looked up by what they say
+    # now and swapped for the same text in the language $script:Lang names; the
+    # menu buttons carry their number in front, and the texts that are made as
+    # the launcher runs (log, statuses, versions) refresh the way they always do.
+    $pairs = @{}
+    foreach ($key in @($script:Strings['pl'].Keys)) {
+        $pl = $script:Strings['pl'][$key]; $en = $script:Strings['en'][$key]
+        if ($pl -is [string] -and $en -is [string] -and $pl -and $en) { $pairs[$pl] = @($pl, $en); $pairs[$en] = @($pl, $en) }
+    }
+    foreach ($key in @($script:UiTextPairs.Keys)) { $pairs[$key] = $script:UiTextPairs[$key] }
+    $target = if ($script:Lang -eq 'en') { 1 } else { 0 }
+    $swap = {
+        param($control)
+        $text = [string]$control.Text
+        $tag = $control.Tag
+        if ($tag -is [hashtable] -and $tag.ContainsKey('Short') -and $tag.ContainsKey('Id') -and $text.StartsWith($tag.Short + '   ')) {
+            $title = $text.Substring($tag.Short.Length + 3)
+            if ($pairs.ContainsKey($title)) {
+                $control.Text = $tag.Short + '   ' + $pairs[$title][$target]
+                $tag.Title = $control.Text
+            }
+        }
+        elseif ($text -and $pairs.ContainsKey($text) -and $pairs[$text][$target] -ne $text) {
+            $control.Text = $pairs[$text][$target]
+        }
+        foreach ($child in @($control.Controls)) { & $swap $child }
+    }
+    & $swap $script:form
+    $languageButton.Text = if ($script:Lang -eq 'en') { 'EN / PL' } else { 'PL / EN' }
+    $footer.Text = Get-UIFooterText
+    Update-PlayButtonLabel
+    if ($script:versionLabel) { Update-VersionFooter }
+}
+
 $sections = @(
     @('home', '01', (UI-Text 'Pulpit' 'Overview'), (UI-Text 'Wróć do swojego świata' 'Return to your world'), (UI-Text 'Uruchom rozgrywkę lub zarządzaj działającym serwerem.' 'Start playing or manage your running server.')),
     @('world', '02', (UI-Text 'Świat i boty' 'World & bots'), (UI-Text 'Świat na Twoich zasadach' 'A world on your terms'), (UI-Text 'Ustaw boty i poziom trudności.' 'Configure bots and difficulty.')),
@@ -476,7 +519,16 @@ $sections = @(
     @('database', '04', (UI-Text 'Baza danych' 'Database'), (UI-Text 'Zarządzanie bazą danych' 'Database management'), (UI-Text 'Dostęp, import i kopie Twojego świata.' 'Connection details, imports and backups of your world.')),
     @('logs', '05', (UI-Text 'Logi i diagnostyka' 'Logs & diagnostics'), (UI-Text 'Sprawdź, co się dzieje' 'See what is happening'), (UI-Text 'Diagnostyka i materiały potrzebne do zgłoszenia problemu.' 'Diagnostics and the information needed to report a problem.'))
 )
+# Lexiw: launcher\branding.json "hideCoop" / "hideVps" - the pages and cards for
+# playing with friends and for a rented server are not made at all, and the
+# menu is numbered from what is left.
+$script:HideCoop = [bool](Get-M2BrandValue -Name 'hideCoop' -Default $false)
+$script:HideVps = [bool](Get-M2BrandValue -Name 'hideVps' -Default $false)
+if ($script:HideCoop) { $sections = @($sections | Where-Object { $_[0] -ne 'coop' }) }
+$sectionNumber = 0
 foreach ($section in $sections) {
+    $sectionNumber++
+    $section[1] = '{0:00}' -f $sectionNumber
     UI-Page $section[0] $section[3] $section[4]
     $nav = New-Button ($section[1] + '   ' + $section[2]) 0 0 232 48
     UI-ButtonStyle $nav; $nav.TextAlign = 'MiddleLeft'
@@ -503,14 +555,18 @@ foreach ($uiLocale in @('pl', 'en')) {
 Update-PlayButtonLabel
 $dockerButton.Visible = $false
 $homeGrid = $script:ui.Pages.home.Grid
-$homeGrid.RowCount = 4; $homeGrid.RowStyles.Clear(); $homeGrid.Height = 368
-for ($i = 0; $i -lt 4; $i++) {
-    [void]$homeGrid.RowStyles.Add([Windows.Forms.RowStyle]::new([Windows.Forms.SizeType]::Percent, 25))
+# Lexiw: with the author's updates off the two cards for them are not made,
+# so the overview is three rows, not four.
+$homeRows = if (Test-M2AuthorUpdatesEnabled) { 4 } else { 3 }
+$script:HomeGridHeight = if ($homeRows -eq 4) { 368 } else { 290 }
+$homeGrid.RowCount = $homeRows; $homeGrid.RowStyles.Clear(); $homeGrid.Height = $script:HomeGridHeight
+for ($i = 0; $i -lt $homeRows; $i++) {
+    [void]$homeGrid.RowStyles.Add([Windows.Forms.RowStyle]::new([Windows.Forms.SizeType]::Percent, (100 / $homeRows)))
 }
 $script:ui.Pages.home.Heading.Height = 40
 $script:ui.Pages.home.Description.Height = 36
 UI-Card 'home' $playButton (UI-Text 'Uruchom serwer i rozpocznij przygodę.' 'Start the server and begin your adventure.') '#21694F'
-UI-Card 'home' $stopButton (UI-Text 'Bezpieczne zatrzymanie z zachowaniem postępu.' 'Stop safely and keep your progress.') '#6A3C39'
+UI-Card 'home' $stopButton (UI-Text 'Bezpieczne zatrzymanie, potem kopia bazy.' 'Stop safely, then back up the database.') '#6A3C39'
 UI-Card 'home' $panelButton (UI-Text 'Statystyki, rankingi i panel zarządzania.' 'Statistics, rankings and management panel.')
 $launchPanel = [Windows.Forms.Panel]::new(); $launchPanel.Dock = 'Fill'
 $launchPanel.BackColor = [Drawing.Color]::Transparent
@@ -520,7 +576,7 @@ $script:launchClientCheck.Font = [Drawing.Font]::new('Segoe UI', 10)
 $script:launchClientCheck.ForeColor = $script:ui.Text
 $script:launchClientCheck.BackColor = [Drawing.Color]::FromArgb(230, 18, 26, 30)
 $launchPanel.Controls.Add($script:launchClientCheck)
-$script:ui.Pages.home.Grid.Controls.Add($launchPanel, 1, 3)
+$script:ui.Pages.home.Grid.Controls.Add($launchPanel, 1, ($homeRows - 1))
 
 UI-Card 'world' $botCountButton (UI-Text 'Liczba botów, królestwa i tempo zaludniania.' 'Bot count, kingdoms and population pace.')
 UI-Card 'world' $difficultyButton (UI-Text 'Dostosuj rozwój postaci do swojego tempa.' 'Adjust character progression to your own pace.')
@@ -530,9 +586,32 @@ $ratesButton.Add_Click({
     Write-LocalLog (UI-Text 'Otwieram edytor rat serwera w panelu WWW.' 'Opening server rates in the web panel.')
     Start-Process $ratesUrl
 })
-UI-Card 'world' $ratesButton (UI-Text 'Edytuj mnożniki w panelu WWW. Serwer musi działać.' 'Edit multipliers in the web panel. The server must be running.')
-# For everybody, like the COOP page.
-UI-Card 'world' $vpsButton (UI-Text 'Postaw ten świat na wynajętym serwerze Linux (VPS).' 'Put this world on a rented Linux server (VPS).')
+UI-Card 'world' $ratesButton (UI-Text 'Mnożniki w panelu WWW (serwer musi działać).' 'Multipliers in the web panel (server must run).')
+# Lexiw: shortcuts straight to the panel pages for watching the bots. The grid
+# holds six cards, so with the VPS card showing the last shortcut is left out.
+$panelShortcuts = @(
+    @{ Path = '/players/activity'; Pl = 'AKTYWNOŚĆ BOTÓW'; En = 'BOT ACTIVITY'; DescPl = 'Co boty robią teraz i w ciągu doby.'; DescEn = 'What the bots do now and over the day.' },
+    @{ Path = '/market'; Pl = 'GIEŁDA'; En = 'MARKET'; DescPl = 'Oferty ze wszystkich sklepów, ceny i okazje.'; DescEn = 'Offers from every shop, prices and deals.' },
+    @{ Path = '/system/cores'; Pl = 'RDZENIE GRY'; En = 'GAME CORES'; DescPl = 'Obciążenie procesorów gry i liczba botów.'; DescEn = 'Game process load and bots per core.' }
+)
+if (-not $script:HideVps) { $panelShortcuts = $panelShortcuts[0..1] }
+foreach ($shortcut in $panelShortcuts) {
+    $shortcutButton = New-Button (UI-Text $shortcut.Pl $shortcut.En) 0 0 280 36
+    $shortcutButton.Tag = $shortcut.Path
+    $shortcutButton.Add_Click({
+        param($sender, $eventArgs)
+        $addresses = Get-M2PanelAddresses -ServerRoot $root
+        $url = ([Uri]::new([Uri]$addresses.ClassicUrl, [string]$sender.Tag)).AbsoluteUri
+        Write-LocalLog (UI-Text "Otwieram w panelu WWW: $url" "Opening in the web panel: $url")
+        Start-Process $url
+    })
+    UI-Card 'world' $shortcutButton (UI-Text $shortcut.DescPl $shortcut.DescEn)
+}
+# For everybody, like the COOP page (Lexiw: "hideVps" / "hideCoop" turn them off).
+if ($script:HideVps) { if ($vpsButton) { $vpsButton.Visible = $false } }
+else { UI-Card 'world' $vpsButton (UI-Text 'Postaw ten świat na wynajętym serwerze Linux (VPS).' 'Put this world on a rented Linux server (VPS).') }
+if ($script:HideCoop) { if ($coopButton) { $coopButton.Visible = $false } }
+else {
 UI-Card 'coop' $coopButton (UI-Text 'Zaproś znajomych do wspólnej rozgrywki.' 'Invite friends to play together.')
 $coopInfo = [Windows.Forms.Panel]::new()
 $coopInfo.Dock = 'Fill'; $coopInfo.BackColor = [Drawing.Color]::FromArgb(235, 18, 26, 30)
@@ -570,6 +649,7 @@ $script:ui.Pages.coop.Grid.SetRowSpan($coopInfo, 2)
 if (-not $coopButton) {
     $null = UI-Label $script:ui.Pages.coop.Grid (UI-Text 'Moduł COOP nie jest zainstalowany.' 'The COOP module is not installed.') 10 $script:ui.Muted 60
 }
+}
 
 UI-Card 'home' $installButton (UI-Text 'Przygotuj pliki i zależności serwera.' 'Prepare server files and dependencies.')
 UI-Card 'home' $clientButton (UI-Text 'Wskaż plik uruchamiający klienta gry.' 'Select the game client executable.')
@@ -578,9 +658,10 @@ if (Test-M2AuthorUpdatesEnabled) {
     UI-Card 'home' $gmPanelButton (UI-Text 'Pobierz pakiet klienta dla tej wersji serwera.' 'Get the client package for this server version.')
 }
 else {
-    # Lexiw: launcher\branding.json "authorUpdates": false.
-    UI-Card 'home' $updateButton (UI-Text 'Wyłączone - wersje autora wgrywamy przez Gita.' 'Off - the author''s versions go in through Git.')
-    UI-Card 'home' $gmPanelButton (UI-Text 'Wyłączone - klient zostaje, jaki jest.' 'Off - the client stays as it is.')
+    # Lexiw: launcher\branding.json "authorUpdates": false - the two buttons
+    # for the author's updates are dead ends, so they are not shown at all.
+    if ($updateButton) { $updateButton.Visible = $false }
+    if ($gmPanelButton) { $gmPanelButton.Visible = $false }
 }
 
 UI-Card 'database' $dbAccessButton (UI-Text 'Dane połączenia dla Navicat i innych narzędzi.' 'Connection details for Navicat and other tools.')
@@ -589,7 +670,7 @@ UI-Card 'database' $importDbButton (UI-Text 'Przenieś bazę z innej instalacji.
 UI-Card 'database' $worldBackupButton (UI-Text 'Utwórz kopię, przywróć zapis lub nowy świat.' 'Back up, restore a save or create a new world.')
 
 UI-Card 'logs' $diagnosticsButton (UI-Text 'Sprawdź środowisko i możliwe przyczyny błędów.' 'Check the environment and possible causes of errors.')
-UI-Card 'logs' $bundleButton (UI-Text 'Przygotuj paczkę logów do zgłoszenia.' 'Prepare a log bundle for a support request.')
+UI-Card 'logs' $bundleButton $(if ((Get-M2BrandValue -Name 'reportMode' -Default '') -eq 'local') { UI-Text 'Zapisz paczkę logów w pliku ZIP na dysku.' 'Save a log bundle as a ZIP file on disk.' } else { UI-Text 'Przygotuj paczkę logów do zgłoszenia.' 'Prepare a log bundle for a support request.' })
 UI-Card 'logs' $openLogButton (UI-Text 'Otwórz bieżący dziennik w edytorze.' 'Open the current log in an editor.')
 UI-Card 'logs' $folderButton (UI-Text 'Przejdź do wszystkich zapisanych logów.' 'Browse all saved log files.')
 # ZGLOS / REPORT, when its module is there (Metin2-Launcher-GUI.ps1 makes the button).
@@ -631,7 +712,9 @@ function Invoke-LayoutSelfTest([string]$OutputDirectory) {
     $script:form.ShowInTaskbar = $false
     $script:dockerStatus.Text = UI-Text 'Docker: podgląd UI' 'Docker: UI preview'
     $script:serverStatus.Text = UI-Text 'Serwer: podgląd UI' 'Server: UI preview'
-    $script:versionLabel.Text = "Serwer: 2.0.96   |   najnowszy: 2.0.96`r`nLauncher: 2.0.96   |   najnowszy: 2.0.96`r`nKlient: 2.0.25   |   najnowszy: 2.0.25"
+    # Lexiw: with the author's channel off the box is the real one (the fork's version, commit, package, client).
+    if (Test-M2AuthorUpdatesEnabled) { $script:versionLabel.Text = "Serwer: 2.0.96   |   najnowszy: 2.0.96`r`nLauncher: 2.0.96   |   najnowszy: 2.0.96`r`nKlient: 2.0.25   |   najnowszy: 2.0.25" }
+    else { Update-VersionFooter }
     $script:logBox.Text = UI-Text "[Test] Podgląd układu launchera.`r`n[Test] Akcje serwera nie zostały uruchomione." "[Test] Launcher layout preview.`r`n[Test] No server actions have been started."
     $previewLog = $script:logBox.Text
     $script:logBox.Text = ((1..100 | ForEach-Object { 'Scroll test line ' + $_ }) -join "`r`n")
@@ -668,7 +751,7 @@ function Invoke-LayoutSelfTest([string]$OutputDirectory) {
     $results = @()
     foreach ($dimensions in @(@(1280, 820), @(1120, 820), @(1004, 741))) {
         $script:form.ClientSize = [Drawing.Size]::new($dimensions[0], $dimensions[1])
-        foreach ($id in @('home', 'world', 'coop', 'database', 'logs')) {
+        foreach ($id in @('home', 'world', 'coop', 'database', 'logs') | Where-Object { $script:ui.Nav.ContainsKey($_) }) {
             $script:ui.Nav[$id].PerformClick()
             [Windows.Forms.Application]::DoEvents()
             if ($script:ui.CurrentPage -ne $id) { throw "Navigation failed: $id" }
@@ -707,15 +790,37 @@ function Invoke-LayoutSelfTest([string]$OutputDirectory) {
     if ($script:logBox.SelectionStart -ne $script:logBox.TextLength) { throw 'Log caret did not follow expansion' }
     if (([Uri](Get-UIRatesUrl)).AbsolutePath -ne '/rates') { throw 'Incorrect rates route' }
     if (-not $coffeeButton.Visible) { throw 'Coffee link is not visible' }
-    $expected = @($installButton, $playButton, $stopButton, $panelButton, $clientButton, $updateButton,
+    $expected = @($installButton, $playButton, $stopButton, $panelButton, $clientButton,
         $bundleButton, $diagnosticsButton, $openLogButton, $folderButton, $botCountButton, $importDbButton,
-        $repairDbButton, $dbAccessButton, $gmPanelButton, $worldBackupButton, $difficultyButton, $languageButton, $ratesButton)
-    if ($coopButton) { $expected += $coopButton }
-    if ($vpsButton) { $expected += $vpsButton }
+        $repairDbButton, $dbAccessButton, $worldBackupButton, $difficultyButton, $languageButton, $ratesButton)
+    if (Test-M2AuthorUpdatesEnabled) { $expected += $updateButton; $expected += $gmPanelButton }
+    elseif ($updateButton.Visible -or $gmPanelButton.Visible) { throw 'Author update buttons are still displayed' }
+    if ($coopButton -and -not $script:HideCoop) { $expected += $coopButton }
+    if ($vpsButton -and -not $script:HideVps) { $expected += $vpsButton }
+    if ($script:HideCoop -and $script:ui.Nav.ContainsKey('coop')) { throw 'COOP page still in the menu' }
+    if ($vpsButton -and $script:HideVps -and $vpsButton.Visible) { throw 'VPS button is still displayed' }
     if ($reportButton) { $expected += $reportButton }
     foreach ($button in $expected) {
         if (@($script:ui.Cards | Where-Object { $_.Button -eq $button }).Count -ne 1) { throw "Missing/duplicate action: $($button.Text)" }
     }
+    # The language changes live: to the other one and back, nothing restarts and
+    # nothing is saved to the configuration here.
+    $originalLang = $script:Lang
+    $originalMenu = $script:ui.Nav['home'].Text
+    $originalPlay = $playButton.Text
+    $script:Lang = if ($originalLang -eq 'en') { 'pl' } else { 'en' }
+    Update-LauncherLanguageLive
+    $otherMenu = $script:ui.Nav['home'].Text
+    if ($otherMenu -eq $originalMenu) { throw 'Live language switch did not change the menu' }
+    if ($otherMenu -notmatch $(if ($script:Lang -eq 'en') { 'Overview' } else { 'Pulpit' })) { throw "Live language switch gave the wrong menu text: $otherMenu" }
+    $bitmap = [Drawing.Bitmap]::new($script:form.Width, $script:form.Height)
+    try {
+        $script:form.DrawToBitmap($bitmap, [Drawing.Rectangle]::new(0, 0, $script:form.Width, $script:form.Height))
+        $bitmap.Save((Join-Path $OutputDirectory "$($script:Lang)-live-switch.png"), [Drawing.Imaging.ImageFormat]::Png)
+    } finally { $bitmap.Dispose() }
+    $script:Lang = $originalLang
+    Update-LauncherLanguageLive
+    if ($script:ui.Nav['home'].Text -ne $originalMenu -or $playButton.Text -ne $originalPlay) { throw 'Live language switch did not come back' }
     $reportBox = if ($reportButton) { 'OK' } else { 'no module' }
     [pscustomobject]@{ Checks = $results; ActionCards = $expected.Count; Navigation = 'OK'; Sidebar = 'OK'; ReportBox = $reportBox; LogToggle = 'OK'; LogScroll = 'OK'; RatesRoute = 'OK'; CoffeeLink = 'OK'; ResizeMsPerStep = $resizeMsPerStep; ResizeReleaseMs = $releaseMs } | ConvertTo-Json -Depth 4
     $script:form.Close()

@@ -1,5 +1,13 @@
 # Updating
 
+> **Lexiw fork:** the author's update channel is switched off in this copy
+> (`"authorUpdates": false` in `launcher\branding.json`), so the launcher's
+> update buttons are gone and nothing below is applied automatically. To take a
+> new upstream version: commit it on the `upstream` branch, merge it into
+> `main`, rebuild the Docker images. The fork's own history is in
+> `CHANGELOG-LEXIW.md`. Stopping the server from the launcher makes a database
+> backup first (`backups\`, last 5 kept).
+
 Nothing in this document touches your database. Accounts, characters, items,
 guilds and safeboxes live in a Docker volume, and no step here goes near it.
 The only command that would destroy them is `docker compose down -v`, and it
