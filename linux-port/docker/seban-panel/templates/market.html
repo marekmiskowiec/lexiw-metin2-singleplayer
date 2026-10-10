@@ -1,6 +1,8 @@
 {% extends 'base.html' %}{% block title %}Giełda · {{ panel_brand }}{% endblock %}{% block content %}
 <link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('player-profile.css') }}">
 <link rel="stylesheet" href="{{ static_asset_url('market.css') }}">
+{% from '_macros.html' import tooltip %}
 {%- macro yang(n) -%}{{ '{:,}'.format(n|int).replace(',', ' ') }}{%- endmacro -%}
 {%- macro short(n) -%}{% if n >= 1000000 %}{{ ('%.2f'|format(n / 1000000)).rstrip('0').rstrip('.').replace('.', ',') }}M{% elif n >= 1000 %}{{ ('%.1f'|format(n / 1000)).rstrip('0').rstrip('.').replace('.', ',') }}k{% else %}{{ n|round|int }}{% endif %}{%- endmacro -%}
 <p class="eyebrow">GOSPODARKA</p><h1>Giełda</h1>
@@ -40,7 +42,7 @@
     <section class="panel table-wrap">
       <table class="market-table"><thead><tr><th>Przedmiot</th><th>Ilość</th><th>Za sztukę</th><th>Cena stosu</th><th>vs rynek</th><th>Wiek</th><th>Sprzedawca</th></tr></thead><tbody>
       {% for o in offers %}<tr>
-        <td class="market-item">{% if o.icon_url %}<img src="{{ o.icon_url }}" alt="" loading="lazy">{% endif %}<div><a href="{{ url_for('economy_item', vnum=o.vnum) }}"><b>{{ o.item_name }}</b></a>
+        <td class="market-item"><span class="market-icon" tabindex="0">{% if o.icon_url %}<img src="{{ o.icon_url }}" alt="" loading="lazy">{% else %}<i>{{ o.vnum }}</i>{% endif %}{{ tooltip(o, o.price) }}</span><div><a href="{{ url_for('economy_item', vnum=o.vnum) }}"><b>{{ o.item_name }}</b></a>
           {% if o.bonuses %}<ul class="market-bonus">{% for b in o.bonuses %}<li class="{{ b.source }}">{{ b.text }}</li>{% endfor %}</ul>{% endif %}</div></td>
         <td data-sort="{{ o.count }}">{{ o.count }}</td>
         <td data-sort="{{ o.unit }}"><b>{{ yang(o.unit) }}</b>{% if o.unit >= 1000 %}<small class="muted"> {{ short(o.unit) }}</small>{% endif %}</td>
