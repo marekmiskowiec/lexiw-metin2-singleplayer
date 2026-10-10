@@ -18,7 +18,7 @@ import re
 from datetime import datetime
 
 import pymysql
-from flask import render_template, request
+from flask import abort, render_template, request, url_for
 
 PER_PAGE = 50
 
@@ -62,6 +62,8 @@ SORTS = {
     "cheap": ("Cena za sztukę ↑", "f.unit ASC"),
     "dear": ("Cena za sztukę ↓", "f.unit DESC"),
     "stack": ("Cena stosu ↓", "f.price DESC"),
+    "profit": ("Największa okazja (zysk)", "f.profit IS NULL, f.profit DESC"),
+    "deal": ("Największa zniżka %", "f.discount IS NULL, f.discount DESC"),
     "new": ("Najnowsze", "f.first_seen DESC"),
     "old": ("Najdłużej wystawione", "f.first_seen ASC"),
 }
@@ -142,8 +144,9 @@ def install_market(m):
             params.append(CLASSES[job][0])
         for field, op, column in (("lmin", ">=", "f.level"), ("lmax", "<=", "f.level"),
                                   ("pmin", ">=", "f.plus"), ("pmax", "<=", "f.plus"),
-                                  ("cmin", ">=", "f.unit"), ("cmax", "<=", "f.unit")):
-            value = number(field, 0, 255 if field[0] in "lp" else 2_000_000_000_000)
+                                  ("cmin", ">=", "f.unit"), ("cmax", "<=", "f.unit"),
+                                  ("dmin", ">=", "f.discount")):
+            value = number(field, 0, 255 if field[0] in "lp" else 100 if field == "dmin" else 2_000_000_000_000)
             asked[field] = value
             if value is not None:
                 where.append(f"{column} {op} %s")
@@ -221,6 +224,7 @@ def install_market(m):
         order = SORTS[asked["sort"]][1]
         offers = list(m.rows(f"""SELECT f.item_id AS id, f.vnum, f.cnt AS count, f.price, f.unit, f.owner_id, f.seller,
             f.shop_name, f.shop_map, f.first_seen, f.name AS item_name, f.socket0, f.socket1, f.socket2,
+            f.variant, f.median_unit, f.peers, f.discount, f.profit,
             f.attrtype0,f.attrvalue0,f.attrtype1,f.attrvalue1,f.attrtype2,f.attrvalue2,f.attrtype3,f.attrvalue3,
             f.attrtype4,f.attrvalue4,f.attrtype5,f.attrvalue5,f.attrtype6,f.attrvalue6,
             p.applytype0,p.applyvalue0,p.applytype1,p.applyvalue1,p.applytype2,p.applyvalue2,p.size AS item_size,p.type AS item_type
@@ -231,28 +235,19 @@ def install_market(m):
             for bonus in offer["bonuses"]:
                 bonus["kind"] = bonus_kind(bonus["text"])
                 bonus["negative"] = bool(re.search(r"[−-]\d", bonus["text"]))
-        # The market's median per piece of every item on this page: what
-        # "cheap" and "dear" mean for it.
-        medians = {}
-        vnums = sorted({int(o["vnum"]) for o in offers})
-        if vnums:
-            marks = ",".join(["%s"] * len(vnums))
-            by_key = {}
-            for r in m.rows(f"SELECT f.vnum, IF(f.vnum IN ({book_marks}), f.socket0, 0) AS variant, f.unit FROM {FLAT} "
-                            f"WHERE f.vnum IN ({marks})", vnums):
-                by_key.setdefault((int(r["vnum"]), int(r["variant"])), []).append(float(r["unit"]))
-            medians = {key: (median(values), len(values)) for key, values in by_key.items()}
         now = datetime.now()
         for offer in offers:
             unit = float(offer["unit"])
-            variant = int(offer["socket0"] or 0) if int(offer["vnum"]) in m.SKILLBOOK_VNUMS else 0
-            mid, seen = medians.get((int(offer["vnum"]), variant), (0, 0))
+            discount = offer["discount"]
             offer.update(unit=unit, count=int(offer["count"]), price=int(offer["price"]),
                          icon_url=m.item_icon_url(offer["vnum"]), age=age_text(offer["first_seen"], now),
-                         median=mid, same_offers=seen, map_name=m.map_name(offer["shop_map"]),
-                         shop_name=m.game_text(offer["shop_name"]) or "",
-                         # Only a comparison among several offers means something.
-                         diff=round((unit - mid) * 100 / mid) if mid and seen >= 3 else None)
+                         median=float(offer["median_unit"] or 0), same_offers=int(offer["peers"] or 0),
+                         map_name=m.map_name(offer["shop_map"]), shop_name=m.game_text(offer["shop_name"]) or "",
+                         # Against the median of the same item with as many added bonuses,
+                         # worked out by the collector; with fewer than 3 offers there is none.
+                         diff=-int(discount) if discount is not None else None,
+                         resale=int(offer["profit"]) if offer["profit"] is not None and offer["profit"] > 0 else None,
+                         history_url=url_for("market_item", vnum=offer["vnum"], v=offer["variant"] or None))
         info = shared()
         args = {k: v for k, v in request.args.items() if k != "page" and v not in ("", None)}
         window = [n for n in range(1, total_pages + 1) if n in (1, total_pages) or abs(n - page) <= 2]
@@ -277,3 +272,124 @@ def install_market(m):
         if _shared["overview"] is None or time.time() - _shared["at"] > 60:
             _shared.update(overview=overview(), counts=category_counts(), bonuses=bonus_choices(), at=time.time())
         return _shared
+
+    # ------------------------------------------------------- one item's prices
+
+    def variant_label(vnum, variant):
+        if vnum in m.SKILLBOOK_VNUMS:
+            return m.SKILL_NAMES.get(variant, f"umiejętność {variant}")
+        proto = m.ITEM_DEFS.get(str(vnum), {})
+        if int(proto.get("type") or 0) in (1, 2):
+            return "bez dodanych bonusów" if variant == 0 else f"{variant} dodane bonusy" if variant < 5 else f"{variant} dodanych bonusów"
+        return ""
+
+    @app.route("/market/item/<int:vnum>")
+    @m.login_required
+    def market_item(vnum):
+        """The price of one item: now (lowest, median, highest, how many
+        offers), the hourly history and the cheapest offers."""
+        proto = m.one("SELECT vnum, name, locale_name FROM player.item_proto WHERE vnum=%s", (vnum,))
+        if not proto:
+            abort(404)
+        name = m.game_text(proto["locale_name"] or proto["name"])
+        try:
+            groups = m.rows("SELECT variant, offers, min_unit, median_unit, max_unit, avg_unit FROM player.web_seban_price_now "
+                            "WHERE vnum=%s ORDER BY variant", (vnum,))
+        except pymysql.MySQLError:
+            groups = []
+        variant = number("v", 0, 1_000_000)
+        if variant is None or variant not in {int(g["variant"]) for g in groups}:
+            variant = int(max(groups, key=lambda g: g["offers"])["variant"]) if groups else 0
+        now_row = next((g for g in groups if int(g["variant"]) == variant), None)
+        history = m.rows("SELECT DATE_FORMAT(captured_at, '%%d.%%m %%H:00') AS label, offers, min_unit, median_unit, max_unit "
+                         "FROM player.web_seban_price_history WHERE vnum=%s AND variant=%s AND captured_at >= NOW() - INTERVAL 30 DAY "
+                         "ORDER BY captured_at", (vnum, variant)) if groups else []
+        cheapest = list(m.rows(f"""SELECT f.item_id AS id, f.vnum, f.cnt AS count, f.price, f.unit, f.owner_id, f.seller, f.shop_map,
+            f.first_seen, f.discount, f.name AS item_name, f.socket0, f.socket1, f.socket2,
+            f.attrtype0,f.attrvalue0,f.attrtype1,f.attrvalue1,f.attrtype2,f.attrvalue2,f.attrtype3,f.attrvalue3,
+            f.attrtype4,f.attrvalue4,f.attrtype5,f.attrvalue5,f.attrtype6,f.attrvalue6,
+            p.applytype0,p.applyvalue0,p.applytype1,p.applyvalue1,p.applytype2,p.applyvalue2,p.size AS item_size,p.type AS item_type
+          FROM {FLAT} LEFT JOIN player.item_proto p ON p.vnum=f.vnum WHERE f.vnum=%s AND f.variant=%s
+          ORDER BY f.unit LIMIT 20""", (vnum, variant)))
+        m._enrich_items(cheapest)
+        stamp = datetime.now()
+        for offer in cheapest:
+            for bonus in offer["bonuses"]:
+                bonus["kind"] = bonus_kind(bonus["text"])
+                bonus["negative"] = bool(re.search(r"[−-]\d", bonus["text"]))
+            offer.update(unit=float(offer["unit"]), price=int(offer["price"]), count=int(offer["count"]),
+                         age=age_text(offer["first_seen"], stamp), map_name=m.map_name(offer["shop_map"]))
+        return render_template("market_item.html", vnum=vnum, name=name, icon=m.item_icon_url(vnum), now=now_row, variant=variant,
+                               variant_name=variant_label(vnum, variant), history=history, offers=cheapest,
+                               groups=[dict(g, label=variant_label(vnum, int(g["variant"])) or "wszystkie oferty") for g in groups])
+
+    # ------------------------------------------------------------- price index
+
+    def price_index():
+        """An index of the market's prices: for the items with 10 or more
+        offers now, each hour's median against the first median seen, averaged
+        (100 = the first hour)."""
+        rows = m.rows("""SELECT h.vnum, h.variant, DATE_FORMAT(h.captured_at, '%%Y-%%m-%%d %%H:00') AS hour, h.median_unit
+                         FROM player.web_seban_price_history h JOIN player.web_seban_price_now n ON n.vnum=h.vnum AND n.variant=h.variant
+                         WHERE n.offers >= 10 AND h.offers >= 3 AND h.median_unit > 0 AND h.captured_at >= NOW() - INTERVAL 30 DAY
+                         ORDER BY h.captured_at""")
+        series, base, hours = {}, {}, []
+        for r in rows:
+            key = (int(r["vnum"]), int(r["variant"]))
+            base.setdefault(key, float(r["median_unit"]))
+            series.setdefault(key, {})[r["hour"]] = float(r["median_unit"]) / base[key]
+            if not hours or hours[-1] != r["hour"]:
+                hours.append(r["hour"])
+        index = []
+        for hour in hours:
+            ratios = [s[hour] for s in series.values() if hour in s]
+            index.append(round(100 * sum(ratios) / len(ratios), 2) if ratios else None)
+        movers = []
+        for (vnum, variant), s in series.items():
+            ordered = sorted(s)
+            if len(ordered) >= 2:
+                movers.append({"vnum": vnum, "variant": variant, "change": round((s[ordered[-1]] / s[ordered[0]] - 1) * 100, 1)})
+        if movers:
+            names = {}
+            wanted = sorted({x["vnum"] for x in movers})
+            for r in m.rows("SELECT vnum, name, locale_name FROM player.item_proto WHERE vnum IN (" + ",".join(["%s"] * len(wanted)) + ")", wanted):
+                names[int(r["vnum"])] = m.game_text(r["locale_name"] or r["name"])
+            for x in movers:
+                x["name"] = names.get(x["vnum"], f"VNUM {x['vnum']}")
+                x["label"] = variant_label(x["vnum"], x["variant"])
+            movers.sort(key=lambda x: x["change"])
+        return {"hours": [h[8:10] + "." + h[5:7] + " " + h[11:] for h in hours], "index": index, "basket": len(series),
+                "down": movers[:6], "up": list(reversed(movers[-6:])) if movers else []}
+
+    def turnover(days=14):
+        """Offline-shop sales a day: how many and for how much yang (the log's
+        PLAYERBOT_STALL_SOLD lines, '<vnum> x<count> za <price>')."""
+        found = {}
+        for r in m.rows("SELECT DATE(time) AS day, hint FROM log.log WHERE how='PLAYERBOT_STALL_SOLD' AND time >= CURDATE() - INTERVAL %s DAY", (days,)):
+            hit = m.SALE_HINT_RE.match(m.game_text(r["hint"]))
+            if hit:
+                entry = found.setdefault(str(r["day"]), [0, 0])
+                entry[0] += 1
+                entry[1] += int(hit.group(3))
+        return [{"label": day[8:10] + "." + day[5:7], "sales": v[0], "yang": v[1]} for day, v in sorted(found.items())]
+
+    _index_cache = {"at": 0.0, "data": None}
+
+    @app.route("/market/index")
+    @m.login_required
+    def market_index():
+        import time
+        if _index_cache["data"] is None or time.time() - _index_cache["at"] > 300:
+            data = {"prices": price_index()}
+            data["yang"] = m.rows("SELECT DATE_FORMAT(MIN(captured_at), '%%d.%%m %%H:00') AS label, AVG(value) AS value "
+                                  "FROM player.web_seban_metric_snapshot WHERE metric='total_yang' AND captured_at >= NOW() - INTERVAL 7 DAY "
+                                  "GROUP BY DATE_FORMAT(captured_at, '%%Y-%%m-%%d %%H') ORDER BY MIN(captured_at)")
+            data["offers_value"] = m.rows("SELECT DATE_FORMAT(MIN(t.at), '%%d.%%m %%H:00') AS label, AVG(t.value) AS value FROM "
+                                          "(SELECT captured_at AS at, SUM(total_value) AS value FROM player.web_seban_shop_snapshot "
+                                          "WHERE captured_at >= NOW() - INTERVAL 7 DAY GROUP BY captured_at) t "
+                                          "GROUP BY DATE_FORMAT(t.at, '%%Y-%%m-%%d %%H') ORDER BY MIN(t.at)")
+            data["turnover"] = turnover()
+            _index_cache.update(at=time.time(), data=data)
+        data = _index_cache["data"]
+        return render_template("market_index.html", prices=data["prices"], yang=data["yang"], offers_value=data["offers_value"],
+                               turnover=data["turnover"])

@@ -308,6 +308,24 @@ def init(cur):
       attrtype4 INT NOT NULL, attrvalue4 INT NOT NULL, attrtype5 INT NOT NULL, attrvalue5 INT NOT NULL,
       attrtype6 INT NOT NULL, attrvalue6 INT NOT NULL,
       KEY(vnum), KEY(ptype, psubtype), KEY(unit), KEY(price), KEY(first_seen), KEY(owner_id)) ENGINE=InnoDB""")
+    # Against the market: the median price per piece of the same item and how
+    # far under it this offer is (percent, positive = cheaper), and what
+    # reselling the stack at the median would make. Filled from price_now.
+    for ddl in ("variant INT NOT NULL DEFAULT 0", "median_unit DOUBLE NULL", "peers INT NOT NULL DEFAULT 0",
+                "discount SMALLINT NULL", "profit DOUBLE NULL"):
+        cur.execute("ALTER TABLE player.web_seban_offer_flat ADD COLUMN IF NOT EXISTS " + ddl)
+    cur.execute("ALTER TABLE player.web_seban_offer_flat ADD INDEX IF NOT EXISTS discount (discount)")
+    cur.execute("ALTER TABLE player.web_seban_offer_flat ADD INDEX IF NOT EXISTS profit (profit)")
+    # Per item (and per taught skill for the Skill Book) what the offers say
+    # right now; and every hour's copy of it, for the price charts and index.
+    cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_price_now (
+      vnum INT UNSIGNED NOT NULL, variant INT NOT NULL, offers INT UNSIGNED NOT NULL,
+      min_unit DOUBLE NOT NULL, median_unit DOUBLE NOT NULL, max_unit DOUBLE NOT NULL, avg_unit DOUBLE NOT NULL,
+      PRIMARY KEY(vnum, variant)) ENGINE=InnoDB""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_price_history (
+      captured_at DATETIME NOT NULL, vnum INT UNSIGNED NOT NULL, variant INT NOT NULL, offers INT UNSIGNED NOT NULL,
+      min_unit DOUBLE NOT NULL, median_unit DOUBLE NOT NULL, max_unit DOUBLE NOT NULL, avg_unit DOUBLE NOT NULL,
+      PRIMARY KEY(vnum, variant, captured_at), KEY(captured_at)) ENGINE=InnoDB""")
     cur.execute("""CREATE TABLE IF NOT EXISTS player.web_seban_bot_position_snapshot (
       captured_at DATETIME NOT NULL, pid INT UNSIGNED NOT NULL, map_index INT UNSIGNED NOT NULL,
       x INT NOT NULL, y INT NOT NULL, PRIMARY KEY(captured_at,pid), KEY(pid,captured_at)) ENGINE=InnoDB""")
@@ -514,7 +532,7 @@ def collect(con, previous):
           (item_id, vnum, cnt, price, unit, ptype, psubtype, level, plus, antiflag, owner_id, seller, shop_name, shop_map,
            name, pname, first_seen, socket0, socket1, socket2,
            attrtype0, attrvalue0, attrtype1, attrvalue1, attrtype2, attrvalue2, attrtype3, attrvalue3,
-           attrtype4, attrvalue4, attrtype5, attrvalue5, attrtype6, attrvalue6)
+           attrtype4, attrvalue4, attrtype5, attrvalue5, attrtype6, attrvalue6, variant)
           SELECT i.id, i.vnum, GREATEST(i.count,1), CAST(JSON_UNQUOTE(JSON_EXTRACT(i.ikashop_data,'$.yang')) AS UNSIGNED),
             CAST(JSON_UNQUOTE(JSON_EXTRACT(i.ikashop_data,'$.yang')) AS UNSIGNED) / GREATEST(i.count,1),
             p.type, p.subtype,
@@ -523,11 +541,34 @@ def collect(con, previous):
             COALESCE(p.locale_name, CONCAT('VNUM ', i.vnum)), COALESCE(p.name,''), s.first_seen,
             i.socket0, i.socket1, i.socket2,
             i.attrtype0, i.attrvalue0, i.attrtype1, i.attrvalue1, i.attrtype2, i.attrvalue2, i.attrtype3, i.attrvalue3,
-            i.attrtype4, i.attrvalue4, i.attrtype5, i.attrvalue5, i.attrtype6, i.attrvalue6
+            i.attrtype4, i.attrvalue4, i.attrtype5, i.attrvalue5, i.attrtype6, i.attrvalue6,
+            -- The group an offer is compared within: the taught skill for the Skill Book, the number
+            -- of added bonuses for a weapon or armour (a +2 earring with five lines is not
+            -- priced like a bare one), else the item alone.
+            IF(i.vnum=50300, i.socket0, IF(p.type IN (1,2),
+              (i.attrtype0>0)+(i.attrtype1>0)+(i.attrtype2>0)+(i.attrtype3>0)+(i.attrtype4>0)+(i.attrtype5>0)+(i.attrtype6>0), 0))
           FROM player.item i JOIN player.ikashop_offlineshop o ON o.owner=i.owner_id AND o.duration > 0
           JOIN player.item_proto p ON p.vnum=i.vnum JOIN player.player pl ON pl.id=i.owner_id
           LEFT JOIN player.web_seban_offer_seen s ON s.item_id=i.id
           WHERE i.window = 'IKASHOP_OFFLINESHOP' AND i.ikashop_data IS NOT NULL AND i.ikashop_data <> ''""")
+        # The market per item: one row of what the offers of it say.
+        cur.execute("DELETE FROM player.web_seban_price_now")
+        cur.execute("""INSERT INTO player.web_seban_price_now (vnum, variant, offers, min_unit, median_unit, max_unit, avg_unit)
+          SELECT vnum, variant, COUNT(*), MIN(unit), MAX(med), MAX(unit), SUM(price) / SUM(cnt)
+          FROM (SELECT vnum, variant, unit, price, cnt,
+                  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY unit) OVER (PARTITION BY vnum, variant) AS med
+                FROM player.web_seban_offer_flat) t GROUP BY vnum, variant""")
+        cur.execute("""UPDATE player.web_seban_offer_flat f JOIN player.web_seban_price_now n ON n.vnum=f.vnum AND n.variant=f.variant
+          SET f.median_unit=n.median_unit, f.peers=n.offers,
+              f.discount=IF(n.offers >= 3 AND n.median_unit > 0, ROUND((n.median_unit - f.unit) * 100 / n.median_unit), NULL),
+              f.profit=IF(n.offers >= 3, (n.median_unit - f.unit) * f.cnt, NULL)""")
+        # Every hour a copy for the charts; a month of hours is a few hundred thousand rows at most.
+        if True:  # INSERT IGNORE keeps the first copy of each hour
+            cur.execute("""INSERT IGNORE INTO player.web_seban_price_history
+              (captured_at, vnum, variant, offers, min_unit, median_unit, max_unit, avg_unit)
+              SELECT %s, vnum, variant, offers, min_unit, median_unit, max_unit, avg_unit FROM player.web_seban_price_now""",
+                        (now.replace(minute=0),))
+            cur.execute("DELETE FROM player.web_seban_price_history WHERE captured_at < %s - INTERVAL 120 DAY", (now,))
         cur.execute("COMMIT")
         cur.execute("""INSERT IGNORE INTO player.web_seban_shop_item_snapshot (captured_at, vnum, socket0, offers, total_units, total_value)
           SELECT %s, vnum, IF(vnum=50300, socket0, 0), COUNT(*), SUM(count),

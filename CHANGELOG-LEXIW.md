@@ -12,7 +12,12 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
-## 2.21.1-lexiw.10 — 2026-10-10 — Giełda: kolorowe bonusy; Wiki: ulepszanie u kowala
+## 2.21.1-lexiw.10 — 2026-10-10 — Giełda: bonusy, okazje, ceny i indeks; Wiki: ulepszanie u kowala
+
+- [panel] Giełda → Okazje: przycisk „🔥 Okazje” (oferty co najmniej 30% poniżej mediany, od największego zysku) i filtr „Taniej od mediany o (%)”; sortowanie po zysku z odsprzedaży i po zniżce. Mediana jest liczona w grupie tych samych przedmiotów z tą samą liczbą dodanych bonusów (kolczyki z pięcioma liniami nie są porównywane z gołymi) i dla Księgi Umiejętności osobno dla każdej umiejętności; wymaga co najmniej 3 ofert. Przy ofercie widać różnicę względem mediany i zysk z odsprzedaży stosu.
+- [panel] Giełda → strona ceny przedmiotu (klik w nazwę): najtaniej, mediana, najdrożej i liczba ofert, wykres ceny za sztukę w czasie (godzinowe punkty), przełącznik grupy porównania i 20 najtańszych ofert.
+- [panel] Gospodarka → Indeks cen i obieg yang: indeks cen z godzinnych median przedmiotów mających co najmniej 10 ofert (100 = pierwsza zmierzona godzina) z listą najbardziej podrożałych i potaniałych, yang w obiegu, wartość ofert w sklepach i dzienny obrót sprzedaży botów (liczba i yang).
+- [panel] Collector: tabele web_seban_price_now (ceny teraz per przedmiot i grupa) i web_seban_price_history (godzinna historia, 120 dni); w płaskiej tabeli ofert mediana, zniżka i zysk liczone przy każdej migawce. Historia cen i indeks zbierają się od uruchomienia tej funkcji — wykresy ruszą po kilku godzinach.
 
 - [panel] Wiki, strona przedmiotu → Poziomy ulepszeń: przy każdym plusie szansa ulepszenia na następny plus, koszt u kowala (yang) i potrzebne materiały (z linkami do ich stron) — z tabeli ulepszeń serwera; „U botów” to rzeczywiste wyniki botów na tym przedmiocie z logu ulepszeń (od 20 prób, np. Miecz+5: 56% z 312 prób przy 60% w tabeli); „Bez porażki od +0” to szansa dojścia do danego plusa bez jednej porażki.
 - [panel] Giełda: bonusy przedmiotu jako kolorowe „pigułki” w wierszu oferty — kolor zależy od rodzaju bonusu: niebieski obrona i odporności, zielononiebieski atak (Silny przeciw, obrażenia, cios krytyczny), fioletowy życie i statystyki (Maks. PŻ, Siła, regeneracja, kradzież), pomarańczowy szybkość i bonusy (yang, exp, drop), szary reszta; czerwone dla wartości ujemnych. Bonusy wbudowane w przedmiot są tylko obrysowane, dodane — wypełnione.

@@ -1,0 +1,49 @@
+{% extends 'base.html' %}{% block title %}{{ name }} · Ceny · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('player-profile.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('market.css') }}">
+{%- macro yang(n) -%}{{ '{:,}'.format(n|int).replace(',', ' ') }}{%- endmacro -%}
+<p class="eyebrow"><a href="{{ url_for('market') }}">GIEŁDA</a> · CENY PRZEDMIOTU</p>
+<section class="wiki-head">
+  <div class="wiki-icon">{% if icon %}<img src="{{ icon }}" alt="">{% endif %}</div>
+  <div><h1>{{ name }}</h1>
+    <p class="muted">VNUM {{ vnum }}{% if variant_name %} · {{ variant_name }}{% endif %} · <a href="{{ url_for('wiki_item', vnum=vnum) }}">strona w wiki →</a> · <a href="{{ url_for('market', q=vnum) }}">wszystkie oferty →</a></p></div>
+</section>
+
+{% if not now %}
+<p class="muted">Tego przedmiotu nie ma teraz na żadnym straganie, więc nie ma jego ceny. Historia pojawi się, gdy ktoś go wystawi.</p>
+{% else %}
+{% if groups|length > 1 %}<nav class="item-types market-variants"><span class="muted">Porównanie w grupie:</span>{% for g in groups %}<a class="{{ 'active' if g.variant == variant }}" href="{{ url_for('market_item', vnum=vnum, v=g.variant) }}">{{ g.label }} <small>{{ g.offers }}</small></a>{% endfor %}</nav>{% endif %}
+<div class="trend-grid market-kpi">
+  <article class="trend-card"><span>Najtaniej (za sztukę)</span><strong>{{ yang(now.min_unit) }}</strong></article>
+  <article class="trend-card"><span>Mediana</span><strong>{{ yang(now.median_unit) }}</strong></article>
+  <article class="trend-card"><span>Najdrożej</span><strong>{{ yang(now.max_unit) }}</strong></article>
+  <article class="trend-card"><span>Ofert</span><strong>{{ now.offers }}</strong></article>
+</div>
+<section class="panel">
+  <h2>Cena za sztukę w czasie</h2>
+  {% if history|length >= 2 %}<canvas id="priceChart" height="110"></canvas>
+  <script>new Chart(document.getElementById('priceChart'),{type:'line',data:{labels:{{ history|map(attribute='label')|list|tojson }},datasets:[
+    {label:'Najtaniej',data:{{ history|map(attribute='min_unit')|list|tojson }},borderColor:'#63c993',tension:.25,pointRadius:0},
+    {label:'Mediana',data:{{ history|map(attribute='median_unit')|list|tojson }},borderColor:'#f2c34d',backgroundColor:'#f2c34d22',fill:true,tension:.25,pointRadius:0},
+    {label:'Najdrożej',data:{{ history|map(attribute='max_unit')|list|tojson }},borderColor:'#e0786b',tension:.25,pointRadius:0}]},
+    options:{interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#cfe0f7'}}},scales:{x:{ticks:{color:'#8fa5c1',maxTicksLimit:12}},y:{ticks:{color:'#8fa5c1'}}}}});</script>
+  {% else %}<p class="muted">Historia cen zbiera się od niedawna — jeden punkt na godzinę. Wykres pojawi się po dwóch godzinach działania serwera.</p>{% endif %}
+</section>
+{% endif %}
+
+<section class="panel table-wrap">
+  <h2>Najtańsze oferty{% if variant_name %} ({{ variant_name }}){% endif %}</h2>
+  <table class="market-table"><thead><tr><th>Przedmiot</th><th>Ilość</th><th>Za sztukę</th><th>Cena stosu</th><th>vs mediana</th><th>Wiek</th><th>Sprzedawca</th></tr></thead><tbody>
+  {% from '_macros.html' import tooltip %}
+  {% for o in offers %}<tr>
+    <td class="market-item"><span class="market-icon" tabindex="0">{% if icon %}<img src="{{ icon }}" alt="">{% endif %}{{ tooltip(o, o.price) }}</span>
+      <div><b>{{ o.item_name }}</b>{% if o.bonuses %}<div class="market-pills">{% for b in o.bonuses %}<span class="pill pill--{{ b.kind }} {{ b.source }}{{ ' negative' if b.negative }}">{{ b.text }}</span>{% endfor %}</div>{% endif %}</div></td>
+    <td>{{ o.count }}</td><td><b>{{ yang(o.unit) }}</b></td><td>{{ yang(o.price) }}</td>
+    <td>{% if o.discount is none %}<span class="muted">—</span>{% else %}<span class="market-diff {{ 'cheap' if o.discount >= 15 else 'dear' if o.discount <= -15 else '' }}">{{ '%+d'|format(-o.discount) }}%</span>{% endif %}</td>
+    <td>{{ o.age }}</td>
+    <td><a href="{{ url_for('player', pid=o.owner_id) }}">{{ o.seller }}</a><small class="muted"> {{ o.map_name }}</small></td></tr>
+  {% else %}<tr><td colspan="7" class="muted">Brak ofert.</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endblock %}

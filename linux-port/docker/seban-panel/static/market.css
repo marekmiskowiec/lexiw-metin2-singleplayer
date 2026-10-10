@@ -39,3 +39,4 @@
 .pill--other{background:#3a4560;border-color:#56637f}
 .pill.native{background:transparent;color:color-mix(in srgb,var(--text) 80%,var(--muted))}
 .pill.negative{background:#7a2230;border-color:#b3394c;color:#ffd9de}
+.market-tabs,.market-variants{margin:6px 0 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
