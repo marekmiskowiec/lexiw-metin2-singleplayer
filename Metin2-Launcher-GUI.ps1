@@ -474,6 +474,12 @@ function Switch-LauncherLanguage {
     Save-M2LauncherConfig -Config $config -ConfigPath $configPath
     $script:Lang = $config.language
     Write-LocalLog ("Language: {0}" -f $config.language)
+    # Lexiw: the window changes at once (Layout.ps1); the restart message is
+    # only for a copy without that function.
+    if (Get-Command Update-LauncherLanguageLive -ErrorAction SilentlyContinue) {
+        Update-LauncherLanguageLive
+        return
+    }
     [Windows.Forms.MessageBox]::Show((T 'langSwitched'), (T 'formTitle'),
         [Windows.Forms.MessageBoxButtons]::OK,
         [Windows.Forms.MessageBoxIcon]::Information) | Out-Null
@@ -2941,10 +2947,11 @@ function Update-VersionFooter {
         # the box says which copy of the fork this is.
         $info = Get-LexiwVersionInfo
         $client = Get-InstalledClientVersion
+        $en = $script:Lang -eq 'en'
         $lines = @("Lexiw: $($info.Lexiw)")
         if ($info.Commit) { $lines += "Commit: $($info.Commit)" }
-        if ($info.Package) { $lines += "Paczka MT2009: $($info.Package)" }
-        $lines += "Klient: $(if ($client -and $client -ne 'unknown') { $client } else { 'nieznana' })"
+        if ($info.Package) { $lines += "$(if ($en) { 'MT2009 package' } else { 'Paczka MT2009' }): $($info.Package)" }
+        $lines += "$(if ($en) { 'Client' } else { 'Klient' }): $(if ($client -and $client -ne 'unknown') { $client } elseif ($en) { 'unknown' } else { 'nieznana' })"
         $script:versionLabel.Text = $lines -join "`r`n"
         $script:updateAvailable = $false
         $script:versionBaseColor = [Drawing.Color]::Silver

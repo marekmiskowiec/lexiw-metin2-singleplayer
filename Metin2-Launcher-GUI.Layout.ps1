@@ -117,7 +117,12 @@ public class M2LauncherArtPanel2 : Panel {
     }
 }
 
+$script:UiTextPairs = @{}
 function UI-Text([string]$Pl, [string]$En) {
+    # Lexiw: every pair is remembered, so Update-LauncherLanguageLive can turn a
+    # control showing either text into the other without restarting.
+    $script:UiTextPairs[$Pl] = @($Pl, $En)
+    $script:UiTextPairs[$En] = @($Pl, $En)
     if ($script:Lang -eq 'en') { return $En }
     return $Pl
 }
@@ -245,7 +250,9 @@ $header = [Windows.Forms.Panel]::new(); $header.Dock = 'Top'; $header.Height = 9
 $header.BackColor = UI-Color '#0D141A'; $header.Padding = [Windows.Forms.Padding]::new(26, 14, 26, 10)
 $script:form.Controls.Add($header)
 $brand = [Windows.Forms.Panel]::new(); $brand.Dock = 'Fill'; $header.Controls.Add($brand)
-$subtitle.Text = Get-M2BrandValue -Name 'subtitle' -Default $(if ($script:M2LauncherClassic) { 'SINGLEPLAYER  /  MT2009 CLASSIC  /  BY ZAXEP' } else { 'SINGLEPLAYER  /  MT2009 PLUS  /  BY ZAXEP' })
+$subtitlePl = Get-M2BrandValue -Name 'subtitle' -Default $(if ($script:M2LauncherClassic) { 'SINGLEPLAYER  /  MT2009 CLASSIC  /  BY ZAXEP' } else { 'SINGLEPLAYER  /  MT2009 PLUS  /  BY ZAXEP' })
+# Lexiw: "subtitleEn" in launcher\branding.json, for the English window.
+$subtitle.Text = UI-Text $subtitlePl (Get-M2BrandValue -Name 'subtitleEn' -Default $subtitlePl)
 $subtitle.Dock = 'Top'; $subtitle.Height = 24
 $subtitle.Font = [Drawing.Font]::new('Segoe UI', 9); $subtitle.ForeColor = $script:ui.Muted
 $brand.Controls.Add($subtitle)
@@ -468,6 +475,42 @@ function Get-UIFooterText {
 $footer.Text = Get-UIFooterText
 $footer.ForeColor = $script:ui.Muted; $footer.Padding = [Windows.Forms.Padding]::new(28, 6, 0, 0)
 $main.Controls.Add($footer)
+
+function Update-LauncherLanguageLive {
+    # Lexiw: a language change without a restart. The texts that were made from
+    # a pair (UI-Text) or from a table entry (T) are looked up by what they say
+    # now and swapped for the same text in the language $script:Lang names; the
+    # menu buttons carry their number in front, and the texts that are made as
+    # the launcher runs (log, statuses, versions) refresh the way they always do.
+    $pairs = @{}
+    foreach ($key in @($script:Strings['pl'].Keys)) {
+        $pl = $script:Strings['pl'][$key]; $en = $script:Strings['en'][$key]
+        if ($pl -is [string] -and $en -is [string] -and $pl -and $en) { $pairs[$pl] = @($pl, $en); $pairs[$en] = @($pl, $en) }
+    }
+    foreach ($key in @($script:UiTextPairs.Keys)) { $pairs[$key] = $script:UiTextPairs[$key] }
+    $target = if ($script:Lang -eq 'en') { 1 } else { 0 }
+    $swap = {
+        param($control)
+        $text = [string]$control.Text
+        $tag = $control.Tag
+        if ($tag -is [hashtable] -and $tag.ContainsKey('Short') -and $tag.ContainsKey('Id') -and $text.StartsWith($tag.Short + '   ')) {
+            $title = $text.Substring($tag.Short.Length + 3)
+            if ($pairs.ContainsKey($title)) {
+                $control.Text = $tag.Short + '   ' + $pairs[$title][$target]
+                $tag.Title = $control.Text
+            }
+        }
+        elseif ($text -and $pairs.ContainsKey($text) -and $pairs[$text][$target] -ne $text) {
+            $control.Text = $pairs[$text][$target]
+        }
+        foreach ($child in @($control.Controls)) { & $swap $child }
+    }
+    & $swap $script:form
+    $languageButton.Text = if ($script:Lang -eq 'en') { 'EN / PL' } else { 'PL / EN' }
+    $footer.Text = Get-UIFooterText
+    Update-PlayButtonLabel
+    if ($script:versionLabel) { Update-VersionFooter }
+}
 
 $sections = @(
     @('home', '01', (UI-Text 'Pulpit' 'Overview'), (UI-Text 'Wróć do swojego świata' 'Return to your world'), (UI-Text 'Uruchom rozgrywkę lub zarządzaj działającym serwerem.' 'Start playing or manage your running server.')),
@@ -740,6 +783,24 @@ function Invoke-LayoutSelfTest([string]$OutputDirectory) {
     foreach ($button in $expected) {
         if (@($script:ui.Cards | Where-Object { $_.Button -eq $button }).Count -ne 1) { throw "Missing/duplicate action: $($button.Text)" }
     }
+    # The language changes live: to the other one and back, nothing restarts and
+    # nothing is saved to the configuration here.
+    $originalLang = $script:Lang
+    $originalMenu = $script:ui.Nav['home'].Text
+    $originalPlay = $playButton.Text
+    $script:Lang = if ($originalLang -eq 'en') { 'pl' } else { 'en' }
+    Update-LauncherLanguageLive
+    $otherMenu = $script:ui.Nav['home'].Text
+    if ($otherMenu -eq $originalMenu) { throw 'Live language switch did not change the menu' }
+    if ($otherMenu -notmatch $(if ($script:Lang -eq 'en') { 'Overview' } else { 'Pulpit' })) { throw "Live language switch gave the wrong menu text: $otherMenu" }
+    $bitmap = [Drawing.Bitmap]::new($script:form.Width, $script:form.Height)
+    try {
+        $script:form.DrawToBitmap($bitmap, [Drawing.Rectangle]::new(0, 0, $script:form.Width, $script:form.Height))
+        $bitmap.Save((Join-Path $OutputDirectory "$($script:Lang)-live-switch.png"), [Drawing.Imaging.ImageFormat]::Png)
+    } finally { $bitmap.Dispose() }
+    $script:Lang = $originalLang
+    Update-LauncherLanguageLive
+    if ($script:ui.Nav['home'].Text -ne $originalMenu -or $playButton.Text -ne $originalPlay) { throw 'Live language switch did not come back' }
     $reportBox = if ($reportButton) { 'OK' } else { 'no module' }
     [pscustomobject]@{ Checks = $results; ActionCards = $expected.Count; Navigation = 'OK'; Sidebar = 'OK'; ReportBox = $reportBox; LogToggle = 'OK'; LogScroll = 'OK'; RatesRoute = 'OK'; CoffeeLink = 'OK'; ResizeMsPerStep = $resizeMsPerStep; ResizeReleaseMs = $releaseMs } | ConvertTo-Json -Depth 4
     $script:form.Close()
