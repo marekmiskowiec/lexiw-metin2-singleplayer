@@ -8,7 +8,7 @@
 <section class="panel">
   <h2>Indeks cen{% if prices.basket %} <small class="muted">· {{ prices.basket }} przedmiotów w koszyku</small>{% endif %}</h2>
   {% if prices.index|length >= 2 %}<canvas id="idx" height="90"></canvas>
-  <script>new Chart(document.getElementById('idx'),{type:'line',data:{labels:{{ prices.hours|tojson }},datasets:[{label:'Indeks cen',data:{{ prices.index|tojson }},borderColor:'#f2c34d',backgroundColor:'#f2c34d22',fill:true,tension:.25,pointRadius:0}]},options:{plugins:{legend:{display:false}},scales:{x:{{ axis }},y:{ticks:{color:'#8fa5c1'}}}}});</script>
+  <script>new Chart(document.getElementById('idx'),{type:'line',data:{labels:{{ prices.hours|tojson }},datasets:[{label:'Indeks cen',data:{{ prices.index|tojson }},borderColor:'#f2c34d',backgroundColor:'#f2c34d22',fill:true,tension:.25,pointRadius:0}]},options:{plugins:{legend:{display:false}},scales:{x:{{ axis|safe }},y:{ticks:{color:'#8fa5c1'}}}}});</script>
   {% else %}<p class="muted">Indeks wymaga co najmniej dwóch godzin historii cen — zbiera się od niedawna. Wróć za jakiś czas.</p>{% endif %}
   {% if prices.up or prices.down %}
   <div class="market-lists">
@@ -20,18 +20,18 @@
 <div class="market-lists">
   <section class="panel"><h2>Yang w obiegu · 7 dni</h2>
     {% if yang|length >= 2 %}<canvas id="yangc" height="130"></canvas>
-    <script>new Chart(document.getElementById('yangc'),{type:'line',data:{labels:{{ yang|map(attribute='label')|list|tojson }},datasets:[{label:'Yang',data:{{ yang|map(attribute='value')|map('int')|list|tojson }},borderColor:'#60a5fa',backgroundColor:'#60a5fa22',fill:true,tension:.25,pointRadius:0}]},options:{plugins:{legend:{display:false}},scales:{x:{{ axis }},y:{ticks:{color:'#8fa5c1'}}}}});</script>
+    <script>new Chart(document.getElementById('yangc'),{type:'line',data:{labels:{{ yang|map(attribute='label')|list|tojson }},datasets:[{label:'Yang',data:{{ yang|map(attribute='value')|map('int')|list|tojson }},borderColor:'#60a5fa',backgroundColor:'#60a5fa22',fill:true,tension:.25,pointRadius:0}]},options:{plugins:{legend:{display:false}},scales:{x:{{ axis|safe }},y:{ticks:{color:'#8fa5c1'}}}}});</script>
     {% else %}<p class="muted">Za mało danych.</p>{% endif %}</section>
   <section class="panel"><h2>Wartość ofert w sklepach · 7 dni</h2>
     {% if offers_value|length >= 2 %}<canvas id="offc" height="130"></canvas>
-    <script>new Chart(document.getElementById('offc'),{type:'line',data:{labels:{{ offers_value|map(attribute='label')|list|tojson }},datasets:[{label:'Yang w ofertach',data:{{ offers_value|map(attribute='value')|map('int')|list|tojson }},borderColor:'#63c993',backgroundColor:'#63c99322',fill:true,tension:.25,pointRadius:0}]},options:{plugins:{legend:{display:false}},scales:{x:{{ axis }},y:{ticks:{color:'#8fa5c1'}}}}});</script>
+    <script>new Chart(document.getElementById('offc'),{type:'line',data:{labels:{{ offers_value|map(attribute='label')|list|tojson }},datasets:[{label:'Yang w ofertach',data:{{ offers_value|map(attribute='value')|map('int')|list|tojson }},borderColor:'#63c993',backgroundColor:'#63c99322',fill:true,tension:.25,pointRadius:0}]},options:{plugins:{legend:{display:false}},scales:{x:{{ axis|safe }},y:{ticks:{color:'#8fa5c1'}}}}});</script>
     {% else %}<p class="muted">Za mało danych.</p>{% endif %}</section>
 </div>
 
 <section class="panel">
   <h2>Obrót: sprzedaże ze sklepów offline · 14 dni</h2>
   {% if turnover %}<canvas id="turn" height="90"></canvas>
-  <script>new Chart(document.getElementById('turn'),{data:{labels:{{ turnover|map(attribute='label')|list|tojson }},datasets:[{type:'bar',label:'Yang',data:{{ turnover|map(attribute='yang')|list|tojson }},backgroundColor:'#f2c34d99',yAxisID:'y'},{type:'line',label:'Sprzedaży',data:{{ turnover|map(attribute='sales')|list|tojson }},borderColor:'#e0786b',yAxisID:'y1'}]},options:{plugins:{legend:{labels:{color:'#cfe0f7'}}},scales:{x:{{ axis }},y:{ticks:{color:'#8fa5c1'}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:'#e0786b'}}}}});</script>
+  <script>new Chart(document.getElementById('turn'),{data:{labels:{{ turnover|map(attribute='label')|list|tojson }},datasets:[{type:'bar',label:'Yang',data:{{ turnover|map(attribute='yang')|list|tojson }},backgroundColor:'#f2c34d99',yAxisID:'y'},{type:'line',label:'Sprzedaży',data:{{ turnover|map(attribute='sales')|list|tojson }},borderColor:'#e0786b',yAxisID:'y1'}]},options:{plugins:{legend:{labels:{color:'#cfe0f7'}}},scales:{x:{{ axis|safe }},y:{ticks:{color:'#8fa5c1'}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:'#e0786b'}}}}});</script>
   {% else %}<p class="muted">W tym czasie nie było sprzedaży albo log jest pusty.</p>{% endif %}
   <p class="muted wiki-note">Liczone z wpisów logu, gdy bot kupi ofertę ze straganu. To tylko transakcje botów.</p>
 </section>

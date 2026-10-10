@@ -40,3 +40,11 @@
 .pill.native{background:transparent;color:color-mix(in srgb,var(--text) 80%,var(--muted))}
 .pill.negative{background:#7a2230;border-color:#b3394c;color:#ffd9de}
 .market-tabs,.market-variants{margin:6px 0 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+/* Seen in the screenshots: nothing breaks mid-number, a long shop name is cut with an ellipsis. */
+.market-table td:nth-child(n+2):nth-child(-n+6){white-space:nowrap}
+.market-table td:last-child{max-width:240px}
+.market-table td:last-child a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.market-table td:last-child small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.market-table td:last-child a,.market-table td:last-child small{max-width:220px}
+.market-table td:last-child a,.market-table td:last-child small{max-width:150px}
+.market-item{min-width:190px}

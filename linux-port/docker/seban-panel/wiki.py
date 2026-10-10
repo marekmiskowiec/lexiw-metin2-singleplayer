@@ -270,7 +270,8 @@ def install_wiki(m):
             return []
         marks = ",".join(["%s"] * len(chain))
         protos = {int(r["vnum"]): r for r in m.rows(
-            f"SELECT i.vnum,i.name,i.locale_name,i.refine_set,r.cost,r.prob,"
+            f"SELECT i.vnum,i.name,i.locale_name,i.refine_set,i.type,i.subtype,i.applytype0,i.applyvalue0,i.applytype1,i.applyvalue1,"
+            f"i.applytype2,i.applyvalue2,r.cost,r.prob,"
             f"r.vnum0,r.count0,r.vnum1,r.count1,r.vnum2,r.count2,r.vnum3,r.count3,r.vnum4,r.count4 "
             f"FROM player.item_proto i LEFT JOIN world.refine_proto r ON r.id=i.refine_set WHERE i.vnum IN ({marks})", chain)}
         names = {v: m.game_text(r["locale_name"] or r["name"]) for v, r in protos.items()}
@@ -311,7 +312,14 @@ def install_wiki(m):
                                       for i in range(5) if p.get(f"vnum{i}")]}
             levels.append({"vnum": v, "name": names.get(v, f"VNUM {v}"), "icon": m.item_icon_url(v), "current": v == vnum,
                            "stats": [s for s in m.item_base_stats(v) if not s.startswith("Wymagany poziom:")],
+                           "own": native_bonuses(p) if p else [],
                            "step": step, "observed": observed.get(v), "reach": None})
+        # An item's own bonuses go into the rows only where they change with
+        # the plus (boots: movement speed +2 ... +15); a bonus the same at
+        # every level is already in the item's properties above.
+        if len({tuple(level["own"]) for level in levels}) > 1:
+            for level in levels:
+                level["stats"] = level["stats"] + level["own"]
         # The chance of arriving at each level from the first one without a
         # single failure: the product of the steps before it.
         for level in levels:

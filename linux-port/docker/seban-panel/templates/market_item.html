@@ -1,5 +1,6 @@
 {% extends 'base.html' %}{% block title %}{{ name }} · Ceny · {{ panel_brand }}{% endblock %}{% block content %}
 <link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
 <link rel="stylesheet" href="{{ static_asset_url('player-profile.css') }}">
 <link rel="stylesheet" href="{{ static_asset_url('market.css') }}">
 {%- macro yang(n) -%}{{ '{:,}'.format(n|int).replace(',', ' ') }}{%- endmacro -%}
