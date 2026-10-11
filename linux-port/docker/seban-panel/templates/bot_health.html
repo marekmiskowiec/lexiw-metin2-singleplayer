@@ -1,0 +1,59 @@
+{% extends 'base.html' %}{% block title %}Zdrowie botów · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('observe.css') }}">
+{%- macro num(n) -%}{{ '{:,}'.format((n or 0)|int).replace(',', ' ') }}{%- endmacro -%}
+{%- macro cell(row, key) -%}
+  {%- set v = row[key] -%}
+  {%- if v is none -%}—{%- elif key == 'gold' -%}{{ num(v) }}{%- elif key in ('shop', 'fight', 'travel') -%}{{ v }}%{%- elif v is number and v is not integer -%}{{ ('%g'|format(v))|replace('.', ',') }}{%- else -%}{{ v }}{%- endif -%}
+  {%- if row.delta and row.delta[key] %} <small class="hl-delta {{ row.delta[key].tone }}">{{ row.delta[key].text }}</small>{% endif -%}
+{%- endmacro -%}
+{%- macro group_table(title, rows) -%}
+<section class="panel table-wrap">
+  <h2>{{ title }}</h2>
+  <table class="hl-table"><thead><tr><th>Grupa</th>{% for key, header, _d in columns %}<th>{{ header }}</th>{% endfor %}</tr></thead><tbody>
+  {% for r in rows %}<tr><td><b>{{ r.label }}</b></td>{% for key, header, _d in columns %}<td data-sort="{{ r[key] if r[key] is not none else -1 }}">{{ cell(r, key) }}</td>{% endfor %}</tr>
+  {% else %}<tr><td colspan="{{ columns|length + 1 }}" class="muted">Brak danych.</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{%- endmacro -%}
+<p class="eyebrow">GRACZE I BOTY</p><h1>Zdrowie botów</h1>
+<p class="muted">Jak naprawdę radzą sobie boty: wyniki każdej osobowości i persony, na co boty wydają czas i dlaczego chodzą. Stan z {{ d.at }}, {{ num(d.total) }} botów w świecie; zgony i sprzedaże liczone z ostatniej doby. Zapisz migawkę przed zmianą w grze, a po niej porównaj liczby (zmiany zielone = na lepsze, czerwone = na gorsze, szare = bez oceny).</p>
+
+<section class="panel hl-snap">
+  <form method="post" action="{{ url_for('bot_health') }}" class="hl-form">
+    <input type="hidden" name="health_csrf" value="{{ health_csrf }}">
+    <label>Zapisz obecny stan jako <input name="name" maxlength="80" placeholder="np. przed zmianą przerwy dropperów"></label>
+    <button>Zapisz migawkę</button>
+  </form>
+  <form method="get" action="{{ url_for('bot_health') }}" class="hl-form">
+    <label>Porównaj z migawką
+      <select name="vs"><option value="">— bez porównania —</option>{% for s in snapshots %}<option value="{{ s.id }}" {{ 'selected' if picked and picked.id == s.id }}>{{ s.name }} ({{ s.at }})</option>{% endfor %}</select>
+    </label>
+    <button>Porównaj</button>
+  </form>
+  {% if picked %}<form method="post" action="{{ url_for('bot_health') }}" class="hl-form" onsubmit="return confirm('Usunąć tę migawkę?')">
+    <input type="hidden" name="health_csrf" value="{{ health_csrf }}"><input type="hidden" name="action" value="delete"><input type="hidden" name="snap" value="{{ picked.id }}">
+    <span class="muted">Porównanie z: <b>{{ picked.name }}</b> ({{ picked.data.at }}, {{ num(picked.data.total) }} botów)</span> <button class="secondary">Usuń tę migawkę</button>
+  </form>{% endif %}
+</section>
+
+{% if d.overall %}{{ group_table('Wszystkie boty razem', [d.overall]) }}{% endif %}
+
+<div class="act-grid">
+  <section class="panel table-wrap"><h2>Na co boty wydają czas</h2>
+    <p class="muted">Udział botów w danej chwili (jedna próbka).</p>
+    <table><thead><tr><th>Zajęcie</th><th>Botów</th><th>Udział</th><th></th></tr></thead><tbody>
+    {% for a in d.actions %}<tr><td>{{ a.label }}</td><td>{{ num(a.bots) }}</td><td data-sort="{{ a.pct }}">{{ ('%g'|format(a.pct))|replace('.', ',') }}%{% if a.delta is not none and a.delta != 0 %} <small class="hl-delta">{{ '+' if a.delta > 0 }}{{ ('%g'|format(a.delta))|replace('.', ',') }}</small>{% endif %}</td><td><span class="hl-bar"><i style="width:{{ [a.pct, 100]|min }}%"></i></span></td></tr>{% endfor %}
+    </tbody></table></section>
+  <section class="panel table-wrap"><h2>Dlaczego boty chodzą</h2>
+    <p class="muted">{{ num(d.travelling) }} botów jest w drodze. Powód wynika z tekstu statusu.</p>
+    <table><thead><tr><th>Powód</th><th>Botów</th><th>Udział w świecie</th><th>Z podróżujących</th></tr></thead><tbody>
+    {% for r in d.reasons %}<tr><td>{{ r.label }}</td><td>{{ num(r.bots) }}</td><td data-sort="{{ r.pct }}">{{ ('%g'|format(r.pct))|replace('.', ',') }}%{% if r.delta is not none and r.delta != 0 %} <small class="hl-delta">{{ '+' if r.delta > 0 }}{{ ('%g'|format(r.delta))|replace('.', ',') }}</small>{% endif %}</td><td>{{ r.of_travel }}%</td></tr>
+    {% else %}<tr><td colspan="4" class="muted">Nikt nie podróżuje.</td></tr>{% endfor %}
+    </tbody></table></section>
+</div>
+
+{{ group_table('Osobowości (charaktery)', d.characters) }}
+{{ group_table('Persony (system Iwakury)', d.personas) }}
+<p class="muted">Awans to mediana poziomów na dobę z godzinnych migawek postępu (przy krótkim oknie pomiaru przeliczenie na dobę jest przybliżone). Procent walki i podróży to odsetek botów w tej akcji w chwili odczytu. Szczegóły: <a href="{{ url_for('bot_progress') }}">Rozwój botów</a>, <a href="{{ url_for('bot_traps') }}">Pętle śmierci</a>, <a href="{{ url_for('wiki_bots') }}">Osobowości w wiki</a>.</p>
+{% endblock %}

@@ -11131,6 +11131,8 @@ from wiki_guides import install_guides  # noqa: E402
 install_guides(sys.modules[__name__])
 from observe import install_observe  # noqa: E402
 install_observe(sys.modules[__name__])
+from observe_health import install_health  # noqa: E402
+install_health(sys.modules[__name__])
 
 
 if __name__ == "__main__":

@@ -116,6 +116,8 @@ def install_observe(m):
             _progress_cache.update(at=time.time(), data=(by_bot, stamps, measured))
         return _progress_cache["data"]
 
+    m.observe_progress_cached = progress_cached
+
     @app.route("/players/progress")
     @m.login_required
     def bot_progress():
