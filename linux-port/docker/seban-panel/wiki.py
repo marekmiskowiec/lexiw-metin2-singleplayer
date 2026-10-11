@@ -20,6 +20,8 @@ from collections import defaultdict
 
 from flask import abort, jsonify, render_template, request
 
+from wiki_guides import guide_list, search_guides
+
 # item_proto.antiflag: which classes / sexes may NOT use an item.
 ANTIFLAG_CLASSES = ((1 << 2, "Wojownik"), (1 << 3, "Ninja"), (1 << 4, "Sura"), (1 << 5, "Szaman"))
 ANTIFLAG_FEMALE, ANTIFLAG_MALE = 1 << 0, 1 << 1
@@ -607,7 +609,7 @@ def install_wiki(m):
     @m.login_required
     def wiki():
         index = drop_index()
-        return render_template("wiki.html", query=request.args.get("q", "").strip(),
+        return render_template("wiki.html", query=request.args.get("q", "").strip(), guides=guide_list(),
                                item_count=m.one("SELECT COUNT(*) AS n FROM player.item_proto").get("n", 0),
                                mob_count=len(m.drop_mob_rows()), dropped_items=len(index))
 
@@ -642,7 +644,7 @@ def install_wiki(m):
     def api_wiki_search():
         query = request.args.get("q", "").strip()
         if len(query) < 2 and not query.isdigit():
-            return jsonify(ok=True, items=[], mobs=[])
+            return jsonify(ok=True, items=[], mobs=[], maps=[], guides=[])
         clause, params = m.item_name_search(query)
         items = m.rows("SELECT p.vnum,p.name,p.locale_name,p.type,p.subtype FROM player.item_proto p WHERE "
                        + clause + " ORDER BY (p.vnum=%s) DESC, CHAR_LENGTH(p.locale_name), p.vnum LIMIT 30",
@@ -666,7 +668,7 @@ def install_wiki(m):
                       if folded in family["name"].lower() or folded == key]
         found_maps += [{"number": number, "name": name} for number, name in sorted(m.MAP_NAMES.items())
                        if number in dirs and folded in name.lower()][:8]
-        return jsonify(ok=True, items=found_items, mobs=found_mobs, maps=found_maps)
+        return jsonify(ok=True, items=found_items, mobs=found_mobs, maps=found_maps, guides=search_guides(query))
 
     def region_summary(key, mobs):
         """The three kingdoms' maps of a family as one line of the list."""

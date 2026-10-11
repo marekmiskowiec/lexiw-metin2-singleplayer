@@ -375,6 +375,63 @@ def install_market(m):
 
     _index_cache = {"at": 0.0, "data": None}
 
+    # --------------------------------------------- turnover: what actually sells
+
+    def sales_overview():
+        """The shops by map and kingdom, the value over time and what sells -
+        the old Rynek page, now a tab of the Giełda. Offers, shops and value
+        come from the same collector pass as the offer list, so the numbers
+        here and there are the same."""
+        latest = m.one("SELECT MAX(captured_at) AS at FROM player.web_seban_shop_snapshot").get("at")
+        by_map = []
+        totals = {empire: {"shops": 0, "items": 0} for empire in m.EMPIRES}
+        if latest:
+            by_map = list(m.rows("SELECT map_index, empire, shop_count FROM player.web_seban_shop_snapshot "
+                                 "WHERE captured_at=%s ORDER BY empire, shop_count DESC", (latest,)))
+            for row in by_map:
+                row["map_short"] = m.map_short_code(row["map_index"])
+            for row in m.rows("SELECT empire, SUM(shop_count) AS shops, SUM(item_count) AS items FROM player.web_seban_shop_snapshot "
+                              "WHERE captured_at=%s GROUP BY empire", (latest,)):
+                totals[int(row["empire"])] = {"shops": int(row["shops"] or 0), "items": int(row["items"] or 0)}
+        raw = m.rows("SELECT DATE_FORMAT(captured_at, '%%m-%%d %%H:%%i') AS label, empire, SUM(total_value) AS value "
+                     "FROM player.web_seban_shop_snapshot WHERE captured_at >= NOW() - INTERVAL 7 DAY "
+                     "GROUP BY captured_at, empire ORDER BY captured_at")
+        labels, values = [], {empire: {} for empire in m.EMPIRES}
+        for row in raw:
+            empire = int(row["empire"] or 0)
+            if empire not in values:
+                continue
+            if row["label"] not in labels:
+                labels.append(row["label"])
+            values[empire][row["label"]] = int(row["value"] or 0)
+        trend = {"labels": labels, "series": [{"id": e, "name": m.empire_info(e)["name"],
+                                               "data": [values[e].get(label) for label in labels]} for e in m.EMPIRES]}
+        return by_map, totals, trend
+
+    @app.route("/market/sales")
+    @m.login_required
+    def market_sales():
+        try:
+            info = shared()
+            by_map, totals, trend = sales_overview()
+        except pymysql.MySQLError:
+            app.logger.exception("Giełda: the sales view is not ready")
+            return render_template("market.html", ready=False)
+        try:
+            limit = max(15, min(100, int(m.settings().get("fastest_shop_items_limit", "15"))))
+        except (TypeError, ValueError):
+            limit = 15
+        sold_total = int(m.one("SELECT COUNT(*) AS n FROM log.log WHERE how='PLAYERBOT_STALL_SOLD'").get("n") or 0)
+        sold_day = int(m.one("SELECT COUNT(*) AS n FROM log.log WHERE how='PLAYERBOT_STALL_SOLD' "
+                             "AND time >= NOW() - INTERVAL 24 HOUR").get("n") or 0)
+        velocity = m.shop_sales_velocity(limit=None)
+        books = m.shop_sales_velocity(limit=5, only_skillbooks=True)
+        for item in list(velocity) + list(books):
+            item["variant"] = int(item.get("socket0") or 0) if int(item["vnum"]) in m.SKILLBOOK_VNUMS else None
+        return render_template("market_sales.html", overview=info["overview"], by_map=by_map, empire_totals=totals,
+                               value_trend=trend, sold_total=sold_total, sold_day=sold_day, limit=limit,
+                               sales_velocity=velocity[:limit], skillbook_velocity=books, recent_sales=m.recent_shop_sales(10))
+
     @app.route("/market/index")
     @m.login_required
     def market_index():

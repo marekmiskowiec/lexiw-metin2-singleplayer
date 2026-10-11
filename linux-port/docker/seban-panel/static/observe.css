@@ -8,3 +8,15 @@ tr.core-limit .core-bar i,tr.core-stale .core-bar i{background:#e0786b}
 .core-flag.warn{color:#f2c34d;border-color:#f2c34d}
 .core-flag.bad{color:#e0786b;border-color:#e0786b}
 .market-tabs{margin:6px 0 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+
+/* Zdrowie botow: migawki i porownania */
+.hl-snap{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:flex-end}
+.hl-form{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.hl-form label{display:flex;flex-direction:column;gap:3px;font-size:13px}
+.hl-form input[name=name]{min-width:260px}
+.hl-delta{font-size:11px;color:var(--muted)}
+.hl-delta.good{color:#63c993}
+.hl-delta.bad{color:#e0786b}
+.hl-table td,.hl-table th{white-space:nowrap}
+.hl-bar{display:inline-block;width:120px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--edge) 60%,transparent);overflow:hidden;vertical-align:middle}
+.hl-bar i{display:block;height:100%;background:#69a6ff}

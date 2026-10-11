@@ -547,6 +547,65 @@ def core_bot_counts():
     return counts
 
 
+ALERT_CPU_PERCENT = 90       # a core this busy in each of the last three snapshots (15 minutes)
+ALERT_STALE_SECONDS = 60     # a core with bots whose status file has not changed this long, twice running
+ALERT_CHANNEL_RATIO = 0.55   # the smaller channel holds less than this share of the bigger one
+ALERT_BOT_DROP = 0.7         # bots online fell below this share of the last half hour's best
+
+
+def notify(cur, kind, title, body, link, cooldown_hours=6):
+    """A bell entry (the panel's notifications), unless the same title was raised
+    in the last cooldown_hours - one entry per episode, not one per five minutes."""
+    cur.execute("SELECT 1 FROM player.web_seban_notifications WHERE kind=%s AND title=%s "
+                "AND created_at >= NOW() - INTERVAL %s HOUR LIMIT 1", (kind, title, cooldown_hours))
+    if not cur.fetchone():
+        cur.execute("INSERT INTO player.web_seban_notifications (kind, title, body, link_url) VALUES (%s,%s,%s,%s)",
+                    (kind, title, body, link))
+
+
+def check_alerts(cur, now):
+    """What is worth a look at the bell: a core at its limit, a frozen core,
+    lopsided channels, bots disappearing. Runs after every core snapshot."""
+    reader = cur.connection.cursor(pymysql.cursors.DictCursor)
+    reader.execute("SELECT captured_at, core, cpu_percent, bots, status_age FROM player.web_seban_core_snapshot "
+                "WHERE captured_at >= %s - INTERVAL 20 MINUTE AND core LIKE 'ch%%' ORDER BY captured_at", (now,))
+    by_time = {}
+    for row in reader.fetchall():
+        by_time.setdefault(row["captured_at"], []).append(row)
+    recent = [by_time[t] for t in sorted(by_time)][-3:]
+    if not recent:
+        return
+    link = "/system/cores"
+    if len(recent) == 3:
+        for core in {r["core"] for r in recent[-1]}:
+            series = [next((r for r in snap if r["core"] == core), None) for snap in recent]
+            if all(s and s["cpu_percent"] is not None and float(s["cpu_percent"]) >= ALERT_CPU_PERCENT for s in series):
+                notify(cur, "alert_cpu", f"Rdzeń {core} jest na granicy mocy",
+                       f"Obciążenie procesora co najmniej {ALERT_CPU_PERCENT}% przez ostatnie 15 minut ({int(series[-1]['bots'])} botów na rdzeniu). "
+                       "Gra jest jednowątkowa: przy 100% boty zaczynają zwalniać.", link)
+    if len(recent) >= 2:
+        for core in {r["core"] for r in recent[-1]}:
+            series = [next((r for r in snap if r["core"] == core), None) for snap in recent[-2:]]
+            if all(s and int(s["bots"] or 0) > 0 and s["status_age"] is not None and int(s["status_age"]) >= ALERT_STALE_SECONDS for s in series):
+                notify(cur, "alert_stale", f"Rdzeń {core} przestał się zgłaszać",
+                       f"Plik stanu rdzenia nie zmienił się od ponad {ALERT_STALE_SECONDS} s, a rdzeń ma botów. Może być zawieszony.", link)
+    channels = {}
+    for row in recent[-1]:
+        match = re.match(r"ch(\d+)-", row["core"])
+        if match:
+            channels[match.group(1)] = channels.get(match.group(1), 0) + int(row["bots"] or 0)
+    if len(channels) >= 2 and sum(channels.values()) >= 200:
+        low, high = min(channels.values()), max(channels.values())
+        if high and low / high < ALERT_CHANNEL_RATIO:
+            split = ", ".join(f"kanał {ch}: {n}" for ch, n in sorted(channels.items()))
+            notify(cur, "alert_channels", "Kanały mają bardzo nierówną liczbę botów",
+                   f"{split}. Mniejszy kanał ma {round(100 * low / high)}% większego.", link)
+    totals = [sum(int(r["bots"] or 0) for r in snap) for snap in (by_time[t] for t in sorted(by_time))]
+    if len(totals) >= 3 and max(totals[:-1]) >= 200 and totals[-1] < ALERT_BOT_DROP * max(totals[:-1]) and totals[-1] > 0:
+        notify(cur, "alert_bots", "Liczba botów w świecie gwałtownie spadła",
+               f"Online jest {totals[-1]} botów, a przed chwilą było {max(totals[:-1])}. Sprawdź, czy rdzeń gry się nie zrestartował.", link, 2)
+
+
 def collect(con, previous):
     now = datetime.now().replace(second=0, microsecond=0)
     previous, cpu, used, total, disk_used, disk_total = host_metrics(previous)
@@ -570,6 +629,7 @@ def collect(con, previous):
             cur.execute("INSERT IGNORE INTO player.web_seban_core_snapshot (captured_at, core, cpu_percent, rss_mb, bots, status_age) "
                         "VALUES (%s,%s,%s,%s,%s,%s)", (now, core["core"], core["cpu"], core["rss"], bots, age))
         cur.execute("DELETE FROM player.web_seban_core_snapshot WHERE captured_at < %s - INTERVAL 30 DAY", (now,))
+        check_alerts(cur, now)
         # Once an hour: where every online bot stands in levels. INSERT IGNORE keeps the first look of the hour.
         hour = now.replace(minute=0)
         cur.execute("SELECT 1 FROM player.web_seban_bot_progress WHERE captured_at=%s LIMIT 1", (hour,))

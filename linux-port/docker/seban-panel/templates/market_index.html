@@ -2,6 +2,7 @@
 <link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
 <link rel="stylesheet" href="{{ static_asset_url('market.css') }}">
 <p class="eyebrow"><a href="{{ url_for('market') }}">GIEŁDA</a> · GOSPODARKA</p><h1>Indeks cen i obieg yang</h1>
+{% with tab = "index" %}{% include "_market_tabs.html" %}{% endwith %}
 <p class="muted">Jak zmieniają się ceny na rynku sklepów offline i ile yang krąży po świecie. Indeks cen liczony jest z godzinnych median przedmiotów, które mają teraz co najmniej 10 ofert (100 = pierwsza zmierzona godzina), więc zbiera się dopiero od uruchomienia tej funkcji.</p>
 {% set axis = "{ticks:{color:'#8fa5c1',maxTicksLimit:10}}" %}
 

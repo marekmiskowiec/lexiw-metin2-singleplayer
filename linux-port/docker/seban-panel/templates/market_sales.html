@@ -1,0 +1,72 @@
+{% extends 'base.html' %}{% block title %}Obrót i sprzedaże · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('dashboard-trends.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('market.css') }}">
+{%- macro yang(n) -%}{{ '{:,}'.format(n|int).replace(',', ' ') }}{%- endmacro -%}
+<p class="eyebrow"><a href="{{ url_for('market') }}">GIEŁDA</a> · GOSPODARKA</p><h1>Obrót i sprzedaże</h1>
+{% with tab = "sales" %}{% include "_market_tabs.html" %}{% endwith %}
+<p class="muted">Co się naprawdę sprzedaje i gdzie stoją sklepy. Liczby ofert, sklepów i wartości są te same co na liście ofert (jedna migawka collectora, co 5 minut{% if overview.snapshot %}, ostatnia {{ overview.snapshot }}{% endif %}).</p>
+
+<div class="trend-grid market-kpi">
+  <article class="trend-card"><span>Aktywne sklepy</span><strong>{{ yang(overview.shops) }}</strong><small>otwarte stragany</small></article>
+  <article class="trend-card"><span>Oferty</span><strong>{{ yang(overview.offers) }}</strong><small>{{ yang(overview.pieces) }} sztuk towaru</small></article>
+  <article class="trend-card"><span>Wartość rynku</span><strong>{{ yang(overview.value) }}</strong><small>yang, suma ofert</small></article>
+  <article class="trend-card"><span>Sprzedaży łącznie</span><strong>{{ yang(sold_total) }}</strong><small>ostatnie 24 h: {{ yang(sold_day) }}</small></article>
+</div>
+
+<div class="map-legend"><span><i class="dot" style="background:#ef4444"></i>Shinsoo</span><span><i class="dot" style="background:#f6c85f"></i>Chunjo</span><span><i class="dot" style="background:#4ea5ff"></i>Jinno</span></div>
+<section class="grid two"><article class="panel"><h2>🏪 Sklepy na mapach</h2>{% if by_map %}<canvas id="shopsByMap"></canvas>{% else %}<p class="muted">Brak aktywnych sklepów w ostatnim odczycie.</p>{% endif %}</article><article class="panel"><h2>📦 Sztuk towaru wg królestwa</h2><canvas id="itemsByEmpire"></canvas></article></section>
+<section class="panel"><h2>💰 Wartość rynku w czasie · 7 dni</h2>{% if value_trend.labels %}<canvas id="valueTrend"></canvas>{% else %}<p class="muted">Za mało odczytów collectora, żeby pokazać trend — wróć za kilka cykli (co 5 minut).</p>{% endif %}</section>
+
+{% set trend_icon={'up':'▲','down':'▼','flat':'–'} %}{% set trend_color={'up':'#39e890','down':'#ef4444','flat':'#8fa5c1'} %}
+<section class="panel"><h2>🔥 Najszybciej rozchodzące się przedmioty · ostatnie 24 h</h2><p class="muted">Pozycji: {{ limit }}. Ranking wg liczby faktycznych sprzedaży ze straganów (nie samych ofert); strzałka porównuje cenę z ostatnich 12 h z wcześniejszymi 12 h.</p><table><thead><tr><th>Przedmiot</th><th>Sprzedaży/24h</th><th>Tempo</th><th>Sztuk</th><th>Śr. cena/szt.</th></tr></thead><tbody>{% for i in sales_velocity %}<tr><td class="item-cell">{% if item_icon(i.vnum) %}<img src="{{ item_icon(i.vnum) }}" loading="lazy" alt="">{% endif %}<a href="{{ url_for('market_item', vnum=i.vnum, v=i.variant) }}">{{ i.item_name }}</a></td><td>{{ i.sales }}</td><td>{{ i.per_hour }}/h</td><td>{{ i.units }}</td><td>{{ yang(i.avg_price) }} <span style="color:{{ trend_color[i.price_trend] }}" title="Śr. cena: ostatnie 12 h vs wcześniejsze 12 h">{{ trend_icon[i.price_trend] }}</span></td></tr>{% else %}<tr><td colspan="5" class="muted">Brak sprzedaży ze straganów w ostatnich 24 h.</td></tr>{% endfor %}</tbody></table></section>
+<section class="panel"><h2>📚 Najlepiej sprzedające się księgi umiejętności · ostatnie 24 h</h2><p class="muted">Wszystkie księgi mają ten sam VNUM; konkretną umiejętność da się ustalić tylko dla części sprzedaży (reszta to egzemplarze już zużyte przez bota), więc lista pokazuje tylko rozpoznane.</p><table><thead><tr><th>Umiejętność</th><th>Sprzedaży/24h</th><th>Śr. cena/szt.</th></tr></thead><tbody>{% for i in skillbook_velocity %}<tr><td class="item-cell">{% if item_icon(i.vnum) %}<img src="{{ item_icon(i.vnum) }}" loading="lazy" alt="">{% endif %}<a href="{{ url_for('market_item', vnum=i.vnum, v=i.variant) }}">{{ i.item_name }}</a></td><td>{{ i.sales }}</td><td>{{ yang(i.avg_price) }}</td></tr>{% else %}<tr><td colspan="3" class="muted">Brak rozpoznanych sprzedaży ksiąg w ostatnich 24 h.</td></tr>{% endfor %}</tbody></table></section>
+<section class="panel"><h2>🧾 Ostatnie sprzedaże na straganach</h2><p class="muted">Kto sprzedał co i za ile — silnik nie zapisuje kupującego przy sprzedaży ze straganu, więc widać tylko stronę sprzedawcy. Odświeża się co 20 s.</p><table id="saleFeedTable"><thead><tr><th>Czas</th><th>Przedmiot</th><th>Sprzedawca</th><th>Królestwo</th><th>Sztuk</th><th>Cena</th></tr></thead><tbody>{% for s in recent_sales %}<tr><td>{{ s.time }}</td><td class="item-cell">{% if item_icon(s.vnum) %}<img src="{{ item_icon(s.vnum) }}" loading="lazy" alt="">{% endif %}<a href="{{ url_for('market_item', vnum=s.vnum) }}">{{ s.item_name }}</a></td><td>{% if s.seller_id %}<a href="{{ url_for('player', pid=s.seller_id) }}">{{ s.seller }}</a>{% else %}{{ s.seller }}{% endif %}</td><td>{% if empire_flag(s.empire) %}<img class="empire-flag-inline" src="{{ empire_flag(s.empire) }}" alt="{{ empire_info(s.empire).name }}" title="{{ empire_info(s.empire).name }}">{% endif %}</td><td>{{ s.qty }}</td><td>{{ yang(s.price) }}</td></tr>{% else %}<tr><td colspan="6" class="muted">Brak zarejestrowanych sprzedaży.</td></tr>{% endfor %}</tbody></table></section>
+<script>
+(() => {
+if(window.__shopFeedInterval)clearInterval(window.__shopFeedInterval);
+const EMPIRE_COLORS={1:'#ef4444',2:'#f6c85f',3:'#4ea5ff'};
+const EMPIRE_NAMES={1:'Shinsoo',2:'Chunjo',3:'Jinno'};
+const EMPIRE_FLAGS={1:"{{ empire_flag(1) }}",2:"{{ empire_flag(2) }}",3:"{{ empire_flag(3) }}"};
+const byMap={{ by_map|tojson }};
+if(byMap.length){
+  // A small flag and "M1"/"M2" under each bar instead of the rotated map name.
+  const flagImgs={};Object.keys(EMPIRE_FLAGS).forEach(id=>{const img=new Image();img.src=EMPIRE_FLAGS[id];flagImgs[id]=img;});
+  const mapTickPlugin={id:'mapTickPlugin',afterDatasetsDraw(chart){
+    const {ctx,chartArea:{bottom},scales:{x}}=chart;
+    ctx.save();
+    byMap.forEach((m,i)=>{
+      const xPos=x.getPixelForTick(i);
+      const img=flagImgs[m.empire];
+      if(img&&img.complete)ctx.drawImage(img,xPos-9,bottom+6,18,12);
+      ctx.fillStyle='#8fa5c1';ctx.font='11px system-ui,sans-serif';ctx.textAlign='center';
+      ctx.fillText(m.map_short,xPos,bottom+28);
+    });
+    ctx.restore();
+  }};
+  new Chart(document.getElementById('shopsByMap'),{type:'bar',data:{labels:byMap.map(m=>m.map_short),datasets:[{label:'Sklepy',data:byMap.map(m=>m.shop_count),backgroundColor:byMap.map(m=>EMPIRE_COLORS[m.empire]||'#8fa5c1')}]},options:{layout:{padding:{bottom:30}},plugins:{legend:{display:false}},scales:{x:{ticks:{display:false},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#8fa5c1',precision:0}}}},plugins:[mapTickPlugin]});
+}
+const empireTotals={{ empire_totals|tojson }};
+const empireIds=[1,2,3];
+new Chart(document.getElementById('itemsByEmpire'),{type:'bar',data:{labels:empireIds.map(e=>EMPIRE_NAMES[e]),datasets:[{label:'Sztuk',data:empireIds.map(e=>(empireTotals[e]||{}).items||0),backgroundColor:empireIds.map(e=>EMPIRE_COLORS[e])}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8fa5c1'}},y:{beginAtZero:true,ticks:{color:'#8fa5c1',precision:0}}}}});
+const trend={{ value_trend|tojson }};
+if(trend.labels.length){new Chart(document.getElementById('valueTrend'),{type:'line',data:{labels:trend.labels,datasets:trend.series.map(s=>({label:s.name,data:s.data,borderColor:EMPIRE_COLORS[s.id],backgroundColor:EMPIRE_COLORS[s.id]+'22',fill:false,tension:.25,pointRadius:0,spanGaps:false}))},options:{interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#cfe0f7'}}},scales:{x:{ticks:{color:'#8fa5c1',maxTicksLimit:12},grid:{color:'#1d3048'}},y:{beginAtZero:true,ticks:{color:'#8fa5c1'},grid:{color:'#1d3048'}}}}});}
+
+// The sale feed repaints every 20 s from /api/shop-feed instead of reloading the page.
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function renderSaleFeed(sales){
+  const body=document.querySelector('#saleFeedTable tbody');
+  if(!body)return;
+  if(!sales.length){body.innerHTML='<tr><td colspan="6" class="muted">Brak zarejestrowanych sprzedaży.</td></tr>';return;}
+  body.innerHTML=sales.map(s=>{
+    const icon=s.icon_url?`<img src="${esc(s.icon_url)}" loading="lazy" alt="">`:'';
+    const flagSrc=EMPIRE_FLAGS[s.empire];
+    const flag=flagSrc?`<img class="empire-flag-inline" src="${esc(flagSrc)}" alt="${esc(EMPIRE_NAMES[s.empire]||'')}" title="${esc(EMPIRE_NAMES[s.empire]||'')}">`:'';
+    const seller=s.seller_id?`<a href="${window.SEBAN_ROOT||''}/player/${Number(s.seller_id)}">${esc(s.seller)}</a>`:esc(s.seller);
+    return `<tr><td>${esc(s.time)}</td><td class="item-cell">${icon}<a href="${window.SEBAN_ROOT||''}/market/item/${s.vnum}">${esc(s.item_name)}</a></td><td>${seller}</td><td>${flag}</td><td>${s.qty}</td><td>${s.price.toLocaleString('pl-PL')}</td></tr>`;
+  }).join('');
+}
+window.__shopFeedInterval=setInterval(()=>{
+  fetch('{{ url_for("api_shop_feed") }}').then(r=>r.json()).then(d=>{if(d.ok)renderSaleFeed(d.sales);}).catch(()=>{});
+}, 20000);
+})();
+</script>{% endblock %}

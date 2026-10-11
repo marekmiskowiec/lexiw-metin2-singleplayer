@@ -48,3 +48,25 @@
 .wiki-mats a{display:inline-flex;align-items:center;gap:4px;margin-right:10px;white-space:nowrap}
 .wiki-mats img{width:20px;height:20px;object-fit:contain}
 .wiki-chain td:nth-child(n+3){white-space:nowrap}
+
+/* Guides (wiki_guides/*.md) */
+.guide-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}
+.guide-card{display:block;text-decoration:none;color:var(--text)}
+.guide-card h2{margin:0 0 6px;font-size:17px}
+.guide-card p{margin:0}
+.guide-card:hover{border-color:var(--gold,#e8b93f)}
+.guide-toc{margin:12px 0}
+.guide-toc ul{margin:4px 0 0;padding-left:18px}
+.guide-toc>ul{padding-left:0;list-style:none}
+.guide-body{line-height:1.6;max-width:880px}
+.guide-body h2{margin:26px 0 8px;font-size:20px}
+.guide-body h3{margin:18px 0 6px}
+.guide-body table{border-collapse:collapse;width:100%;margin:10px 0}
+.guide-body th,.guide-body td{padding:6px 10px;border-bottom:1px solid color-mix(in srgb,var(--edge) 60%,transparent);text-align:left}
+.guide-body code{background:color-mix(in srgb,var(--edge) 50%,transparent);padding:1px 5px;border-radius:4px}
+.guide-body pre{overflow:auto;padding:10px 12px;background:color-mix(in srgb,var(--edge) 35%,transparent);border-radius:6px}
+.guide-body pre code{background:none;padding:0}
+.guide-body blockquote{margin:12px 0;padding:6px 14px;border-left:3px solid var(--gold,#e8b93f);color:var(--muted)}
+.guide-broken{color:#ef4444}
+.guide-pager{display:flex;justify-content:space-between;gap:12px;margin:14px 0}
+.wiki-guides-box{margin:10px 0}

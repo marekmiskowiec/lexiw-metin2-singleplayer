@@ -1,0 +1,12 @@
+{% extends 'base.html' %}{% block title %}{{ guide.title }} · Poradniki · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+<p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI SERWERA</a> · <a href="{{ url_for('wiki_guides') }}">PORADNIKI</a></p><h1>{{ guide.title }}</h1>
+{% if guide.summary %}<p class="muted">{{ guide.summary }}</p>{% endif %}
+{% macro toc_list(tokens) %}<ul>{% for t in tokens %}<li><a href="#{{ t.id }}">{{ t.name }}</a>{% if t.children %}{{ toc_list(t.children) }}{% endif %}</li>{% endfor %}</ul>{% endmacro %}
+{% if toc|length > 2 %}<nav class="panel guide-toc"><h3>W tym poradniku</h3>{{ toc_list(toc) }}</nav>{% endif %}
+<article class="panel guide-body">{{ body|safe }}</article>
+<nav class="guide-pager">
+  {% if previous %}<a href="{{ url_for('wiki_guide', slug=previous.slug) }}">← {{ previous.title }}</a>{% else %}<span></span>{% endif %}
+  {% if following %}<a href="{{ url_for('wiki_guide', slug=following.slug) }}">{{ following.title }} →</a>{% endif %}
+</nav>
+{% endblock %}

@@ -24,7 +24,7 @@ samodzielnie, bez aktualizacji od autora paczki (kanał aktualizacji jest
 wyłączony: `authorUpdates` w `launcher\branding.json`). Nowe wersje autora
 wgrywamy przez Gita (gałąź `upstream`, potem scalenie do `main`).
 
-- **Lista zmian forka:** [CHANGELOG-LEXIW.md](CHANGELOG-LEXIW.md) (wersje `2.21.1-lexiw.N`).
+- **Wersja forka: `2.21.1-lexiw.11`** (zawsze najnowszy nagłówek w [CHANGELOG-LEXIW.md](CHANGELOG-LEXIW.md); pokazuje ją też launcher w polu „Wersje” i panel w zakładce Changelog). Pliki `VERSION` zostają wersją paczki autora (`2.21.1`), bo na nich opiera się instalator i porównania z kanałem autora.
 - **Panel** (`http://127.0.0.1:7794`): aktywność, rozwój i zgony botów, Giełda
   (oferty ze wszystkich sklepów, ceny, okazje), rdzenie gry, majątek botów, wiki serwera.
 - **Launcher:** zatrzymanie kończy się kopią bazy (`backups\`, ostatnie 5) i

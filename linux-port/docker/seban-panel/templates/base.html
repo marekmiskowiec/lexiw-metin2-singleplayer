@@ -61,7 +61,7 @@
   {'l': 'Szukaj postaci', 'i': '♙', 'u': url_for('players')},
   {'l': 'Szukaj w bazie przedmiotów', 'i': '▦', 'u': url_for('items_database')},
   {'l': 'Szukaj przedmiotu w obiegu', 'i': '◇', 'u': url_for('economy')},
-  {'l': 'Szukaj na rynku (sklepy offline)', 'i': '🏪', 'u': url_for('economy_shops')}
+  {'l': 'Szukaj w Giełdzie (oferty sklepów)', 'i': '🏪', 'u': url_for('market')}
 ], 'index': nav.index, 'current': {'l': (nav.item.label if nav.item and nav_ep == nav_active else nav_detail), 'g': (nav.group.label if nav.group else 'Start'), 'i': (nav.group.icon if nav.group else '⌂')}}|tojson }}</script>
 <script defer src="{{ static_asset_url('nav.js') }}"></script>
 <script defer src="{{ static_asset_url('action-toast.js') }}"></script>
