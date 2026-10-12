@@ -1,0 +1,56 @@
+{% extends 'base.html' %}{% block title %}Sala chwały · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('player-profile.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('market.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('hall-of-fame.css') }}">
+{% from '_macros.html' import tooltip %}
+{%- macro num(n) -%}{{ '{:,}'.format((n or 0)|int).replace(',', ' ') }}{%- endmacro -%}
+<p class="eyebrow">WYDARZENIA</p><h1>Sala chwały</h1>
+{% if not d %}<p class="muted">Brak danych: liczniki postaci jeszcze się nie zapisały. Wróć za chwilę.</p>{% else %}
+<p class="muted">Rekordziści świata, od początku gry. Liczniki pochodzą z silnika (te same co w oknie „Statystyki” w grze), broń z przedmiotów, które postacie mają przy sobie lub na straganie. Liczą się wszyscy oprócz GM-ów. Stan z {{ d.at }} (odświeżane co 10 minut).</p>
+
+<section class="hof-section">
+  <h2>🗡️ Najlepsza broń</h2>
+  <div class="hof-grid hof-grid--wide">
+  {% for w in d.weapons %}
+    <article class="panel hof-card">
+      <h3>{{ w.title }} <a class="hof-more" href="{{ url_for('rankings', type='weapon30', sort=w.key) }}">pełna lista →</a></h3>
+      {% if w.rows %}
+      <ol class="hof-list hof-weapons">
+        {% for r in w.rows %}<li class="{{ 'hof-first' if loop.first }}">
+          <span class="hof-rank">{{ loop.index }}</span>
+          <span class="market-icon hof-icon" tabindex="0">{% if r.icon %}<img src="{{ r.icon }}" alt="" loading="lazy">{% endif %}{% if r.tip %}{{ tooltip(r.tip) }}{% endif %}</span>
+          <span class="hof-who"><a href="{{ url_for('wiki_item', vnum=r.vnum) }}">{{ r.item }}</a>
+            <small><a href="{{ url_for('player', pid=r.id) }}">{{ r.name }}</a> · poz. {{ r.level }}{% if r.shop %} · na straganie{% endif %}</small></span>
+          <span class="hof-val"><b>{{ r.value }}%</b><small>{{ w.other|lower }} {{ r.other }}%</small></span>
+        </li>{% endfor %}
+      </ol>
+      {% else %}<p class="muted">Nikt jeszcze nie ma broni 30 poziomu z tym bonusem.</p>{% endif %}
+    </article>
+  {% endfor %}
+  </div>
+</section>
+
+{% for b in d.boards %}
+<section class="hof-section">
+  <h2>{{ b.icon }} {{ b.title }}</h2>
+  <div class="hof-grid">
+  {% for c in b.cards %}
+    <article class="panel hof-card">
+      <h3>{{ c.title }}{% if c.kind %} <a class="hof-more" href="{{ url_for('rankings', type=c.kind) }}">pełna lista →</a>{% endif %}</h3>
+      {% if c.rows %}
+      <ol class="hof-list">
+        {% for r in c.rows %}<li class="{{ 'hof-first' if loop.first }}">
+          <span class="hof-rank">{{ loop.index }}</span>
+          <span class="hof-who"><a href="{{ url_for('player', pid=r.id) }}">{{ r.name }}</a><small>poz. {{ r.level }}</small></span>
+          <span class="hof-val"><b>{{ num(r.value) }}</b></span>
+        </li>{% endfor %}
+      </ol>
+      <p class="hof-foot muted">{% if c.record %}{{ num(c.people) }} postaci z rekordem{% else %}{{ num(c.total) }} {{ c.unit }} w świecie · {{ num(c.people) }} postaci{% endif %}</p>
+      {% else %}<p class="muted">Jeszcze nikt.</p>{% endif %}
+    </article>
+  {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endif %}
+{% endblock %}

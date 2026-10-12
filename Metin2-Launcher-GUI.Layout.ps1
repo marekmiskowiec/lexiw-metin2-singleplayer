@@ -330,7 +330,9 @@ function Scroll-UILogToEnd {
 }
 function Get-UIRatesUrl {
     $addresses = Get-M2PanelAddresses -ServerRoot $root
-    return ([Uri]::new([Uri]$addresses.ClassicUrl, '/rates')).AbsoluteUri
+    # Lexiw: the multipliers are edited in the Seban panel (Gra i serwer), at the
+    # section that holds them.
+    return ([Uri]::new([Uri]$addresses.SebanUrl, '/manage#raty-i-restart')).AbsoluteUri
 }
 $sidebar = [Windows.Forms.Panel]::new(); $sidebar.Dock = 'Left'; $sidebar.Width = 252
 $sidebar.BackColor = UI-Color '#0D141A'; $sidebar.Padding = [Windows.Forms.Padding]::new(10, 16, 10, 14)
@@ -789,7 +791,8 @@ function Invoke-LayoutSelfTest([string]$OutputDirectory) {
     if (-not $script:logBox.Visible) { throw 'Show log failed' }
     [Windows.Forms.Application]::DoEvents()
     if ($script:logBox.SelectionStart -ne $script:logBox.TextLength) { throw 'Log caret did not follow expansion' }
-    if (([Uri](Get-UIRatesUrl)).AbsolutePath -ne '/rates') { throw 'Incorrect rates route' }
+    $ratesUri = [Uri](Get-UIRatesUrl)
+    if ($ratesUri.AbsolutePath -ne '/manage' -or $ratesUri.Fragment -ne '#raty-i-restart') { throw 'Incorrect rates route' }
     if (-not $coffeeButton.Visible) { throw 'Coffee link is not visible' }
     $expected = @($installButton, $playButton, $stopButton, $panelButton, $clientButton,
         $bundleButton, $diagnosticsButton, $openLogButton, $folderButton, $botCountButton, $importDbButton,

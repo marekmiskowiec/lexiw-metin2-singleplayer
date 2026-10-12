@@ -1,0 +1,28 @@
+/* Lexiw: Sala chwały */
+.hof-section{margin:18px 0}
+.hof-section>h2{margin:0 0 10px}
+.hof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.hof-grid--wide{grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}
+.hof-card h3{margin:0 0 8px;font-size:15px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.hof-more{font-size:12px;font-weight:normal;white-space:nowrap;color:var(--gold,#e8b93f)!important}
+.hof-list{list-style:none;margin:0;padding:0}
+.hof-list li{display:flex;align-items:center;gap:10px;padding:5px 2px;border-top:1px solid color-mix(in srgb,var(--edge) 55%,transparent)}
+.hof-list li:first-child{border-top:0}
+.hof-rank{width:22px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;flex:0 0 22px}
+.hof-who{display:flex;flex-direction:column;min-width:0;flex:1}
+.hof-who a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hof-who small,.hof-val small{color:var(--muted);font-size:12px}
+.hof-val{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hof-weapons .hof-icon>img{width:32px;height:32px;object-fit:contain}
+.hof-first{background:color-mix(in srgb,var(--gold,#e8b93f) 10%,transparent);border-radius:6px}
+.hof-first .hof-rank{color:var(--gold,#e8b93f);font-weight:700}
+.hof-first .hof-val b{color:var(--gold,#e8b93f)}
+.hof-foot{margin:8px 0 0;font-size:12px}
+@media (max-width:640px){.hof-grid--wide{grid-template-columns:1fr}}
+/* The item tooltip opens beside the icon, past the card: the Empire theme cuts the
+   card corners with clip-path, which would cut the tooltip too (as on /player/). */
+body[data-theme="empire"] .hof-card{clip-path:none}
+.hof-icon{flex:0 0 32px}
+/* .panel clips its content (overflow:hidden in enhancements.css); the weapon
+   cards let the tooltip out, as the Giełda table does. */
+.panel.hof-card{overflow:visible}
