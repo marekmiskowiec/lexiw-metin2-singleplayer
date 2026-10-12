@@ -601,7 +601,8 @@ foreach ($shortcut in $panelShortcuts) {
     $shortcutButton.Add_Click({
         param($sender, $eventArgs)
         $addresses = Get-M2PanelAddresses -ServerRoot $root
-        $url = ([Uri]::new([Uri]$addresses.ClassicUrl, [string]$sender.Tag)).AbsoluteUri
+        # These pages live in the Seban panel, not the classic one (that is where /rates is).
+        $url = ([Uri]::new([Uri]$addresses.SebanUrl, [string]$sender.Tag)).AbsoluteUri
         Write-LocalLog (UI-Text "Otwieram w panelu WWW: $url" "Opening in the web panel: $url")
         Start-Process $url
     })
