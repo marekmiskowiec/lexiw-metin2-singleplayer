@@ -1,0 +1,42 @@
+/* Lexiw: Show tańca */
+.ds-form{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end}
+.ds-form label{display:flex;flex-direction:column;gap:3px;font-size:13px}
+.ds-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.ds-status{margin-top:12px;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ds-dot{width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block}
+.ds-dot--on{background:#63c993}
+.ds-dot--wait{background:#f2c34d}
+.ds-table input.ds-num{width:70px}
+.ds-table input.ds-name{width:160px}
+.ds-table td{vertical-align:middle}
+.ds-actions{white-space:nowrap}
+.ds-check{flex-direction:row!important;align-items:center;gap:6px!important;padding-bottom:6px}
+.ds-look{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:4px 10px;min-width:280px}
+.ds-look label{display:flex;flex-direction:column;font-size:12px;gap:2px}
+.ds-look small{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+input.ds-vnum{width:90px}
+.ds-look label,.ds-form label{position:relative}
+.ds-pick{position:absolute;z-index:30;top:100%;left:0;min-width:260px;max-height:300px;overflow:auto;background:var(--panel,#1a1109);border:1px solid var(--edge);border-radius:6px;box-shadow:0 8px 20px rgba(0,0,0,.4)}
+.ds-pick button{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid color-mix(in srgb,var(--edge) 50%,transparent);padding:5px 8px;color:var(--text);cursor:pointer}
+.ds-pick button:hover{background:color-mix(in srgb,var(--gold,#e8b93f) 12%,transparent)}
+.ds-pick img{width:28px;height:28px;object-fit:contain}
+.ds-pick span{display:flex;flex-direction:column}
+.ds-pick small{color:var(--muted);font-size:11px}
+.ds-pick p{margin:6px 8px}
+.ds-table{overflow:visible}
+/* Choreography, place and recording (LEXIW_DANCE_SHOW_V2) */
+.ds-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:14px 0}
+.ds-group{border:1px solid var(--edge);border-radius:8px;padding:10px 12px;margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+.ds-group legend{padding:0 6px;font-weight:600}
+.ds-group--wide{grid-column:1/-1}
+.ds-script{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.ds-script textarea{width:100%;box-sizing:border-box;font-family:ui-monospace,Consolas,monospace;font-size:13px;min-height:140px}
+.ds-help{font-size:13px}
+.ds-help ul{margin:6px 0 0;padding-left:18px}
+.ds-help code{white-space:nowrap}
+input.ds-coord{width:80px}
+.ds-pos{white-space:nowrap}
+.ds-pos label{display:flex;gap:4px;align-items:center;font-size:12px}
+.ds-bar{margin-top:6px}
+.ds-benched{opacity:.6}
+#ds-preview{width:100%;max-width:520px;height:auto;border:1px solid var(--edge);border-radius:8px;background:color-mix(in srgb,var(--edge) 15%,transparent)}

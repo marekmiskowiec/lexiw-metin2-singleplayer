@@ -7038,6 +7038,9 @@ namespace
 	// fragment that asks these): whose it is, whether it stands at its
 	// owner's side, and what its owner handed it.
 	bool IsPlayerBotSidekickPID(DWORD pid);
+	// LEXIW_DANCE_SHOW_V1: the operator's dancers (playerbot_dancer.h), kept out of
+	// everything the population does, like a companion.
+	bool IsPlayerBotDancerPID(DWORD pid);
 	// MT2009_PLUS_SHOUTERS_V1: the three shouters of the first villages
 	// (playerbot_shouters.h), kept out of everything the population does.
 	bool IsPlayerBotShouterPID(DWORD pid);

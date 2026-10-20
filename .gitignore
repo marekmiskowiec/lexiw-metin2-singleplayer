@@ -10,3 +10,6 @@
 /backups/
 /.m2*
 __pycache__/
+
+# Lexiw: lists exported for the user (dancer looks etc.), not project files
+exports/

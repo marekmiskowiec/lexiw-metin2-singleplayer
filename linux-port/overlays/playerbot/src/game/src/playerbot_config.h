@@ -972,6 +972,9 @@ if (PlayerBotWeightNameEquals(szKey, "ISHOP"))
 	// always did.
 	const char* const PLAYERBOT_HOLD_PATH = "/opt/m2spool/playerbot_hold";
 	bool s_bPlayerBotSpawnHeld = false;
+	// LEXIW_DANCE_SHOW_V1: "Swiat bez botow" of the dance show (playerbot_dancer.h):
+	// the door held while it is on, whatever the file above says.
+	bool s_bPlayerBotDanceQuiet = false;
 	bool s_bPlayerBotSpawnHeldRead = false;
 	bool s_bPlayerBotSpawnHeldReported = false;
 	DWORD s_dwPlayerBotHoldNextCheck = 0;
@@ -1016,7 +1019,7 @@ if (PlayerBotWeightNameEquals(szKey, "ISHOP"))
 	{
 		if (!s_bPlayerBotSpawnHeldRead)
 			ReadPlayerBotHoldFile();
-		return s_bPlayerBotSpawnHeld;
+		return s_bPlayerBotSpawnHeld || s_bPlayerBotDanceQuiet;
 	}
 
 	void RefreshPlayerBotHold(DWORD dwNow)
