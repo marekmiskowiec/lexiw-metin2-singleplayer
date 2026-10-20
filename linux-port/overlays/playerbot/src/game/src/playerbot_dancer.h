@@ -57,8 +57,9 @@ namespace
 		BYTE bLevel;
 		DWORD dwPid;
 		// The look the panel set (item vnums, 0 = leave what it wears):
-		// weapon, body armour, costume, hairstyle.
-		DWORD adwLook[4];
+		// weapon, body armour, costume, hairstyle, weapon skin (after the weapon:
+		// a skin is worn over a weapon of its kind).
+		DWORD adwLook[5];
 	};
 
 	struct TPlayerBotDanceShow
@@ -152,10 +153,11 @@ namespace
 					"ADD COLUMN IF NOT EXISTS weapon INT UNSIGNED NOT NULL DEFAULT 0, "
 					"ADD COLUMN IF NOT EXISTS armor INT UNSIGNED NOT NULL DEFAULT 0, "
 					"ADD COLUMN IF NOT EXISTS costume INT UNSIGNED NOT NULL DEFAULT 0, "
-					"ADD COLUMN IF NOT EXISTS hair INT UNSIGNED NOT NULL DEFAULT 0");
+					"ADD COLUMN IF NOT EXISTS hair INT UNSIGNED NOT NULL DEFAULT 0, "
+					"ADD COLUMN IF NOT EXISTS skin INT UNSIGNED NOT NULL DEFAULT 0");
 		}
 		std::unique_ptr<SQLMsg> msg(AccountDB::instance().DirectQuery(
-				"SELECT id, slot, name, job, level, IFNULL(pid,0), weapon, armor, costume, hair "
+				"SELECT id, slot, name, job, level, IFNULL(pid,0), weapon, armor, costume, hair, skin "
 				"FROM player.playerbot_dancer ORDER BY slot, id"));
 		if (!msg.get() || msg->uiSQLErrno != 0 || !msg->Get() || !msg->Get()->pSQLResult)
 			return;
@@ -175,7 +177,7 @@ namespace
 			str_to_number(job, row[3]);
 			str_to_number(level, row[4]);
 			str_to_number(d.dwPid, row[5]);
-			for (int k = 0; k < 4; ++k)
+			for (int k = 0; k < 5; ++k)
 			{
 				d.adwLook[k] = 0;
 				if (row[6 + k])
@@ -404,7 +406,7 @@ namespace
 	void ApplyPlayerBotDancerLook(LPCHARACTER ch, const TPlayerBotDancer& d)
 	{
 		bool changed = false;
-		for (int k = 0; k < 4; ++k)
+		for (int k = 0; k < 5; ++k)
 		{
 			const DWORD vnum = d.adwLook[k];
 			if (vnum == 0)

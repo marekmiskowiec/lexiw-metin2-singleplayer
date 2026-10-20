@@ -35,10 +35,12 @@ DDL = ("CREATE TABLE IF NOT EXISTS player.playerbot_dancer ("
 LOOK_DDL = ("ALTER TABLE player.playerbot_dancer ADD COLUMN IF NOT EXISTS weapon INT UNSIGNED NOT NULL DEFAULT 0, "
             "ADD COLUMN IF NOT EXISTS armor INT UNSIGNED NOT NULL DEFAULT 0, "
             "ADD COLUMN IF NOT EXISTS costume INT UNSIGNED NOT NULL DEFAULT 0, "
-            "ADD COLUMN IF NOT EXISTS hair INT UNSIGNED NOT NULL DEFAULT 0")
+            "ADD COLUMN IF NOT EXISTS hair INT UNSIGNED NOT NULL DEFAULT 0, "
+            "ADD COLUMN IF NOT EXISTS skin INT UNSIGNED NOT NULL DEFAULT 0")
 # (column, label, what fits: item_proto (type, subtype) - None = any subtype but arrows)
 LOOK_SLOTS = (("weapon", "Broń", ((1, None),)), ("armor", "Zbroja", ((2, 0),)),
-              ("costume", "Kostium", ((28, 0),)), ("hair", "Fryzura", ((28, 1), (25, None))))
+              ("costume", "Kostium", ((28, 0),)), ("hair", "Fryzura", ((28, 1), (25, None))),
+              ("skin", "Skórka broni", ((28, 4),)))
 # item_proto.antiflag bits: who may NOT use it.
 ANTI_FEMALE, ANTI_MALE = 1 << 0, 1 << 1
 ANTI_CLASS = (1 << 2, 1 << 3, 1 << 4, 1 << 5)   # Wojownik, Ninja, Sura, Szaman = job % 4
@@ -116,8 +118,21 @@ def install_dance_show(m):
             return f"{label}: „{m.game_text(row['name'])}” nie pasuje do klasy albo płci tego tancerza."
         return None
 
+    def skin_problem(skin, weapon):
+        """A weapon skin is worn over a weapon of its kind (item value3 = the
+        weapon's subtype), as the engine asks when a player puts one on."""
+        if not skin:
+            return None
+        if not weapon:
+            return "Skórka broni: wpisz też broń tego rodzaju w polu „Broń” (skórka zakłada się na broń)."
+        s = m.one("SELECT value3 FROM player.item_proto WHERE vnum=%s", (skin,))
+        w = m.one("SELECT subtype FROM player.item_proto WHERE vnum=%s", (weapon,))
+        if s and w and int(s["value3"]) != int(w["subtype"]):
+            return "Skórka broni: pasuje do innego rodzaju broni niż ta w polu „Broń”."
+        return None
+
     def read_look(job):
-        """The four vnums of the form, and the first problem with them."""
+        """The look vnums of the form, and the first problem with them."""
         look, problem = {}, None
         for column, _label, _fits in LOOK_SLOTS:
             try:
@@ -125,14 +140,47 @@ def install_dance_show(m):
             except ValueError:
                 look[column] = 0
             problem = problem or look_problem(column, look[column], job)
+        problem = problem or skin_problem(look.get("skin", 0), look.get("weapon", 0))
         return look, problem
+
+    @app.get("/api/dance/items")
+    @m.login_required
+    def dance_items():
+        """The picker beside a look field: items of that slot's kind a dancer of
+        that class and sex can wear, by name or VNUM."""
+        column = request.args.get("slot", "")
+        fits = next((f for c, _l, f in LOOK_SLOTS if c == column), None)
+        query = request.args.get("q", "").strip()
+        try:
+            job = int(request.args.get("job", "0") or 0)
+            weapon = int(request.args.get("weapon", "0") or 0)
+        except ValueError:
+            job, weapon = 0, 0
+        if fits is None or (len(query) < 2 and not query.isdigit()):
+            return {"items": []}
+        kinds = " OR ".join(f"(p.type={t}" + (f" AND p.subtype={s})" if s is not None else
+                                              (" AND p.subtype<>6)" if t == 1 else ")")) for t, s in fits)
+        anti = ANTI_CLASS[job % 4] | (ANTI_FEMALE if job in FEMALE_JOBS else ANTI_MALE)
+        clause, params = m.item_name_search(query)
+        extra = ""
+        if column == "skin" and weapon:
+            w = m.one("SELECT subtype FROM player.item_proto WHERE vnum=%s", (weapon,))
+            if w:
+                extra = f" AND p.value3={int(w['subtype'])}"
+        found = m.rows(f"""SELECT p.vnum, COALESCE(p.locale_name, p.name) AS name,
+                CASE WHEN p.limittype0=1 THEN p.limitvalue0 WHEN p.limittype1=1 THEN p.limitvalue1 ELSE 0 END AS lvl
+              FROM player.item_proto p WHERE ({kinds}) AND (p.antiflag & {anti}) = 0{extra} AND ({clause})
+              ORDER BY (p.vnum=%s) DESC, CHAR_LENGTH(p.locale_name), p.vnum LIMIT 25""",
+                       params + [int(query) if query.isdigit() else -1])
+        return {"items": [{"vnum": int(r["vnum"]), "name": m.game_text(r["name"]), "level": int(r["lvl"] or 0),
+                           "icon": m.item_icon_url(int(r["vnum"]))} for r in found]}
 
     @app.route("/dance")
     @m.login_required
     def dance_show():
         ensure_table()
         roster = list(m.rows("""SELECT d.id, d.slot, d.name, d.job, d.level, d.pid, d.status,
-                                       d.weapon, d.armor, d.costume, d.hair,
+                                       d.weapon, d.armor, d.costume, d.hair, d.skin,
                                        p.name AS char_name, p.level AS char_level
                                 FROM player.playerbot_dancer d LEFT JOIN player.player p ON p.id = d.pid
                                 ORDER BY d.slot, d.id"""))
@@ -193,9 +241,9 @@ def install_dance_show(m):
                 look = read_look(job)[0]
                 if not slot:
                     slot = int((m.one("SELECT COALESCE(MAX(slot),0)+1 AS s FROM player.playerbot_dancer") or {}).get("s") or 1)
-                m.rows("INSERT INTO player.playerbot_dancer (slot, name, job, level, weapon, armor, costume, hair, status) "
-                       "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'czeka na Zbierz')",
-                       (slot, name, job, level, look["weapon"], look["armor"], look["costume"], look["hair"]))
+                m.rows("INSERT INTO player.playerbot_dancer (slot, name, job, level, weapon, armor, costume, hair, skin, status) "
+                       "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'czeka na Zbierz')",
+                       (slot, name, job, level, look["weapon"], look["armor"], look["costume"], look["hair"], look["skin"]))
                 flash(f"Dodano tancerza {name}. Postać dostanie przy pierwszym „Zbierz”.")
         elif action == "save" and row_id:
             current = m.one("SELECT pid, job FROM player.playerbot_dancer WHERE id=%s", (row_id,))
@@ -214,8 +262,8 @@ def install_dance_show(m):
                            (name, job, level, slot, row_id))
                 else:
                     m.rows("UPDATE player.playerbot_dancer SET name=%s, job=%s, level=%s, slot=%s, "
-                           "weapon=%s, armor=%s, costume=%s, hair=%s WHERE id=%s",
-                           (name, job, level, slot, look["weapon"], look["armor"], look["costume"], look["hair"], row_id))
+                           "weapon=%s, armor=%s, costume=%s, hair=%s, skin=%s WHERE id=%s",
+                           (name, job, level, slot, look["weapon"], look["armor"], look["costume"], look["hair"], look["skin"], row_id))
                 flash(f"Zapisano tancerza {name}. Nowy nick wchodzi, gdy postać jest poza grą (do ~11 minut po wylogowaniu); "
                       "wygląd zakłada się przy najbliższym „Zbierz”.")
         elif action == "delete" and row_id:

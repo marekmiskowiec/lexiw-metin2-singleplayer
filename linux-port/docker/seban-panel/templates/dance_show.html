@@ -40,7 +40,7 @@
 <section class="panel table-wrap">
   <h2>🩰 Zespół</h2>
   <p class="muted">Klasa i płeć są stałe od pierwszego „Zbierz” (wtedy tancerz dostaje postać). Nick i poziom można zmieniać: nowy nick wchodzi, gdy postać jest poza grą od ok. 11 minut, a poziom tylko rośnie.</p>
-  <p class="muted">Wygląd: wpisz numer VNUM broni, zbroi, kostiumu i fryzury (0 = zostaw, co ma). Numery znajdziesz w <a href="{{ url_for('wiki') }}">Wiki</a> (wpisz nazwę, przy przedmiocie jest VNUM) albo w <a href="{{ url_for('items_database') }}">Bazie przedmiotów</a>. Przedmiot zakłada się przy najbliższym „Zbierz”, a to, co tancerz nosił w tym miejscu, znika.</p>
+  <p class="muted">Wygląd: w polu broni, zbroi, kostiumu, fryzury albo skórki broni zacznij pisać nazwę, a panel podpowie pasujące przedmioty dla klasy i płci tancerza (albo wpisz VNUM; 0 = zostaw, co ma). Kostium zakrywa zbroję, a skórka broni wymaga broni tego samego rodzaju. Numery znajdziesz w <a href="{{ url_for('wiki') }}">Wiki</a> (wpisz nazwę, przy przedmiocie jest VNUM) albo w <a href="{{ url_for('items_database') }}">Bazie przedmiotów</a>. Przedmiot zakłada się przy najbliższym „Zbierz”, a to, co tancerz nosił w tym miejscu, znika.</p>
   <table class="ds-table">
     <thead><tr><th>Kolejność</th><th>Nick</th><th>Klasa</th><th>Poziom</th><th>Wygląd (VNUM)</th><th>Stan</th><th></th></tr></thead>
     <tbody>
@@ -52,7 +52,7 @@
           <td><input form="{{ f }}" name="name" value="{{ r.name }}" maxlength="24" class="ds-name">{% if r.name_pending %}<small class="muted"> w grze jeszcze: {{ r.char_name }}</small>{% endif %}</td>
           <td><select form="{{ f }}" name="job" {{ 'disabled' if r.pid }}>{% for j, label in jobs %}<option value="{{ j }}" {{ 'selected' if r.job == j }}>{{ label }}</option>{% endfor %}</select>{% if r.pid %}<input form="{{ f }}" type="hidden" name="job" value="{{ r.job }}">{% endif %}</td>
           <td><input form="{{ f }}" type="number" name="level" min="1" max="99" value="{{ r.level }}" class="ds-num">{% if r.char_level %}<small class="muted"> teraz {{ r.char_level }}</small>{% endif %}</td>
-          <td class="ds-look">{% for l in r.look %}<label>{{ l.label }} <input form="{{ f }}" type="number" name="{{ l.column }}" min="0" value="{{ l.vnum }}" class="ds-vnum">{% if l.name %}<small class="muted">{{ l.name }}</small>{% endif %}</label>{% endfor %}</td>
+          <td class="ds-look">{% for l in r.look %}<label>{{ l.label }} <input form="{{ f }}" type="text" name="{{ l.column }}" value="{{ l.vnum }}" class="ds-vnum" data-slot="{{ l.column }}" autocomplete="off" placeholder="VNUM lub nazwa">{% if l.name %}<small class="muted">{{ l.name }}</small>{% endif %}</label>{% endfor %}</td>
           <td>{{ r.status or '—' }}{% if r.pid %}<br><a href="{{ url_for('player', pid=r.pid) }}"><small>postać</small></a>{% endif %}</td>
           <td class="ds-actions"><button form="{{ f }}" name="action" value="save" class="secondary">Zapisz</button>
             <button form="{{ f }}" name="action" value="delete" class="secondary" onclick="return confirm('Usunąć tancerza {{ r.name }}?')">Usuń</button></td>
@@ -68,8 +68,52 @@
     <label>Nick <input name="name" maxlength="24" placeholder="np. [Tancerz]Ola" required></label>
     <label>Klasa <select name="job">{% for j, label in jobs %}<option value="{{ j }}">{{ label }}</option>{% endfor %}</select></label>
     <label>Poziom <input type="number" name="level" min="1" max="99" value="30"></label>
-    {% for column, label, _fits in look_slots %}<label>{{ label }} (VNUM) <input type="number" name="{{ column }}" min="0" value="0" class="ds-vnum"></label>{% endfor %}
+    {% for column, label, _fits in look_slots %}<label>{{ label }} (VNUM) <input type="text" name="{{ column }}" value="0" class="ds-vnum" data-slot="{{ column }}" autocomplete="off" placeholder="VNUM lub nazwa"></label>{% endfor %}
     <div class="ds-buttons"><button>➕ Dodaj</button></div>
   </form>
 </section>
+<script>
+(function () {
+  // The picker beside every look field: type a name, pick an item; its VNUM goes into the field.
+  const api = "{{ url_for('dance_items') }}";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  document.querySelectorAll('input.ds-vnum').forEach((input) => {
+    const box = document.createElement('div');
+    box.className = 'ds-pick';
+    box.hidden = true;
+    input.parentNode.appendChild(box);
+    let timer = null;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 2 || /^\d+$/.test(q)) { box.hidden = true; return; }
+      timer = setTimeout(() => {
+        const form = input.form;
+        const job = form && form.elements['job'] ? form.elements['job'].value : '0';
+        const weapon = form && form.elements['weapon'] ? form.elements['weapon'].value : '0';
+        const url = api + '?slot=' + encodeURIComponent(input.dataset.slot) + '&job=' + encodeURIComponent(job) +
+                    '&weapon=' + encodeURIComponent(/^\d+$/.test(weapon) ? weapon : '0') + '&q=' + encodeURIComponent(q);
+        fetch(url, {cache: 'no-store'}).then((r) => r.json()).then((data) => {
+          if (input.value.trim() !== q) return;
+          box.innerHTML = data.items.length ? data.items.map((i) =>
+            `<button type="button" data-vnum="${i.vnum}" data-name="${esc(i.name)}">${i.icon ? `<img src="${esc(i.icon)}" alt="">` : ''}<span><b>${esc(i.name)}</b><small>VNUM ${i.vnum}${i.level ? ' · poz. ' + i.level : ''}</small></span></button>`).join('')
+            : '<p class="muted">Nic nie pasuje do tej klasy i płci.</p>';
+          box.hidden = false;
+        }).catch(() => { box.hidden = true; });
+      }, 250);
+    });
+    box.addEventListener('mousedown', (e) => {
+      const pick = e.target.closest('button[data-vnum]');
+      if (!pick) return;
+      e.preventDefault();
+      input.value = pick.dataset.vnum;
+      let label = input.parentNode.querySelector('small.ds-picked');
+      if (!label) { label = document.createElement('small'); label.className = 'muted ds-picked'; input.after(label); }
+      label.textContent = pick.dataset.name + ' (zapisz, żeby zachować)';
+      box.hidden = true;
+    });
+    input.addEventListener('blur', () => setTimeout(() => { box.hidden = true; }, 150));
+  });
+})();
+</script>
 {% endblock %}
