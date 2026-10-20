@@ -24,3 +24,19 @@ input.ds-vnum{width:90px}
 .ds-pick small{color:var(--muted);font-size:11px}
 .ds-pick p{margin:6px 8px}
 .ds-table{overflow:visible}
+/* Choreography, place and recording (LEXIW_DANCE_SHOW_V2) */
+.ds-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:14px 0}
+.ds-group{border:1px solid var(--edge);border-radius:8px;padding:10px 12px;margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+.ds-group legend{padding:0 6px;font-weight:600}
+.ds-group--wide{grid-column:1/-1}
+.ds-script{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.ds-script textarea{width:100%;box-sizing:border-box;font-family:ui-monospace,Consolas,monospace;font-size:13px;min-height:140px}
+.ds-help{font-size:13px}
+.ds-help ul{margin:6px 0 0;padding-left:18px}
+.ds-help code{white-space:nowrap}
+input.ds-coord{width:80px}
+.ds-pos{white-space:nowrap}
+.ds-pos label{display:flex;gap:4px;align-items:center;font-size:12px}
+.ds-bar{margin-top:6px}
+.ds-benched{opacity:.6}
+#ds-preview{width:100%;max-width:520px;height:auto;border:1px solid var(--edge);border-radius:8px;background:color-mix(in srgb,var(--edge) 15%,transparent)}

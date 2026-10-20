@@ -1,64 +1,174 @@
 {% extends 'base.html' %}{% block title %}Show tańca · {{ panel_brand }}{% endblock %}{% block content %}
 <link rel="stylesheet" href="{{ static_asset_url('dance-show.css') }}">
+{% set s = settings %}
 <p class="eyebrow">WYDARZENIA</p><h1>Show tańca</h1>
-<p class="muted">Twój własny zespół tancerzy do nagrywania filmików. Tancerze to osobne postacie, które nie grają na serwerze: nie polują, nie handlują i nie podróżują. Zaloguj się w grze postacią z listy „Przy postaci”, kliknij <b>Zbierz</b>, a gdy wszyscy staną w szyku, <b>Start</b>: każdy zacznie ten sam taniec w tej samej chwili.</p>
+<p class="muted">Twój własny zespół tancerzy do nagrywania filmików. Tancerze to osobne postacie, które nie grają na serwerze: nie polują, nie handlują i nie podróżują. Zaloguj się w grze postacią z listy „Postać”, kliknij <b>Zbierz</b>, a gdy wszyscy staną w szyku, <b>Start</b>: odliczanie, gest startowy i taniec — u wszystkich w tej samej chwili, według skryptu, jeśli go napiszesz.</p>
 
 <section class="panel">
   <h2>🎬 Sterowanie</h2>
-  <form method="post" action="{{ url_for('dance_command') }}" class="ds-form">
+  <form method="post" action="{{ url_for('dance_command') }}" id="ds-control">
     <input type="hidden" name="dance_csrf" value="{{ dance_csrf }}">
-    <label>Przy postaci
-      <select name="owner">{% for o in owners %}<option value="{{ o.id }}" {{ 'selected' if show.owner|default('') == o.id|string or (not show.owner and o.name == '[GA]Lexiw') }}>{{ o.name }} (poz. {{ o.level }})</option>{% endfor %}</select>
-    </label>
-    <label>Tancerzy <input type="number" name="count" min="1" max="{{ max_dancers }}" value="{{ show.count|default(roster|length if roster else 10) }}"></label>
-    <label>Szyk <select name="formation">{% for key, label in formations %}<option value="{{ key }}" {{ 'selected' if show.formation|default('row') == key }}>{{ label }}</option>{% endfor %}</select></label>
-    <label>Taniec <select name="dance">{% for n in range(1, 7) %}<option value="{{ n }}" {{ 'selected' if show.dance|default('1') == n|string }}>Taniec {{ n }}</option>{% endfor %}</select></label>
-    <label>Powtarzaj co (s, 0 = raz) <input type="number" name="repeat" min="0" max="600" value="{{ show.repeat|default('0') }}"></label>
-    <label class="ds-check" title="Grające boty wylogowują się w ciągu ok. 20 s i nie wchodzą do świata, dopóki to pole jest zaznaczone. Odznacz i kliknij dowolny przycisk (np. Stop), a wrócą same, stopniowo, jak po restarcie."><input type="checkbox" name="quiet" value="1" {{ 'checked' if show.quiet|default('0') == '1' }}> Świat bez botów (tylko tancerze)</label>
-    <div class="ds-buttons">
-      <button name="command" value="gather">👥 Zbierz</button>
-      <button name="command" value="start">💃 Start</button>
-      <button name="command" value="stop" class="secondary">⏹ Stop</button>
+    <div class="ds-form">
+      <label>Postać
+        <select name="owner">{% for o in owners %}<option value="{{ o.id }}" {{ 'selected' if s.owner == o.id|string or (not s.owner and o.name == '[GA]Lexiw') }}>{{ o.name }} (poz. {{ o.level }})</option>{% endfor %}</select>
+      </label>
+      <label>Tancerzy <input type="number" name="count" min="1" max="{{ max_dancers }}" value="{{ s.count }}"></label>
+      <label>Szyk na start <select name="formation">{% for key, label, word in formations %}<option value="{{ key }}" {{ 'selected' if s.formation == key }}>{{ label }}</option>{% endfor %}</select></label>
+      <label title="Gdy skrypt jest pusty: ten taniec u wszystkich.">Taniec <select name="dance">{% for n in range(1, 25) %}<option value="{{ n }}" {{ 'selected' if s.dance == n|string }}>Taniec {{ n }}{{ ' (custom)' if n > 6 }}</option>{% endfor %}</select></label>
+      <label title="Gdy skrypt jest pusty: co ile sekund taniec rusza od nowa.">Powtarzaj co (s, 0 = raz) <input type="number" name="repeat" min="0" max="600" value="{{ s.repeat }}"></label>
+      <label class="ds-check" title="Grające boty wylogowują się w ciągu ok. 20 s i nie wchodzą do świata, dopóki to pole jest zaznaczone. Odznacz i kliknij dowolny przycisk (np. Stop), a wrócą same, stopniowo, jak po restarcie."><input type="checkbox" name="quiet" value="1" {{ 'checked' if s.quiet == '1' }}> Świat bez botów (tylko tancerze)</label>
+    </div>
+
+    <div class="ds-groups">
+      <fieldset class="ds-group">
+        <legend>📍 Miejsce</legend>
+        <label class="ds-check"><input type="radio" name="anchor" value="owner" {{ 'checked' if s.anchor != 'spot' }}> przed moją postacią (koło: wokół niej)</label>
+        <label class="ds-check"><input type="radio" name="anchor" value="spot" {{ 'checked' if s.anchor == 'spot' }}> punkt na mapie</label>
+        <div class="ds-form ds-spot">
+          <label>Mapa <select name="map"><option value="">—</option>{% for i, n in maps %}<option value="{{ i }}" {{ 'selected' if s.map == i|string }}>{{ n }}</option>{% endfor %}</select></label>
+          <label>X <input name="spot_x" value="{{ s.spot_x }}" class="ds-coord" inputmode="decimal"></label>
+          <label>Y <input name="spot_y" value="{{ s.spot_y }}" class="ds-coord" inputmode="decimal"></label>
+          <button type="button" class="secondary" id="ds-here" title="Pozycja postaci z gry (odświeżana co 2 s, gdy postać jest zalogowana).">📍 Tu, gdzie stoję</button>
+        </div>
+        <small class="muted" id="ds-here-note">X i Y jak w grze (współrzędne na mapie).</small>
+        <div class="ds-form">
+          <label>Tancerze patrzą <select name="facing">
+            <option value="owner" {{ 'selected' if s.facing == 'owner' }}>na moją postać (kamera)</option>
+            <option value="same" {{ 'selected' if s.facing == 'same' }}>tam, gdzie moja postać</option>
+            <option value="deg" {{ 'selected' if s.facing == 'deg' }}>w stronę (stopnie)</option>
+          </select></label>
+          <label>Stopnie (0–359) <input type="number" name="facing_deg" min="0" max="359" value="{{ s.facing_deg }}"></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="ds-group">
+        <legend>🎥 Nagranie</legend>
+        <div class="ds-form">
+          <label>Odliczanie (s) <input type="number" name="countdown" min="1" max="30" value="{{ s.countdown }}"></label>
+          <label class="ds-check"><input type="checkbox" name="notice" value="1" {{ 'checked' if s.notice == '1' }}> 3, 2, 1 na moim ekranie</label>
+          <label title="Wszyscy robią go razem zaraz po odliczaniu; skrypt rusza 3 s później. Łatwo po nim zgrać film z muzyką.">Gest startowy <select name="marker">
+            <option value="-">bez gestu</option>
+            {% for key, label, word in gestures %}<option value="{{ key }}" {{ 'selected' if s.marker == key }}>{{ label }}</option>{% endfor %}
+          </select></label>
+          <label>Pora dnia <select name="daymode">
+            <option value="keep" {{ 'selected' if s.daymode == 'keep' }}>jak w świecie</option>
+            <option value="light" {{ 'selected' if s.daymode == 'light' }}>dzień</option>
+            <option value="dark" {{ 'selected' if s.daymode == 'dark' }}>noc</option>
+          </select></label>
+          <label>Śnieg <select name="snow">
+            <option value="keep" {{ 'selected' if s.snow == 'keep' }}>jak w świecie</option>
+            <option value="on" {{ 'selected' if s.snow == 'on' }}>pada</option>
+            <option value="off" {{ 'selected' if s.snow == 'off' }}>nie pada</option>
+          </select></label>
+        </div>
+        <small class="muted">Pora dnia i śnieg zmieniają się tylko na ekranie Twojej postaci, na czas pokazu. Nicki nad głowami ukryjesz w grze: Opcje → Systemowe → „Nazwy” / „Pokaż nazwy”.</small>
+      </fieldset>
+
+      <fieldset class="ds-group ds-group--wide">
+        <legend>🩰 Choreografia</legend>
+        <div class="ds-form">
+          <label>Zmiana szyku <select name="transition">
+            <option value="walk" {{ 'selected' if s.transition == 'walk' }}>przechodzą</option>
+            <option value="run" {{ 'selected' if s.transition == 'run' }}>przebiegają</option>
+            <option value="jump" {{ 'selected' if s.transition == 'jump' }}>od razu (skok)</option>
+          </select></label>
+          <label title="Po tylu sekundach od początku skryptu zaczyna się od nowa. 0 = jeden raz.">Pętla skryptu (s, 0 = raz) <input type="number" name="loop" min="0" max="3600" value="{{ s.loop }}"></label>
+        </div>
+        <label class="ds-script">Skrypt (pusty = jeden taniec u wszystkich, jak wyżej)
+          <textarea name="script" rows="8" spellcheck="false" placeholder="0 taniec 5 co 1&#10;8 taniec 3 parzyści&#10;8 taniec 2 nieparzyści&#10;14 gest klask&#10;16 szyk koło&#10;20 taniec 1 co 1">{{ s.script }}</textarea>
+        </label>
+        <details class="ds-help"><summary>Jak pisać skrypt</summary>
+          <p>Jedna linia = jeden krok: <b>sekunda</b> od początku skryptu, co się dzieje i — opcjonalnie — kto. Linie po <code>#</code> to komentarz.</p>
+          <ul>
+            <li><code>0 taniec 5</code> — taniec 5 (1–6; 7–24 to tańce custom z paczki Kaia — widać je tylko w kliencie z tą paczką). <code>co 1</code> na końcu: powtarzaj co sekundę, aż ci tancerze dostaną kolejny krok.</li>
+            <li><code>12 gest klask</code> — gest: {% for key, label, word in gestures %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}.</li>
+            <li><code>16 szyk koło</code> — zespół przechodzi do szyku: {% for key, label, word in formations %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}.</li>
+            <li><code>20 pauza parzyści</code> — ich powtarzany taniec się kończy.</li>
+            <li>Kto: <code>wszyscy</code> (domyślnie), <code>parzyści</code>, <code>nieparzyści</code>, <code>rząd 2</code>, numer <code>4</code> albo zakres <code>1-5</code> (miejsca w zespole od 1).</li>
+          </ul>
+        </details>
+      </fieldset>
+    </div>
+
+    <div class="ds-form ds-bar">
+      <div class="ds-buttons">
+        <button name="command" value="gather">👥 Zbierz</button>
+        <button name="command" value="start">💃 Start</button>
+        <button name="command" value="stop" class="secondary">⏹ Stop</button>
+        <button name="command" value="save" class="secondary" title="Zapisuje pola bez wysyłania do gry.">💾 Zapisz ustawienia</button>
+      </div>
+      <label>Scena <input name="scene_name" maxlength="48" placeholder="np. Finał z kołem"></label>
+      <button name="command" value="save_scene" class="secondary" title="Zapisuje te ustawienia, skrypt i pierwszych tancerzy zespołu (z wyglądem i miejscami) pod tą nazwą.">🎞️ Zapisz jako scenę</button>
     </div>
   </form>
+
   <div class="ds-status">
     {% if status and status_age is not none and status_age < 15 %}
       <span class="ds-dot ds-dot--on"></span>
       Kanał {{ status.channel }}: {{ status.present }} z {{ status.wanted }} tancerzy w grze, {{ status.placed }} w szyku
       · polecenie: <b>{{ {'gather': 'Zbierz', 'start': 'Start', 'stop': 'Stop'}.get(status.command, status.command) }}</b>
-      {% if status.beats and status.beats != '0' %} · tańców: {{ status.beats }}{% if last_beat %} (ostatni {{ last_beat }}){% endif %}{% endif %}
+      {% if status.phase and status.phase != '-' %} · {{ phases.get(status.phase, status.phase) }}{% endif %}
+      {% if status.formation and status.formation != '-' %} · szyk: {{ formation_names.get(status.formation, status.formation) }}{% endif %}
+      {% if status.command == 'start' and status.steps %} · krok {{ status.step }} z {{ status.steps }}{% endif %}
+      {% if status.walking and status.walking != '0' %} · w drodze: {{ status.walking }}{% endif %}
+      {% if status.beats and status.beats != '0' %} · ruchów: {{ status.beats }}{% if last_beat %} (ostatni {{ last_beat }}){% endif %}{% endif %}
       {% if status.quiet == '1' %} · świat bez botów: {% if status.population in ('0', none) %}pusty{% else %}wylogowuję, zostało {{ status.population }}{% endif %}{% endif %}
     {% elif show.command and show.command != 'stop' %}
       <span class="ds-dot ds-dot--wait"></span>
-      Serwer nie potwierdza pokazu. Sprawdź, czy postać „Przy postaci” jest w grze i czy serwer gry działa.
+      Serwer nie potwierdza pokazu. Sprawdź, czy wybrana postać jest w grze (przy punkcie na mapie: na tym samym kanale) i czy serwer gry działa.
     {% else %}
       <span class="ds-dot"></span> Pokaz nieaktywny.
     {% endif %}
   </div>
 </section>
 
+<section class="panel">
+  <h2>👀 Podgląd szyku</h2>
+  <p class="muted">Tak staną tancerze (numery = miejsca w zespole), patrząc w dół rysunku; ★ to punkt, od którego liczy się szyk (przy postaci: przed nią, w kole: ona sama).</p>
+  <canvas id="ds-preview" width="520" height="300"></canvas>
+</section>
+
+<section class="panel">
+  <h2>🎞️ Sceny</h2>
+  {% if scenes %}
+  <form method="post" action="{{ url_for('dance_scene') }}" class="ds-form">
+    <input type="hidden" name="dance_csrf" value="{{ dance_csrf }}">
+    <label>Scena <select name="scene">{% for sc in scenes %}<option value="{{ sc.id }}">{{ sc.name }} · {{ sc.dancers }} tancerzy · {{ sc.updated_at.strftime('%d.%m %H:%M') if sc.updated_at else '' }}</option>{% endfor %}</select></label>
+    <div class="ds-buttons">
+      <button name="action" value="load">📂 Wczytaj</button>
+      <button name="action" value="delete" class="secondary" onclick="return confirm('Usunąć tę scenę?')">Usuń</button>
+    </div>
+  </form>
+  <p class="muted">Wczytanie ustawia sterowanie i kolejność zespołu (tancerze sceny na początku, z jej wyglądem i miejscami; reszta na koniec). Nie zmienia nic w grze, dopóki nie klikniesz „Zbierz”.</p>
+  {% else %}
+  <p class="muted">Nie ma jeszcze scen. Ustaw zespół, szyk i skrypt, wpisz nazwę przy „Zapisz jako scenę”.</p>
+  {% endif %}
+</section>
+
 <section class="panel table-wrap">
   <h2>🩰 Zespół</h2>
   <p class="muted">Klasa i płeć są stałe od pierwszego „Zbierz” (wtedy tancerz dostaje postać). Nick i poziom można zmieniać: nowy nick wchodzi, gdy postać jest poza grą od ok. 11 minut, a poziom tylko rośnie.</p>
   <p class="muted">Wygląd: w polu broni, zbroi, kostiumu, fryzury albo skórki broni zacznij pisać nazwę, a panel podpowie pasujące przedmioty dla klasy i płci tancerza (albo wpisz VNUM; 0 = zostaw, co ma). Kostium zakrywa zbroję, a skórka broni wymaga broni tego samego rodzaju. Numery znajdziesz w <a href="{{ url_for('wiki') }}">Wiki</a> (wpisz nazwę, przy przedmiocie jest VNUM) albo w <a href="{{ url_for('items_database') }}">Bazie przedmiotów</a>. Przedmiot zakłada się przy najbliższym „Zbierz”, a to, co tancerz nosił w tym miejscu, znika.</p>
+  <p class="muted">Miejsce: tylko dla szyku „Własne miejsca” — metry w prawo (X, ujemne w lewo) i do tyłu (Y) od punktu szyku, patrząc tak jak tancerze. Kolejność 900+ to tancerze odsunięci przez wczytaną scenę.</p>
   <table class="ds-table">
-    <thead><tr><th>Kolejność</th><th>Nick</th><th>Klasa</th><th>Poziom</th><th>Wygląd (VNUM)</th><th>Stan</th><th></th></tr></thead>
+    <thead><tr><th>Kolejność</th><th>Nick</th><th>Klasa</th><th>Poziom</th><th>Wygląd (VNUM)</th><th>Miejsce (m)</th><th>Stan</th><th></th></tr></thead>
     <tbody>
     {% for r in roster %}
       {% set f = 'dancer-' ~ r.id %}
-      <tr>
+      <tr class="{{ 'ds-benched' if r.slot >= 900 }}">
           <td><form id="{{ f }}" method="post" action="{{ url_for('dance_roster') }}"><input type="hidden" name="dance_csrf" value="{{ dance_csrf }}"><input type="hidden" name="id" value="{{ r.id }}"></form>
             <input form="{{ f }}" type="number" name="slot" min="0" max="999" value="{{ r.slot }}" class="ds-num"></td>
           <td><input form="{{ f }}" name="name" value="{{ r.name }}" maxlength="24" class="ds-name">{% if r.name_pending %}<small class="muted"> w grze jeszcze: {{ r.char_name }}</small>{% endif %}</td>
           <td><select form="{{ f }}" name="job" {{ 'disabled' if r.pid }}>{% for j, label in jobs %}<option value="{{ j }}" {{ 'selected' if r.job == j }}>{{ label }}</option>{% endfor %}</select>{% if r.pid %}<input form="{{ f }}" type="hidden" name="job" value="{{ r.job }}">{% endif %}</td>
           <td><input form="{{ f }}" type="number" name="level" min="1" max="99" value="{{ r.level }}" class="ds-num">{% if r.char_level %}<small class="muted"> teraz {{ r.char_level }}</small>{% endif %}</td>
           <td class="ds-look">{% for l in r.look %}<label>{{ l.label }} <input form="{{ f }}" type="text" name="{{ l.column }}" value="{{ l.vnum }}" class="ds-vnum" data-slot="{{ l.column }}" autocomplete="off" placeholder="VNUM lub nazwa">{% if l.name %}<small class="muted">{{ l.name }}</small>{% endif %}</label>{% endfor %}</td>
+          <td class="ds-pos"><label>X <input form="{{ f }}" name="pos_x" value="{{ r.pos_x_m }}" class="ds-coord" inputmode="decimal"></label><label>Y <input form="{{ f }}" name="pos_y" value="{{ r.pos_y_m }}" class="ds-coord" inputmode="decimal"></label></td>
           <td>{{ r.status or '—' }}{% if r.pid %}<br><a href="{{ url_for('player', pid=r.pid) }}"><small>postać</small></a>{% endif %}</td>
           <td class="ds-actions"><button form="{{ f }}" name="action" value="save" class="secondary">Zapisz</button>
             <button form="{{ f }}" name="action" value="delete" class="secondary" onclick="return confirm('Usunąć tancerza {{ r.name }}?')">Usuń</button></td>
       </tr>
     {% else %}
-      <tr><td colspan="7" class="muted">Nie ma jeszcze tancerzy. Dodaj pierwszego poniżej.</td></tr>
+      <tr><td colspan="8" class="muted">Nie ma jeszcze tancerzy. Dodaj pierwszego poniżej.</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -69,6 +179,8 @@
     <label>Klasa <select name="job">{% for j, label in jobs %}<option value="{{ j }}">{{ label }}</option>{% endfor %}</select></label>
     <label>Poziom <input type="number" name="level" min="1" max="99" value="30"></label>
     {% for column, label, _fits in look_slots %}<label>{{ label }} (VNUM) <input type="text" name="{{ column }}" value="0" class="ds-vnum" data-slot="{{ column }}" autocomplete="off" placeholder="VNUM lub nazwa"></label>{% endfor %}
+    <label>Miejsce X (m) <input name="pos_x" value="0" class="ds-coord" inputmode="decimal"></label>
+    <label>Miejsce Y (m) <input name="pos_y" value="0" class="ds-coord" inputmode="decimal"></label>
     <div class="ds-buttons"><button>➕ Dodaj</button></div>
   </form>
 </section>
@@ -114,6 +226,87 @@
     });
     input.addEventListener('blur', () => setTimeout(() => { box.hidden = true; }, 150));
   });
+
+  const form = document.getElementById('ds-control');
+
+  // "Here, where I stand": the owner's position from the game.
+  const here = document.getElementById('ds-here');
+  const note = document.getElementById('ds-here-note');
+  here.addEventListener('click', () => {
+    fetch("{{ url_for('dance_owner_spot') }}", {cache: 'no-store'}).then((r) => r.json()).then((d) => {
+      if (!d.ok || String(d.owner) !== form.elements['owner'].value) {
+        note.textContent = 'Wybrana postać nie jest teraz w grze (albo serwer jeszcze nie podał jej pozycji).';
+        return;
+      }
+      const select = form.elements['map'];
+      if (![...select.options].some((o) => o.value === String(d.map))) select.add(new Option(d.map_name, d.map));
+      select.value = String(d.map);
+      form.elements['spot_x'].value = d.x;
+      form.elements['spot_y'].value = d.y;
+      form.querySelector('input[name=anchor][value=spot]').checked = true;
+      note.textContent = `${d.name}: ${d.map_name}, X ${d.x}, Y ${d.y} (sprzed ${d.age} s).`;
+    }).catch(() => { note.textContent = 'Nie udało się odczytać pozycji.'; });
+  });
+
+  // The formation preview: the same layout the engine makes (playerbot_dancer.h).
+  const manual = {{ manual|tojson }};
+  const canvas = document.getElementById('ds-preview');
+  const ctx = canvas.getContext('2d');
+  function spots(formation, n) {
+    const s = 250, out = [];
+    for (let i = 0; i < n; i++) {
+      let u = 0, v = 0;
+      if (formation === 'circle') {
+        const r = Math.max(400, n * s / (2 * Math.PI)), a = 2 * Math.PI * i / n;
+        u = r * Math.sin(a); v = -r * Math.cos(a);
+      } else if (formation === 'halfcircle') {
+        const r = Math.max(500, n * s / Math.PI), end = Math.PI * 0.42;
+        const a = n === 1 ? 0 : -end + 2 * end * i / (n - 1);
+        u = r * Math.sin(a); v = r * (Math.cos(a) - Math.cos(end));
+      } else if (formation === 'column') {
+        v = i * s;
+      } else if (formation === 'wedge' || formation === 'vee') {
+        const k = Math.floor((i + 1) / 2), side = i % 2 ? -1 : 1, depth = Math.floor(n / 2);
+        u = side * k * s * 0.8; v = (formation === 'wedge' ? k : depth - k) * s * 0.8;
+      } else if (formation === 'manual') {
+        const p = manual[i] || {x: 0, y: 0};
+        u = p.x; v = p.y;
+      } else {
+        const rows = Math.min(formation === 'rows' ? 2 : formation === 'grid' ? 3 : 1, n);
+        const per = Math.ceil(n / rows), row = Math.floor(i / per), col = i % per;
+        const inRow = Math.min(per, n - row * per);
+        const stagger = (row % 2 && inRow === per && per > 1) ? s * 0.5 : 0;
+        u = (col - (inRow - 1) / 2) * s + stagger; v = row * 300;
+      }
+      out.push([u, v]);
+    }
+    return out;
+  }
+  function draw() {
+    const n = Math.max(1, Math.min({{ max_dancers }}, parseInt(form.elements['count'].value || '1', 10)));
+    const f = form.elements['formation'].value;
+    const pts = spots(f, n);
+    const xs = pts.map((p) => p[0]).concat([0]), ys = pts.map((p) => p[1]).concat([0]);
+    const minX = Math.min(...xs) - 150, maxX = Math.max(...xs) + 150, minY = Math.min(...ys) - 150, maxY = Math.max(...ys) + 150;
+    const scale = Math.min(canvas.width / (maxX - minX), canvas.height / (maxY - minY), 0.25);
+    const cx = canvas.width / 2 - (minX + maxX) / 2 * scale, cy = canvas.height / 2 - (minY + maxY) / 2 * scale;
+    const css = getComputedStyle(document.body);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // The audience is "down": the rows go back, up the picture.
+    ctx.fillStyle = css.getPropertyValue('--gold') || '#e8b93f';
+    ctx.fillText('★', cx, cy - 0 * scale);
+    pts.forEach(([u, v], i) => {
+      const x = cx + u * scale, y = cy - v * scale;
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, 2 * Math.PI);
+      ctx.fillStyle = '#63c993'; ctx.fill();
+      ctx.fillStyle = '#10140f'; ctx.fillText(String(i + 1), x, y);
+    });
+    ctx.fillStyle = css.getPropertyValue('--muted') || '#999';
+    ctx.fillText('widz / kamera ↓', canvas.width / 2, canvas.height - 8);
+  }
+  ['count', 'formation'].forEach((k) => form.elements[k].addEventListener('input', draw));
+  draw();
 })();
 </script>
 {% endblock %}

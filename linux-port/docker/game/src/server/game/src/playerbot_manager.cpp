@@ -4804,6 +4804,14 @@ void CPlayerBotManager::OnGuildBotOrder(LPCHARACTER ch, const char* szArgument)
 bool CPlayerBotManager::PlaceLoadingSidekick(DWORD dwPlayerID, long& lMapIndex, long& x, long& y)
 {
 	LPCHARACTER owner = GetPlayerBotSidekickOwnerHere(dwPlayerID);
+	// LEXIW_DANCE_SHOW_V2: a dancer loads where its show stands on this core
+	// (beside the owner or on a chosen spot).
+	if (!owner && IsPlayerBotDancerPID(dwPlayerID) && GetPlayerBotDanceLoadSpot(lMapIndex, x, y))
+	{
+		sys_log(0, "PLAYERBOT_DANCE: saved on a map this core does not host, loads on the show's spot pid=%u map=%ld",
+				dwPlayerID, lMapIndex);
+		return true;
+	}
 	// LEXIW_DANCE_SHOW_V1: a dancer saved on a map this core does not host loads
 	// beside the character its show stands by.
 	if (!owner && IsPlayerBotDancerPID(dwPlayerID) && s_kPlayerBotDanceShow.dwOwner)
