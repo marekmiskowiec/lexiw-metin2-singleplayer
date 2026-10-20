@@ -63,6 +63,7 @@
 #include <deque>
 #include <algorithm>
 #include <cstdlib>
+#include <cmath> // LEXIW_DANCE_SHOW_V1: the circle formation
 #include <climits>
 #include <cstdio>
 #include <cstring>
@@ -271,6 +272,9 @@ namespace { bool HandlePlayerBotConversationWith(DWORD playerPID, const char* pl
 // MT2009_PLUS_SIDEKICK_SHOP_ERRAND_V1: the owner's "Kup" errand - potions and
 // arrows at the merchants, capes and the like off the stands.
 #include "playerbot_sidekick_shop.h"
+// LEXIW_DANCE_SHOW_V1: the operator's dance troupe ("Show tanca" in the panel):
+// after the companion, whose identity pick, spawn path and placement it uses.
+#include "playerbot_dancer.h"
 // Iwakura's social personalities: the companion's phase and its invitations
 // to people, a companion Shaman's party buffs, and the mercenary's contracts.
 #include "playerbot_companions.h"
@@ -570,6 +574,9 @@ namespace
 			return;
 		LPCHARACTER leader = CHARACTER_MANAGER::instance().FindByPID(leaderPid);
 		if (!leader || leader->IsDead())
+			return;
+		// LEXIW_DANCE_SHOW_V1: a dancer is in nobody's party.
+		if (IsPlayerBotDancerPID(ch->GetPlayerID()))
 			return;
 		// A player's companion is in its owner's party and nobody else's.
 		if (IsPlayerBotSidekickPID(ch->GetPlayerID()) && !IsPlayerBotSidekickInviteFromOwner(ch, leader))
@@ -881,6 +888,8 @@ namespace
 		const char* unready = GetPlayerBotDuelUnreadiness(ch, dwNow);
 		if (unready)
 			return unready;
+		if (ch && IsPlayerBotDancerPID(ch->GetPlayerID())) // LEXIW_DANCE_SHOW_V1
+			return "dancer";
 		if (ch && IsPlayerBotSidekickPID(ch->GetPlayerID()))
 			return "companion";
 		if (ch)
@@ -1776,7 +1785,8 @@ namespace
 		// A player's companion is in its owner's party, which its own pass
 		// keeps (playerbot_sidekick.h), or in none; and a bot that owns one
 		// under the self-test keeps the party the companion is in.
-		if (IsPlayerBotSidekickPID(ch->GetPlayerID()) || IsPlayerBotSidekickOwnerPID(ch->GetPlayerID()))
+		if (IsPlayerBotSidekickPID(ch->GetPlayerID()) || IsPlayerBotSidekickOwnerPID(ch->GetPlayerID()) ||
+				IsPlayerBotDancerPID(ch->GetPlayerID())) // LEXIW_DANCE_SHOW_V1
 			return;
 
 		state.dwNextPartyCheckTime = dwNow + PLAYERBOT_PARTY_CHECK_INTERVAL + number(0, 3000);
@@ -3065,6 +3075,7 @@ namespace
 		// A player's companion, on a core no bot has woken yet: the first of
 		// them starts Update and ends this clock (playerbot_sidekick.h).
 		ManagePlayerBotSidekicks(dwNow);
+		ManagePlayerBotDancers(dwNow); // LEXIW_DANCE_SHOW_V1: the operator's dance troupe
 		// MT2009_PLUS_SHOUTERS_V1: and the shouters, whatever the population.
 		ManagePlayerBotShouters(dwNow);
 #if defined(PLAYERBOT_ENGINE_MT2009)
@@ -3131,7 +3142,7 @@ bool CPlayerBotManager::Spawn(DWORD dwPlayerID, BYTE bEmpire)
 	// SpawnSidekick starts one, on the core its owner stands on, whatever this
 	// channel's partition says - and nothing of the population's does.
 	const bool bSidekick = m_dwSpawningSidekick != 0 && m_dwSpawningSidekick == dwPlayerID;
-	if (!bSidekick && IsPlayerBotSidekickPID(dwPlayerID))
+	if (!bSidekick && (IsPlayerBotSidekickPID(dwPlayerID) || IsPlayerBotDancerPID(dwPlayerID))) // LEXIW_DANCE_SHOW_V1: a dancer too
 		return false;
 
 	// Taken over by a person from the advanced panel (playerbot_takeover.h):
@@ -3913,7 +3924,7 @@ void CPlayerBotManager::SpawnPendingBatch(DWORD dwNow)
 			continue;
 		// A resting one likewise: its rest ends in ManageLifeSchedule. And a
 		// player's companion, which logs in with its owner (SpawnSidekick).
-		if (IsRestingBot(pid) || IsPlayerBotSidekickPID(pid))
+		if (IsRestingBot(pid) || IsPlayerBotSidekickPID(pid) || IsPlayerBotDancerPID(pid))
 			continue;
 		Spawn(pid, GetRegisteredEmpire(pid));
 		++sent;
@@ -4003,7 +4014,7 @@ void CPlayerBotManager::SpawnLateJoiners(DWORD dwNow)
 		// A banned or resting one is scheduled and not spawned: the top-up
 		// brings it in when the ban lifts or the rest ends, like anybody's.
 		if (m_setBannedBots.find(pid) != m_setBannedBots.end() || IsRestingBot(pid) ||
-				IsPlayerBotSidekickPID(pid))
+				IsPlayerBotSidekickPID(pid) || IsPlayerBotDancerPID(pid))
 			continue;
 		Spawn(pid, GetRegisteredEmpire(pid));
 		sys_log(0, "PLAYERBOT: late joiner pid=%u empire=%u left=%u of %u",
@@ -4048,7 +4059,7 @@ void CPlayerBotManager::TopUpMissingBots(DWORD dwNow)
 		// the top-up from asking for it every minute only for SpawnPendingBatch
 		// to drop it again.
 		else if (m_setBannedBots.find(*it) == m_setBannedBots.end() && !IsRestingBot(*it) && !IsPlayerBotRetirementHold(*it) &&
-				!IsPlayerBotSidekickPID(*it) && !IsPlayerBotTakeoverHold(*it))
+				!IsPlayerBotSidekickPID(*it) && !IsPlayerBotDancerPID(*it) && !IsPlayerBotTakeoverHold(*it))
 			missing.push_back(*it);
 	}
 	if (missing.empty())
@@ -4793,6 +4804,10 @@ void CPlayerBotManager::OnGuildBotOrder(LPCHARACTER ch, const char* szArgument)
 bool CPlayerBotManager::PlaceLoadingSidekick(DWORD dwPlayerID, long& lMapIndex, long& x, long& y)
 {
 	LPCHARACTER owner = GetPlayerBotSidekickOwnerHere(dwPlayerID);
+	// LEXIW_DANCE_SHOW_V1: a dancer saved on a map this core does not host loads
+	// beside the character its show stands by.
+	if (!owner && IsPlayerBotDancerPID(dwPlayerID) && s_kPlayerBotDanceShow.dwOwner)
+		owner = CHARACTER_MANAGER::instance().FindByPID(s_kPlayerBotDanceShow.dwOwner);
 	if (!owner || owner->IsDead() || !owner->GetSectree())
 		return false;
 	lMapIndex = owner->GetMapIndex();
@@ -4893,7 +4908,7 @@ void CPlayerBotManager::ManageLifeSchedule(DWORD dwNow)
 		// A player's companion keeps its owner's hours, not a schedule; a
 		// shouter of the first villages is always there (and Tieru's kind,
 		// MT2009_PLUS_MEDAL_SHOUTERS_V1).
-		if (IsPlayerBotSidekickPID(pid) || IsPlayerBotShouterPID(pid) || IsPlayerBotMedalShouterPID(pid))
+		if (IsPlayerBotSidekickPID(pid) || IsPlayerBotDancerPID(pid) || IsPlayerBotShouterPID(pid) || IsPlayerBotMedalShouterPID(pid))
 			continue;
 		// MT2009_PLUS_AREZZO_BOTS_V1 (cohort): the Arezzo test's characters
 		// play for as long as the test runs.
@@ -5601,7 +5616,7 @@ void CPlayerBotManager::PublishChannelPresence(DWORD dwNow)
 		// (SpawnMedalDropperCohort): the second channel's core does not know
 		// it, so a dropper moved there would become an ordinary bot and the
 		// top-up here would never bring it back.
-		bool pinned = IsMedalDropperCohortPID(pid) || IsPlayerBotSidekickPID(pid) || IsPlayerBotShouterPID(pid) ||
+		bool pinned = IsMedalDropperCohortPID(pid) || IsPlayerBotSidekickPID(pid) || IsPlayerBotDancerPID(pid) || IsPlayerBotShouterPID(pid) ||
 				ch->GetMyShop() != NULL ||
 				(ch->GetParty() && IsPlayerBotHumanLedParty(ch->GetParty())) || IsPlayerBotSummoned(pid) ||
 				ch->GetMapIndex() >= PLAYERBOT_INSTANCE_MAP_INDEX_MIN ||
@@ -5953,7 +5968,7 @@ void CPlayerBotManager::OnChannelAssignments(void* pvMsg)
 	{
 		TPlayerBotAccountMap::const_iterator a = m_mapBotAccounts.find(i->first);
 		// A player's companion stands where its owner is, whatever its row says.
-		if (a != m_mapBotAccounts.end() && a->second.bChannel != g_bChannel && !IsPlayerBotSidekickPID(i->first))
+		if (a != m_mapBotAccounts.end() && a->second.bChannel != g_bChannel && !IsPlayerBotSidekickPID(i->first) && !IsPlayerBotDancerPID(i->first))
 			leave.push_back(i->first);
 	}
 	for (size_t i = 0; i < leave.size(); ++i)
@@ -6066,6 +6081,7 @@ void CPlayerBotManager::Update()
 	// The players' companions: in the world while their owners are here
 	// (playerbot_sidekick.h).
 	ManagePlayerBotSidekicks(dwNow);
+	ManagePlayerBotDancers(dwNow); // LEXIW_DANCE_SHOW_V1: the operator's dance troupe
 	// MT2009_PLUS_SHOUTERS_V1: the shouters of the first villages.
 	ManagePlayerBotShouters(dwNow);
 	// MT2009_PLUS_L30_WEAPON_DROPPER_V1: two or three island droppers a kingdom.
@@ -6273,6 +6289,12 @@ WritePlayerBotGuildStatus(dwNow);
 			continue;
 
 		TPlayerBotAIState& state = s_mapPlayerBotAIStates[it->first];
+		// LEXIW_DANCE_SHOW_V1: a dancer stands where the show put it, and does nothing else.
+		if (IsPlayerBotDancerPID(it->first))
+		{
+			KeepPlayerBotDancer(ch, state, dwNow);
+			continue;
+		}
 
 		// Retirement (playerbot_retirement.h): never despawns from inside this loop.
 		if (ManagePlayerBotRetirement(ch, state, dwNow))

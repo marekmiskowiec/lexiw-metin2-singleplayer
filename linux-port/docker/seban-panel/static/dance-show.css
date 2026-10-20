@@ -1,0 +1,13 @@
+/* Lexiw: Show tańca */
+.ds-form{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end}
+.ds-form label{display:flex;flex-direction:column;gap:3px;font-size:13px}
+.ds-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.ds-status{margin-top:12px;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ds-dot{width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block}
+.ds-dot--on{background:#63c993}
+.ds-dot--wait{background:#f2c34d}
+.ds-table input.ds-num{width:70px}
+.ds-table input.ds-name{width:160px}
+.ds-table td{vertical-align:middle}
+.ds-actions{white-space:nowrap}
+.ds-check{flex-direction:row!important;align-items:center;gap:6px!important;padding-bottom:6px}

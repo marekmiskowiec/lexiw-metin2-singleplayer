@@ -11135,6 +11135,8 @@ from observe_health import install_health  # noqa: E402
 install_health(sys.modules[__name__])
 from hall_of_fame import install_hall_of_fame  # noqa: E402
 install_hall_of_fame(sys.modules[__name__])
+from dance_show import install_dance_show  # noqa: E402
+install_dance_show(sys.modules[__name__])
 
 
 if __name__ == "__main__":
