@@ -11,3 +11,7 @@
 .ds-table td{vertical-align:middle}
 .ds-actions{white-space:nowrap}
 .ds-check{flex-direction:row!important;align-items:center;gap:6px!important;padding-bottom:6px}
+.ds-look{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:4px 10px;min-width:280px}
+.ds-look label{display:flex;flex-direction:column;font-size:12px;gap:2px}
+.ds-look small{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+input.ds-vnum{width:90px}

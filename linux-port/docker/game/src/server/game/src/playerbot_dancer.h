@@ -56,6 +56,9 @@ namespace
 		BYTE bJob;
 		BYTE bLevel;
 		DWORD dwPid;
+		// The look the panel set (item vnums, 0 = leave what it wears):
+		// weapon, body armour, costume, hairstyle.
+		DWORD adwLook[4];
 	};
 
 	struct TPlayerBotDanceShow
@@ -143,9 +146,17 @@ namespace
 				sys_err("PLAYERBOT_DANCE: no dancer table");
 				return;
 			}
+			// The look of each dancer (LEXIW_DANCE_SHOW_V1, 20 October): added to
+			// a table that may predate it.
+			PlayerBotDanceExec("ALTER TABLE player.playerbot_dancer "
+					"ADD COLUMN IF NOT EXISTS weapon INT UNSIGNED NOT NULL DEFAULT 0, "
+					"ADD COLUMN IF NOT EXISTS armor INT UNSIGNED NOT NULL DEFAULT 0, "
+					"ADD COLUMN IF NOT EXISTS costume INT UNSIGNED NOT NULL DEFAULT 0, "
+					"ADD COLUMN IF NOT EXISTS hair INT UNSIGNED NOT NULL DEFAULT 0");
 		}
 		std::unique_ptr<SQLMsg> msg(AccountDB::instance().DirectQuery(
-				"SELECT id, slot, name, job, level, IFNULL(pid,0) FROM player.playerbot_dancer ORDER BY slot, id"));
+				"SELECT id, slot, name, job, level, IFNULL(pid,0), weapon, armor, costume, hair "
+				"FROM player.playerbot_dancer ORDER BY slot, id"));
 		if (!msg.get() || msg->uiSQLErrno != 0 || !msg->Get() || !msg->Get()->pSQLResult)
 			return;
 		std::vector<TPlayerBotDancer> dancers;
@@ -164,6 +175,12 @@ namespace
 			str_to_number(job, row[3]);
 			str_to_number(level, row[4]);
 			str_to_number(d.dwPid, row[5]);
+			for (int k = 0; k < 4; ++k)
+			{
+				d.adwLook[k] = 0;
+				if (row[6 + k])
+					str_to_number(d.adwLook[k], row[6 + k]);
+			}
 			d.bJob = (BYTE)MIN(job, 7U);
 			d.bLevel = (BYTE)MINMAX(1U, level, 120U);
 			dancers.push_back(d);
@@ -380,6 +397,62 @@ namespace
 			sys_log(0, "PLAYERBOT_DANCE: renamed pid=%u to %s", d.dwPid, d.strName.c_str());
 	}
 
+	// The look the panel set for a dancer, put on as it is placed: each item is
+	// made new and worn in the cell it is for, what was there goes. A piece it
+	// already wears is left alone, so a second "Zbierz" makes nothing. The show
+	// is the operator's: no level or class check (the panel warns of those).
+	void ApplyPlayerBotDancerLook(LPCHARACTER ch, const TPlayerBotDancer& d)
+	{
+		bool changed = false;
+		for (int k = 0; k < 4; ++k)
+		{
+			const DWORD vnum = d.adwLook[k];
+			if (vnum == 0)
+				continue;
+			bool worn = false;
+			for (int w = 0; w < WEAR_MAX_NUM && !worn; ++w)
+			{
+				LPITEM on = ch->GetWear(w);
+				worn = on && on->GetVnum() == vnum;
+			}
+			if (worn)
+				continue;
+			LPITEM item = ITEM_MANAGER::instance().CreateItem(vnum, 1, 0, false);
+			if (!item)
+			{
+				sys_err("PLAYERBOT_DANCE: no item vnum=%u for pid=%u", vnum, ch->GetPlayerID());
+				continue;
+			}
+			const int cell = item->FindEquipCell(ch);
+			LPITEM old = cell >= 0 ? ch->GetWear(cell) : NULL;
+			if (cell < 0 || (old && IS_SET(old->GetFlag(), ITEM_FLAG_IRREMOVABLE)))
+			{
+				sys_err("PLAYERBOT_DANCE: cannot wear vnum=%u cell=%d pid=%u", vnum, cell, ch->GetPlayerID());
+				M2_DESTROY_ITEM(item);
+				continue;
+			}
+			if (old)
+			{
+				old->RemoveFromCharacter();
+				ITEM_MANAGER::instance().RemoveItem(old, "PLAYERBOT_DANCE_LOOK");
+			}
+			if (!item->EquipTo(ch, (BYTE)cell))
+			{
+				sys_err("PLAYERBOT_DANCE: equip failed vnum=%u cell=%d pid=%u", vnum, cell, ch->GetPlayerID());
+				M2_DESTROY_ITEM(item);
+				continue;
+			}
+			changed = true;
+			sys_log(0, "PLAYERBOT_DANCE: look pid=%u name=%s vnum=%u cell=%d", ch->GetPlayerID(), ch->GetName(), vnum, cell);
+		}
+		if (changed)
+		{
+			// The parts the others see (armour, weapon, hair) are worked out here.
+			ch->ComputePoints();
+			ch->UpdatePacket();
+		}
+	}
+
 	void LogOutPlayerBotDancer(DWORD pid, const char* why)
 	{
 		LPCHARACTER ch = CHARACTER_MANAGER::instance().FindByPID(pid);
@@ -530,6 +603,7 @@ namespace
 					RaisePlayerBotSidekickLevel(ch, d.bLevel);
 				if (ch->IsDead())
 					continue;
+				ApplyPlayerBotDancerLook(ch, d);
 				long x = 0, y = 0;
 				GetPlayerBotDanceSpot(show.strFormation, n, total, owner->GetX(), owner->GetY(), x, y);
 				PIXEL_POSITION pos;

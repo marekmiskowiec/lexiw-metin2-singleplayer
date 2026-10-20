@@ -40,8 +40,9 @@
 <section class="panel table-wrap">
   <h2>🩰 Zespół</h2>
   <p class="muted">Klasa i płeć są stałe od pierwszego „Zbierz” (wtedy tancerz dostaje postać). Nick i poziom można zmieniać: nowy nick wchodzi, gdy postać jest poza grą od ok. 11 minut, a poziom tylko rośnie.</p>
+  <p class="muted">Wygląd: wpisz numer VNUM broni, zbroi, kostiumu i fryzury (0 = zostaw, co ma). Numery znajdziesz w <a href="{{ url_for('wiki') }}">Wiki</a> (wpisz nazwę, przy przedmiocie jest VNUM) albo w <a href="{{ url_for('items_database') }}">Bazie przedmiotów</a>. Przedmiot zakłada się przy najbliższym „Zbierz”, a to, co tancerz nosił w tym miejscu, znika.</p>
   <table class="ds-table">
-    <thead><tr><th>Kolejność</th><th>Nick</th><th>Klasa</th><th>Poziom</th><th>Stan</th><th></th></tr></thead>
+    <thead><tr><th>Kolejność</th><th>Nick</th><th>Klasa</th><th>Poziom</th><th>Wygląd (VNUM)</th><th>Stan</th><th></th></tr></thead>
     <tbody>
     {% for r in roster %}
       {% set f = 'dancer-' ~ r.id %}
@@ -51,12 +52,13 @@
           <td><input form="{{ f }}" name="name" value="{{ r.name }}" maxlength="24" class="ds-name">{% if r.name_pending %}<small class="muted"> w grze jeszcze: {{ r.char_name }}</small>{% endif %}</td>
           <td><select form="{{ f }}" name="job" {{ 'disabled' if r.pid }}>{% for j, label in jobs %}<option value="{{ j }}" {{ 'selected' if r.job == j }}>{{ label }}</option>{% endfor %}</select>{% if r.pid %}<input form="{{ f }}" type="hidden" name="job" value="{{ r.job }}">{% endif %}</td>
           <td><input form="{{ f }}" type="number" name="level" min="1" max="99" value="{{ r.level }}" class="ds-num">{% if r.char_level %}<small class="muted"> teraz {{ r.char_level }}</small>{% endif %}</td>
+          <td class="ds-look">{% for l in r.look %}<label>{{ l.label }} <input form="{{ f }}" type="number" name="{{ l.column }}" min="0" value="{{ l.vnum }}" class="ds-vnum">{% if l.name %}<small class="muted">{{ l.name }}</small>{% endif %}</label>{% endfor %}</td>
           <td>{{ r.status or '—' }}{% if r.pid %}<br><a href="{{ url_for('player', pid=r.pid) }}"><small>postać</small></a>{% endif %}</td>
           <td class="ds-actions"><button form="{{ f }}" name="action" value="save" class="secondary">Zapisz</button>
             <button form="{{ f }}" name="action" value="delete" class="secondary" onclick="return confirm('Usunąć tancerza {{ r.name }}?')">Usuń</button></td>
       </tr>
     {% else %}
-      <tr><td colspan="6" class="muted">Nie ma jeszcze tancerzy. Dodaj pierwszego poniżej.</td></tr>
+      <tr><td colspan="7" class="muted">Nie ma jeszcze tancerzy. Dodaj pierwszego poniżej.</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -66,6 +68,7 @@
     <label>Nick <input name="name" maxlength="24" placeholder="np. [Tancerz]Ola" required></label>
     <label>Klasa <select name="job">{% for j, label in jobs %}<option value="{{ j }}">{{ label }}</option>{% endfor %}</select></label>
     <label>Poziom <input type="number" name="level" min="1" max="99" value="30"></label>
+    {% for column, label, _fits in look_slots %}<label>{{ label }} (VNUM) <input type="number" name="{{ column }}" min="0" value="0" class="ds-vnum"></label>{% endfor %}
     <div class="ds-buttons"><button>➕ Dodaj</button></div>
   </form>
 </section>
