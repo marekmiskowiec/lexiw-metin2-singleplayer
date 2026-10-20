@@ -12,7 +12,7 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
-## 2.21.1-lexiw.11 — 2026-10-10 — Giełda: jedna strona rynku; Wiki: poradniki
+## 2.21.1-lexiw.11 — 2026-10-20 — Show tańca i tańce custom; Sala chwały; zdrowie botów; Giełda: jedna strona rynku; Wiki: poradniki
 
 - [launcher] Poprawka: skróty „Aktywność botów”, „Giełda” i „Rdzenie gry” na stronie „Świat i boty” otwierały adres klasycznego panelu (7788), a te strony są w panelu Seban, więc kończyły się błędem. Teraz używają adresu panelu Seban (port z pliku .env).
 - [launcher] Przycisk „RATY: EXP / DROP / YANG” otwiera teraz ustawienia mnożników w panelu Seban (Gra i serwer, sekcja „Ustawienia wymagające restartu”), a nie starą stronę /rates klasycznego panelu. Samo-test sprawdza nowy adres.
