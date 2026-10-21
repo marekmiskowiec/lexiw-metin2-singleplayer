@@ -4086,6 +4086,10 @@ eMountType GetMountLevelByVnum(DWORD dwMountVnum, bool IsNew) // updated to 2014
 		case 20107: // normal military horse (no guild)
 		case 20108: // normal military horse (guild member)
 		case 20109: // normal military horse (guild master)
+		case 20310: // LEXIW_HORSE31_V1: Storm Horse, level 31 (no guild)
+		case 20311: // LEXIW_HORSE31_V1: Storm Horse (guild)
+		case 20316: // LEXIW_HORSE31_V1: dark skin of the military horse
+		case 20317: // LEXIW_HORSE31_V1: dark skin of the Storm Horse
 			if (IsNew)
 				return MOUNT_TYPE_NONE;
 		// @fixme116 end
@@ -4128,6 +4132,7 @@ eMountType GetMountLevelByVnum(DWORD dwMountVnum, bool IsNew) // updated to 2014
 		case 20104: // normal combat horse (no guild)
 		case 20105: // normal combat horse (guild member)
 		case 20106: // normal combat horse (guild master)
+		case 20315: // LEXIW_HORSE31_V1: dark skin of the combat horse
 			if (IsNew)
 				return MOUNT_TYPE_NONE;
 		// @fixme116 end
@@ -4157,6 +4162,7 @@ eMountType GetMountLevelByVnum(DWORD dwMountVnum, bool IsNew) // updated to 2014
 		case 20101: // normal beginner horse (no guild)
 		case 20102: // normal beginner horse (guild member)
 		case 20103: // normal beginner horse (guild master)
+		case 20314: // LEXIW_HORSE31_V1: dark skin of the beginner horse
 			if (IsNew)
 				return MOUNT_TYPE_NONE;
 		// @fixme116 end

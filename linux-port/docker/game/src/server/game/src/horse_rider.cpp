@@ -58,7 +58,10 @@ THorseStat c_aHorseStat[HORSE_MAX_LEVEL+1] =
 	{ 50,	20107,	44,	150,	62,	83,	42,	0,	94,	75,	112,	56 },
 	{ 50,	20107,	46,	160,	63,	84,	42,	0,	95,	76,	114,	57 },
 	{ 50,	20107,	48,	170,	65,	87,	43,	0,	97,	77,	116,	58 },
-	{ 50,	20107,	50,	200,	67,	89,	45,	0,	99,	79,	118,	59 }
+	{ 50,	20107,	50,	200,	67,	89,	45,	0,	99,	79,	118,	59 },
+	// LEXIW_HORSE31_V1: level 31, the Storm Horse (Kon Szturmowy, race 20310, the
+	// model of the new MT2009 client); for now only given by hand (/horse_level).
+	{ 60,	20310,	55,	220,	70,	92,	47,	0,	103,	82,	123,	62 }
 };
 
 CHorseRider::CHorseRider()

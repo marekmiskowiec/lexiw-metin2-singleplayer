@@ -7964,6 +7964,7 @@ bool CHARACTER::CanReceiveItem(LPCHARACTER from, LPITEM item) const
 		case 20101:
 		case 20102:
 		case 20103:
+		case 20314: // LEXIW_HORSE31_V1
 			if (item->GetVnum() == ITEM_HORSE_FOOD_1)
 			{
 				if (IsDead())
@@ -7980,6 +7981,7 @@ bool CHARACTER::CanReceiveItem(LPCHARACTER from, LPITEM item) const
 		case 20104:
 		case 20105:
 		case 20106:
+		case 20315: // LEXIW_HORSE31_V1
 			if (item->GetVnum() == ITEM_HORSE_FOOD_2)
 			{
 				if (IsDead())
@@ -7997,6 +7999,10 @@ bool CHARACTER::CanReceiveItem(LPCHARACTER from, LPITEM item) const
 		case 20107:
 		case 20108:
 		case 20109:
+		case 20310: // LEXIW_HORSE31_V1
+		case 20311:
+		case 20316:
+		case 20317:
 			if (item->GetVnum() == ITEM_HORSE_FOOD_3)
 			{
 				if (IsDead())
@@ -8140,6 +8146,12 @@ void CHARACTER::ReceiveItem(LPCHARACTER from, LPITEM item)
 		case 20107:
 		case 20108:
 		case 20109:
+		case 20310: // LEXIW_HORSE31_V1
+		case 20311:
+		case 20314:
+		case 20315:
+		case 20316:
+		case 20317:
 			if (item->GetVnum() == ITEM_HORSE_FOOD_1 ||
 					item->GetVnum() == ITEM_HORSE_FOOD_2 ||
 					item->GetVnum() == ITEM_HORSE_FOOD_3)

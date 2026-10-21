@@ -4644,7 +4644,7 @@ ACMD (do_all_skill_master)
 					ch->SetSkillLevel(i, 10);
 					break;
 				case SKILL_HORSE:
-					ch->SetSkillLevel(i, HORSE_MAX_LEVEL);
+					ch->SetSkillLevel(i, 30); // LEXIW_HORSE31_V1: the riding skill stays at 30
 					break;
 				// CanUseSkill will be true for skill_horse_skills if riding
 				case SKILL_HORSE_WILDATTACK:
@@ -8061,7 +8061,7 @@ ACMD(do_gmpanel_set_horse_points)
 
 	str_to_number(value, fields[1]);
 
-	value = MINMAX(0, value, 30); // HORSE_MAX_LEVEL, horse_rider.h
+	value = MINMAX(0, value, HORSE_MAX_LEVEL); // LEXIW_HORSE31_V1 (was 30)
 
 
 

@@ -2219,7 +2219,8 @@ void CHARACTER::SetProto(const CMob * pkMob)
 			GetRaceNum() == 20106 ||
 			GetRaceNum() == 20107 ||
 			GetRaceNum() == 20108 ||
-			GetRaceNum() == 20109
+			GetRaceNum() == 20109 ||
+			(GetRaceNum() >= 20310 && GetRaceNum() <= 20317) // LEXIW_HORSE31_V1: Storm Horse and dark skins
 	  )
 	{
 		m_stateIdle.Set(this, &CHARACTER::BeginStateEmpty, &CHARACTER::StateHorse, &CHARACTER::EndStateEmpty);
@@ -5848,7 +5849,8 @@ void CHARACTER::SetTarget(LPCHARACTER pkChrTarget)
 					m_pkChrTarget->GetRaceNum() == 20106 ||
 					m_pkChrTarget->GetRaceNum() == 20107 ||
 					m_pkChrTarget->GetRaceNum() == 20108 ||
-					m_pkChrTarget->GetRaceNum() == 20109)
+					m_pkChrTarget->GetRaceNum() == 20109 ||
+					(m_pkChrTarget->GetRaceNum() >= 20310 && m_pkChrTarget->GetRaceNum() <= 20317)) // LEXIW_HORSE31_V1
 			{
 				LPCHARACTER owner = m_pkChrTarget->GetVictim();
 

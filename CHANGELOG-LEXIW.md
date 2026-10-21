@@ -12,6 +12,14 @@ Każdy wpis zaczyna się od części, której dotyczy: `[serwer]`, `[klient]`,
 
 ---
 
+## 2.21.1-lexiw.12 — 2026-10-20 — Konie: Koń Szturmowy i skórki Ironman
+
+- [serwer] Koń Szturmowy: nowy, 31. poziom konia (HORSE_MAX_LEVEL 31; poziom 30 to dalej Czarny Rumak). Na razie tylko ręcznie: /horse_level <nick> 31. Statystyki są o stopień wyższe niż na poziomie 30. Model z nowego klienta MT2009 (horse2_king), rasy 20310 (bez gildii) i 20311 (w gildii); umiejętności i atak jak u konia wojskowego, karmi się go jak konia wojskowego.
+- [serwer] Skórki koni Ironman (ciemne modele z nowego klienta MT2009): flaga questa lexiw_horse.skin = 1 (/setqf lexiw_horse.skin 1 <nick>) zmienia źrebaka, bojowca, militara i szturmowca w ich ciemną wersję (rasy 20314–20317). Nowe rasy dostały wolne vnumy, bo 20110–20123 nowego klienta to na tym serwerze dzik, wilk, tygrys i lew. Wiersze mob_proto dodaje playerbot/apply.sh przy starcie.
+- [serwer] Show tańca, efekty: w skrypcie „efekt <nazwa>” (fajerwerk, petarda, serce, level up, błysk, piorun, kolorowe ognie, nietoperze, dym i inne — efekty silnika albo pliki efektów klienta; z „co N” powtarzane), „aura <nazwa> na N” (świecenie z umiejętności: aura miecza, berserk, ogniste kule, tarcza many, błogosławieństwo, pomoc smoka, płonięcie i inne; każda na własnym typie efektu, więc kilka naraz), „bez aury” oraz „przemiana <vnum>” / „powrót” (tancerz w postaci potwora). Aury i przemiany znikają przy wylogowaniu tancerza i na początku każdego Startu.
+- [panel] Show tańca: opis i sprawdzanie nowych kroków skryptu (efekt, aura, bez aury, przemiana z kontrolą numeru potwora, powrót).
+- [klient] tools/kaia-dances dokłada do paczki root ciemne modele koni z MT2009-new i rejestruje rasy 20310–20317 w Pythonie (nazwy modeli w miejsce wpisów npclist).
+
 ## 2.21.1-lexiw.11 — 2026-10-20 — Show tańca i tańce custom; Sala chwały; zdrowie botów; Giełda: jedna strona rynku; Wiki: poradniki
 
 - [launcher] Poprawka: skróty „Aktywność botów”, „Giełda” i „Rdzenie gry” na stronie „Świat i boty” otwierały adres klasycznego panelu (7788), a te strony są w panelu Seban, więc kończyły się błędem. Teraz używają adresu panelu Seban (port z pliku .env).
