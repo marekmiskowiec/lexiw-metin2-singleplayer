@@ -64,6 +64,16 @@ MAP_BACKGROUNDS = {21: "chunjo-m1", 23: "chunjo-m2", 24: "guild-map-02", 25: "ea
                    209: "ochao-temple", 360: "arezzo-cyclops-valley", 361: "arezzo-pharaoh-wastes",
                    362: "arezzo-enchanted-forest", 363: "arezzo-library", 364: "arezzo-wukong-hill",
                    365: "arezzo-scorpion-ruins", 366: "arezzo-ancient-jungle"}
+# LEXIW_WIKI_SPAWN_MAP_V1: the bot miners' fixed veins (map, world x, world y,
+# vein vnum), as overlays/playerbot/.../playerbot_mining.h places them.
+MINER_VEIN_SITES = (
+    (64, 276600, 684600, 20054), (64, 281700, 795300, 20050), (64, 290300, 799400, 20051), (64, 348300, 705800, 20047),
+    (64, 391100, 738100, 20052), (64, 315800, 732600, 20055), (64, 342600, 729800, 20053),
+    (63, 291300, 515700, 20054), (63, 237500, 525900, 20048), (63, 264600, 526100, 20050), (63, 317900, 526100, 20056),
+    (63, 336900, 534300, 20051), (63, 245100, 542500, 20049), (63, 264500, 552300, 20057),
+    (61, 432000, 272000, 20054), (61, 393600, 265600, 20057), (61, 470400, 291200, 20058), (61, 438400, 272000, 20059),
+    (61, 412800, 278400, 20052), (61, 483200, 208000, 20056),
+)
 SPAWN_FILES = {"regen.txt": "Potwory", "stone.txt": "Metiny", "boss.txt": "Bossowie", "npc.txt": "NPC"}
 
 # The three kingdoms' first and second villages, one page each: the same
@@ -815,7 +825,18 @@ def install_wiki(m):
                     "group": len(set(members)) > 1 or kind_char in ("g", "r"),
                     "names": sorted({mob["name"] for mob in known})[:6],
                     "time": spawn_time_text(start, end), "count": t[9] if t[9].isdigit() else "1"})
-        order = {"mob": 0, "npc": 1, "flower": 2, "ore": 2, "miniboss": 3, "metin": 4, "boss": 5}
+        # The bot miners' fixed veins: the engine keeps one standing at each of
+        # these (playerbot_mining.h PLAYERBOT_VEIN_SITES, world x/y), checked
+        # every minute - not in the map's files, so listed here.
+        base_x, base_y = bounds[0], bounds[1]
+        for site_map, wx, wy, vein in MINER_VEIN_SITES:
+            mob = mobs.get(vein)
+            if site_map != number or not mob:
+                continue
+            points.append({"x": round((wx - base_x) / width * 100, 2), "y": round((wy - base_y) / height * 100, 2),
+                           "rx": 0, "ry": 0, "kind": "orefixed", "vnum": vein, "name": mob["name"], "level": mob["level"],
+                           "group": False, "names": [mob["name"]], "time": "co minutę, gdy zniknie", "count": "1"})
+        order = {"mob": 0, "npc": 1, "flower": 2, "ore": 2, "orefixed": 2, "miniboss": 3, "metin": 4, "boss": 5}
         points.sort(key=lambda p: order.get(p["kind"], 0))
         return points
 

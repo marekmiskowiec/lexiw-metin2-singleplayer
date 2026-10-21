@@ -15,7 +15,7 @@ itself are written in double brackets and are checked when the page is drawn:
     [[item:50011]]   an item          [[item:50011|text to show]]
     [[mob:101]]      a monster        [[map:63]]  a map
     [[region:m1]]    a map family     [[guide:jak-uzywac-wiki]]  another guide
-    [[page:mapy]]    the maps list, [[page:osobowosci-botow]], [[page:gielda]], [[page:aktywnosc-botow]], [[page:wiki]]
+    [[page:mapy]]    the maps list, [[page:osobowosci-botow]], [[page:gielda]], [[page:aktywnosc-botow]], [[page:wiki]], [[page:respawny]]
 
 An unknown number is drawn as red text, so a typo does not go unnoticed.
 New or changed files are picked up on the next request after the panel image is
@@ -35,7 +35,7 @@ LINK_RE = re.compile(r"\[\[(item|mob|map|region|guide|page):([\w-]+)(?:\|([^\]]+
 CODE_RE = re.compile(r"(```.*?```|`[^`\n]+`)", re.S)
 SLUG_RE =re.compile(r"^[a-z0-9][a-z0-9-]*$")
 # [[page:x]]: panel pages a guide may point to (the wiki's own and the ones about the bots and the market).
-PAGES = {"wiki": "wiki", "mapy": "wiki_maps", "osobowosci-botow": "wiki_bots", "gielda": "market", "aktywnosc-botow": "bot_activity", "wiadomosci": "world_feed"}
+PAGES = {"wiki": "wiki", "mapy": "wiki_maps", "osobowosci-botow": "wiki_bots", "gielda": "market", "aktywnosc-botow": "bot_activity", "wiadomosci": "world_feed", "respawny": "respawns"}
 
 _cache = {"key": None, "guides": {}}
 
