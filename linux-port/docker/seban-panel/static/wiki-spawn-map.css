@@ -35,3 +35,10 @@
 .wsm-area.wsm-ore{border-color:#9fe3e8;background:rgba(159,227,232,.08);transform:translate(-50%,-50%)}
 .wsm-area[hidden]{display:none}
 .wsm-key{display:inline-flex!important;flex-direction:row!important;white-space:nowrap}
+/* the bot miners' fixed veins: an always-there vein, drawn as a star */
+.wsm-orefixed{width:16px;height:16px;z-index:3;background:#ffd84d;border:2px solid #3b2a00;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);box-shadow:none}
+.wsm-key.k-orefixed i{background:#ffd84d;border-radius:0;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);border:0;width:14px;height:14px}
+.wsm-legend{align-items:center}
+.wsm-only,.wsm-all{font-size:11px;padding:2px 7px;margin-left:-10px;border:1px solid var(--edge);border-radius:999px;background:none;color:var(--muted);cursor:pointer}
+.wsm-all{margin-left:0;font-size:12px;padding:4px 10px}
+.wsm-only:hover,.wsm-all:hover{color:var(--gold,#e8b93f);border-color:var(--gold,#e8b93f)}

@@ -66,6 +66,21 @@ Każdy boss ma własny rozkład respawnu. Poniżej wszyscy bossowie, którzy maj
 
 Zwykle (choć nie zawsze) im potężniejszy boss, tym dłużej wraca; najdłużej — Silna Lodowa Wiedźma, 8 godzin. Różnice w czasie (np. „27–33 min”) to losowość respawnu, nie błąd: serwer losuje moment w tym zakresie.
 
+## Jak liczy się respawn
+
+Czas respawnu **nie liczy się od zabicia**. Każde miejsce spawnu (boss, Metin, potwór, żyła rudy) ma własny zegar, który tyka w kółko co czas z pliku mapy — przy zakresie, np. „20–25 min”, każdy kolejny odstęp jest losowany z tego zakresu. Przy każdym tyknięciu miejsce sprawdza:
+
+| Co zastaje | Co robi |
+|---|---|
+| boss / Metin jeszcze żyje | nic — czeka do następnego tyknięcia |
+| boss / Metin nie żyje | od razu stawia nowego |
+
+Dlatego po zbiciu nowy pojawi się **przy najbliższym tyknięciu**: czasem po chwili, najpóźniej po pełnym czasie respawnu, średnio po połowie. Przykład: Metin z czasem 20–25 min zbity tuż przed tyknięciem wraca prawie od razu, a zbity tuż po nim — dopiero po ok. 20–25 minutach.
+
+- Zegary ruszają razem z serwerem, więc po restarcie wszystko pojawia się od nowa według swoich zegarów.
+- Przyspieszenie z [[page:respawny|Respawnów]] skraca odstęp między tyknięciami (np. 65% = co 65% czasu z pliku, najczęściej co 3 sekundy).
+- Czasy w tabelach Wiki i na mapie spawnów to właśnie ten odstęp, czyli **najdłuższe** możliwe czekanie po zbiciu.
+
 ## Jak znaleźć konkretnego potwora
 
 Wpisz jego nazwę w wyszukiwarce [[page:wiki|Wiki serwera]]. Strona potwora pokazuje poziom, rangę, to, co upuszcza, i **wszystkie mapy**, na których się pojawia, z czasem odnowienia. Jeśli szukasz przedmiotu, a nie potwora, wyszukaj przedmiot: jego strona wymienia potwory i szkatułki, z których wypada.

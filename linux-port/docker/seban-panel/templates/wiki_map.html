@@ -12,11 +12,11 @@
 </div>
 {% if points %}
 <link rel="stylesheet" href="{{ static_asset_url('wiki-spawn-map.css') }}">
-{% set wsm_kinds = (('boss', 'Bossowie', 1), ('metin', 'Metiny', 1), ('miniboss', 'Minibossy', 1), ('flower', 'Kwiaty', 1), ('ore', 'Rudy', 1), ('npc', 'NPC', 0)) %}
+{% set wsm_kinds = (('boss', 'Bossowie', 1), ('metin', 'Metiny', 1), ('miniboss', 'Minibossy', 1), ('flower', 'Kwiaty', 1), ('ore', 'Rudy', 1), ('orefixed', 'Stałe żyły górników', 1), ('npc', 'NPC', 0)) %}
 <section class="panel wsm">
   <h2>🗺️ Mapa spawnów</h2>
-  <p class="muted">Gdzie się pojawiają — z plików mapy serwera. Kropka to środek miejsca spawnu, a przerywany okrąg wokół niej to obszar, w którym może się pojawić (np. Metin losuje miejsce w tym okręgu). Najedź na punkt po szczegóły; kliknij w legendę, żeby pokazać albo ukryć rodzaj.</p>
-  <div class="wsm-legend">
+  <p class="muted">Gdzie się pojawiają — z plików mapy serwera. Kropka to środek miejsca spawnu, a przerywany okrąg wokół niej to obszar, w którym może się pojawić (np. Metin losuje miejsce w tym okręgu). Najedź na punkt po szczegóły. Filtr: zaznacz w legendzie dowolne rodzaje (np. Metiny i Rudy), „tylko” pokazuje jeden rodzaj, a „Wszystko” / „Nic” — wszystkie albo żaden. Wybór zapamiętuje się dla kolejnych map.</p>
+  <div class="wsm-legend"><button type="button" class="wsm-all" data-all="1">Wszystko</button><button type="button" class="wsm-all" data-all="0">Nic</button>
     {% for key, label, on in wsm_kinds %}{% set n = points|selectattr('kind', 'equalto', key)|list|length %}{% if n %}
     <label class="wsm-key k-{{ key }}{{ '' if on else ' off' }}"><input type="checkbox" {{ 'checked' if on }} data-kind="{{ key }}"><i></i>{{ label }} ({{ n }})</label>{% endif %}{% endfor %}
   </div>
@@ -24,15 +24,58 @@
     {% for p in points %}{% set on = (wsm_kinds|selectattr(0, 'equalto', p.kind)|first)[2] %}
     {% if p.kind not in ('mob', 'npc') and (p.rx > 0 or p.ry > 0) %}<span class="wsm-area wsm-{{ p.kind }}" data-kind="{{ p.kind }}" style="left:{{ p.x }}%;top:{{ p.y }}%;width:{{ p.rx * 2 }}%;height:{{ p.ry * 2 }}%" {{ '' if on else 'hidden' }}></span>{% endif %}
     <span class="wsm-pt wsm-{{ p.kind }}" data-kind="{{ p.kind }}" style="left:{{ p.x }}%;top:{{ p.y }}%;{% if p.kind == 'mob' %}width:max(6px, {{ p.rx * 2 }}%);height:max(6px, {{ p.ry * 2 }}%);{% endif %}" tabindex="0" {{ '' if on else 'hidden' }}>
-      <span class="wsm-tip"><b>{{ p.name }}</b> · poz. {{ p.level }}{% if p.group %} · grupa{% endif %}<br>{% if p.group and p.names|length > 1 %}{{ p.names|join(', ') }}<br>{% endif %}respawn {{ p.time }}{% if p.count != '1' %} · ×{{ p.count }}{% endif %}{% if p.rx > 0 or p.ry > 0 %}<br>obszar ±{{ (p.rx * summary_width / 10000)|round|int }} m{% endif %}</span>
+      <span class="wsm-tip"><b>{{ p.name }}</b> · poz. {{ p.level }}{% if p.group %} · grupa{% endif %}<br>{% if p.group and p.names|length > 1 %}{{ p.names|join(', ') }}<br>{% endif %}respawn {{ p.time }}{% if p.count != '1' %} · ×{{ p.count }}{% endif %}{% if p.kind == 'orefixed' %}<br>stałe miejsce botów-górników — silnik stawia nową żyłę, gdy zniknie{% endif %}{% if p.rx > 0 or p.ry > 0 %}<br>obszar ±{{ (p.rx * summary_width / 10000)|round|int }} m{% endif %}</span>
     </span>{% endfor %}
   </div>
+  <p class="muted wsm-note">⏱️ Czas respawnu nie liczy się od zbicia: każde miejsce ma zegar, który co podany czas sprawdza, czy jego boss, Metin albo żyła jeszcze stoi, i jeśli nie — od razu stawia nowego. Po zbiciu czekasz więc od chwili do pełnego czasu respawnu, średnio połowę. Więcej w poradniku <a href="{{ url_for('wiki_guide', slug='bossowie-i-metiny') }}#jak-liczy-sie-respawn">Bossowie i Metiny</a>.</p>
 </section>
 <script>
-document.querySelectorAll('.wsm-legend input').forEach((box) => box.addEventListener('change', () => {
-  box.closest('label').classList.toggle('off', !box.checked);
-  document.querySelectorAll('.wsm-map [data-kind="' + box.dataset.kind + '"]').forEach((p) => { p.hidden = !box.checked; });
-}));
+(function () {
+  // The spawn map's filter: tick any set of kinds, "tylko" shows one alone,
+  // Wszystko / Nic; the choice is remembered for the next map.
+  const boxes = [...document.querySelectorAll('.wsm-legend input')];
+  const KEY = 'lexiw-wsm-kinds';
+  function apply(box) {
+    box.closest('label').classList.toggle('off', !box.checked);
+    document.querySelectorAll('.wsm-map [data-kind="' + box.dataset.kind + '"]').forEach((p) => { p.hidden = !box.checked; });
+  }
+  function save() {
+    // kind -> shown, for the kinds of this map; the others keep what they had.
+    try {
+      const all = JSON.parse(localStorage.getItem(KEY) || '{}') || {};
+      boxes.forEach((b) => { all[b.dataset.kind] = b.checked; });
+      localStorage.setItem(KEY, JSON.stringify(all));
+    } catch (e) {}
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+    if (saved && !Array.isArray(saved)) boxes.forEach((b) => { if (b.dataset.kind in saved) b.checked = !!saved[b.dataset.kind]; });
+  } catch (e) {}
+  boxes.forEach((box) => {
+    apply(box);
+    box.addEventListener('change', () => { apply(box); save(); });
+    const only = document.createElement('button');
+    only.type = 'button';
+    only.className = 'wsm-only';
+    only.textContent = 'tylko';
+    only.title = 'Pokaż tylko ten rodzaj';
+    only.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      boxes.forEach((b) => { b.checked = b === box; apply(b); });
+      // "Only" means only, on the next maps too.
+      try {
+        const all = {};
+        ['boss', 'metin', 'miniboss', 'flower', 'ore', 'orefixed', 'npc'].forEach((k) => { all[k] = k === box.dataset.kind; });
+        localStorage.setItem(KEY, JSON.stringify(all));
+      } catch (err) {}
+    });
+    box.closest('label').after(only);
+  });
+  document.querySelectorAll('.wsm-all').forEach((btn) => btn.addEventListener('click', () => {
+    boxes.forEach((b) => { b.checked = btn.dataset.all === '1'; apply(b); });
+    save();
+  }));
+})();
 </script>
 {% endif %}
 {% set titles = {'mob': 'Potwory', 'metin': 'Metiny', 'boss': 'Bossowie', 'npc': 'NPC i inne'} %}
