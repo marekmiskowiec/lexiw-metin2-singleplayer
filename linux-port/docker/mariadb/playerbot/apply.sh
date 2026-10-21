@@ -2613,6 +2613,33 @@ if [ "$CLASSIC" = 1 ]; then
     echo "[playerbot-migrate] Classic: ItemShop $(db -e 'SELECT COUNT(*) FROM common.itemshop_items;' 2>/dev/null || echo '?') line(s)"
 fi
 
+# LEXIW_HORSE31_V1: the horses of the new MT2009 client on free vnums (the new
+# client's own 20110-20123 are this world's boar, wolf, tiger and lion mounts):
+# 20310/20311 the Storm Horse of horse level 31 (horse2_king_normal / _member),
+# 20314-20317 the dark (Ironman) skins of the beginner, combat, military and
+# storm horse, chosen with the quest flag lexiw_horse.skin (char_horse.cpp).
+# Each a copy of the horse of its grade; the patched client (tools/kaia-dances)
+# names their models. PROTO_FROM_DB: read at the db core's boot. Idempotent.
+db -e "DROP TEMPORARY TABLE IF EXISTS world.lx_horse;
+CREATE TEMPORARY TABLE world.lx_horse AS SELECT * FROM world.mob_proto WHERE vnum = 20109 LIMIT 1;
+UPDATE world.lx_horse SET vnum = 20310, name = 'Kon Szturmowy', locale_name = 'Kon Szturmowy', folder = 'horse2';
+INSERT IGNORE INTO world.mob_proto SELECT * FROM world.lx_horse;
+UPDATE world.lx_horse SET vnum = 20311, name = 'Kon Szturmowy (gildia)', locale_name = 'Kon Szturmowy (gildia)';
+INSERT IGNORE INTO world.mob_proto SELECT * FROM world.lx_horse;
+UPDATE world.lx_horse SET vnum = 20316, name = 'Militar (Ironman)', locale_name = 'Militar (Ironman)';
+INSERT IGNORE INTO world.mob_proto SELECT * FROM world.lx_horse;
+UPDATE world.lx_horse SET vnum = 20317, name = 'Szturmowiec (Ironman)', locale_name = 'Szturmowiec (Ironman)';
+INSERT IGNORE INTO world.mob_proto SELECT * FROM world.lx_horse;
+DROP TEMPORARY TABLE world.lx_horse;
+CREATE TEMPORARY TABLE world.lx_horse AS SELECT * FROM world.mob_proto WHERE vnum = 20106 LIMIT 1;
+UPDATE world.lx_horse SET vnum = 20315, name = 'Bojowiec (Ironman)', locale_name = 'Bojowiec (Ironman)', folder = 'horse';
+INSERT IGNORE INTO world.mob_proto SELECT * FROM world.lx_horse;
+DROP TEMPORARY TABLE world.lx_horse;
+CREATE TEMPORARY TABLE world.lx_horse AS SELECT * FROM world.mob_proto WHERE vnum = 20103 LIMIT 1;
+UPDATE world.lx_horse SET vnum = 20314, name = 'Kon (Ironman)', locale_name = 'Kon (Ironman)', folder = 'pony';
+INSERT IGNORE INTO world.mob_proto SELECT * FROM world.lx_horse;
+DROP TEMPORARY TABLE world.lx_horse;" || echo "[playerbot-migrate] WARNING: could not add the Storm Horse and the dark horse skins" >&2
+
 # MT2009_PLUS_FAST_START_V1: the full run is done - its fingerprint for the next start.
 db -e "REPLACE INTO common.playerbot_migrate_state (id, fingerprint, done_at) VALUES (1, '$migrate_fp', NOW());" >/dev/null 2>&1 \
     || echo "[playerbot-migrate] WARNING: could not record the run's fingerprint (the next start runs it all again)" >&2

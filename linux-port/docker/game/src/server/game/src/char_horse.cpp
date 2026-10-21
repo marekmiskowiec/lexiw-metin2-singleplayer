@@ -333,9 +333,30 @@ DWORD CHARACTER::GetMyHorseVnum() const
 
 	// MT2009_PLUS_HORSE30_V1 (black steed): the horse of level 30 is the Black Steed (race
 	// 20119, quest konie - Digi Rasta's horse to level 30), without a guild's tint.
-	if (GetHorseLevel() >= 30)
+	DWORD vnum = 0;
+	if (GetHorseLevel() >= 31)
+		vnum = 20310 + (delta ? 1 : 0); // LEXIW_HORSE31_V1: the Storm Horse; 20311 its guild armour
+	else if (GetHorseLevel() >= 30)
 		return 20119;
-	return c_aHorseStat[GetHorseLevel()].iNPCRace + delta;
+	else
+		vnum = c_aHorseStat[GetHorseLevel()].iNPCRace + delta;
+
+	// LEXIW_HORSE31_V1: the dark skins of the new MT2009 client (its Ironman
+	// horses), chosen per character with the quest flag lexiw_horse.skin = 1
+	// (/setqf lexiw_horse.skin 1 <name>); read without touching the quest
+	// manager's current character (GetPCForce, not GetQuestFlag).
+	if (IsPC() && quest::CQuestManager::instance().GetPCForce(GetPlayerID())->GetFlag("lexiw_horse.skin") == 1)
+	{
+		if (vnum >= 20101 && vnum <= 20103)
+			return 20314;
+		if (vnum >= 20104 && vnum <= 20106)
+			return 20315;
+		if (vnum >= 20107 && vnum <= 20109)
+			return 20316;
+		if (vnum == 20310 || vnum == 20311)
+			return 20317;
+	}
+	return vnum;
 }
 
 void CHARACTER::ClearHorseInfo()

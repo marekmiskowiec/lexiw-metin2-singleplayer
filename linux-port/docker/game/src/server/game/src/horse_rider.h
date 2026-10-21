@@ -9,7 +9,7 @@
 namespace quest { extern ALUA(horse_set_stat0); }
 #endif
 
-const int HORSE_MAX_LEVEL = 30;
+const int HORSE_MAX_LEVEL = 31; // LEXIW_HORSE31_V1: 31 = Kon Szturmowy (was 30)
 
 struct THorseStat
 {
