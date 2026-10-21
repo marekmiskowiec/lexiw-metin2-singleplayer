@@ -550,6 +550,8 @@ def install_wiki(m):
         """map number -> its folder (map/index)."""
         return {number: folder for folder, numbers in map_indexes().items() for number in numbers}
 
+    m.wiki_map_dirs = map_dirs  # LEXIW: the wiki's side menu lists the maps
+
     def map_spawns(folder):
         """Everything a map's files put down: [(mob, entry)]."""
         return [(vnum, entry) for vnum, entries in spawn_index().items() for entry in entries if entry["dir"] == folder]

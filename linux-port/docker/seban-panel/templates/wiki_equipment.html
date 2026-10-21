@@ -1,0 +1,118 @@
+{% extends 'wiki_base.html' %}{% block title %}{{ title }} · Wiki · {{ panel_brand }}{% endblock %}{% block wiki %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+<link rel="stylesheet" href="{{ static_asset_url('wiki-equipment.css') }}">
+<p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · EKWIPUNEK</p>
+<h1>{{ title }}</h1>
+<p class="we-tabs">{% for key, label in categories %}<a href="{{ url_for('wiki_equipment', category=key) }}" class="{{ 'on' if key == category }}">{{ label }}</a>{% endfor %}</p>
+<p class="muted">{{ intro }} Kliknij wiersz, aby rozwinąć wszystkie poziomy ulepszenia (+0 do +9) z bonusami i ulepszaczami. Liczby są takie jak w okienku przedmiotu w grze.</p>
+
+<section class="panel we-filters">
+  <label>Nazwa przedmiotu <input id="we-name" placeholder="{{ 'np. Księżycowy Miecz' if weapons else ('np. Złoty Naszyjnik' if jewels else 'np. Pancerz Tygrysa') }}" autocomplete="off"></label>
+  <label>Rodzaj <select id="we-kind"><option value="">Wszystkie</option>{% for sub, label in kinds %}<option value="{{ sub }}">{{ label }}</option>{% endfor %}</select></label>
+  <label>Klasa <select id="we-class"><option value="">Wszystkie</option>{% for key, label, _bit in classes %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+  <label>Poziom od <input id="we-min" type="number" min="0" max="120"></label>
+  <label>Poziom do <input id="we-max" type="number" min="0" max="120"></label>
+  <span class="muted" id="we-count">Pokazane: {{ items|length }}</span>
+</section>
+
+<section class="panel table-wrap we-table-wrap" data-table-tools="off">
+  <table class="we-table">
+    <thead><tr>
+      <th>Przedmiot</th><th>Rodzaj</th><th>Poziom</th>
+      {% if weapons %}<th>Atak</th><th>Mag. atak</th>{% else %}<th>Obrona</th>{% endif %}
+      <th>Wbudowane bonusy</th><th>Ulepszacze</th>
+    </tr></thead>
+    <tbody>
+    {% for it in items %}
+      <tr class="we-row" data-vnum="{{ it.vnum }}" data-name="{{ it.name|lower }}" data-kind="{{ it.subtype }}" data-level="{{ it.level }}" data-classes="{{ it.classes }}" tabindex="0">
+        <td class="we-item">
+          <span class="we-arrow">{{ '▸' if it.levels > 1 else '' }}</span>
+          <span class="we-icon">{% if it.icon %}<img src="{{ it.icon }}" alt="" loading="lazy">{% endif %}</span>
+          <span class="we-names"><a href="{{ url_for('wiki_item', vnum=it.vnum) }}" onclick="event.stopPropagation()">{{ it.name }}</a>{% if it.full != it.name %}<small class="muted">{{ it.full }}</small>{% endif %}{% if it.classes.split()|length < 4 %}<span class="we-cls">{% for key, label, _bit in classes %}{% if key in it.classes.split() %}<i title="{{ label }}">{{ label }}</i>{% endif %}{% endfor %}</span>{% endif %}</span>
+        </td>
+        <td>{{ it.kind }}</td>
+        <td class="we-num">{{ it.level }}</td>
+        {% if weapons %}<td class="we-num">{{ it.attack or '—' }}</td><td class="we-num">{{ it.magic or '—' }}</td>{% else %}<td class="we-num">{{ it.defence or '—' }}</td>{% endif %}
+        <td class="we-bonus">{% for b in it.bonuses %}<span>{{ b }}</span>{% else %}<span class="muted">—</span>{% endfor %}</td>
+        <td class="we-upg"><small class="muted">{{ "rozwiń, by zobaczyć" if it.levels > 1 else "—" }}</small></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="muted">Brak przedmiotów.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+<script>
+(function () {
+  const api = "{{ url_for('api_wiki_equipment', vnum=0) }}".replace(/0$/, '');
+  const cols = {{ 7 if weapons else 6 }};
+  const weapons = {{ 'true' if weapons else 'false' }}, jewels = {{ 'true' if jewels else 'false' }};
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const yang = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+  function levelRows(levels) {
+    // Each plus is one row; its upgraders are what the step INTO it takes
+    // (the previous level's refine), as the MT2009 wiki shows them.
+    return levels.map((l, i) => {
+      const prev = i > 0 ? levels[i - 1].step : null;
+      const mats = prev ? `<div class="we-mats">${prev.materials.map((m) =>
+          `<a href="${esc(m.url)}" title="${esc(m.name)}">${m.icon ? `<img src="${esc(m.icon)}" alt="">` : '<span class="we-noicon"></span>'}<b>${m.count}×</b><span>${esc(m.name)}</span></a>`).join('')}
+          <small class="muted">${yang(prev.cost)} Yang · ${prev.chance}%</small></div>`
+        : '<span class="muted">—</span>';
+      const stats = weapons ? `<td class="we-num">${esc(l.attack || '—')}</td><td class="we-num">${esc(l.magic || '—')}</td>`
+        : `<td class="we-num">${esc(l.defence || '—')}</td>`;
+      return `<tr class="we-level"><td class="we-plus-cell"><a class="we-plus" href="${esc(l.url)}">${l.plus == null ? '·' : '+' + l.plus}</a></td>
+        <td></td><td class="we-num">${l.level}</td>${stats}
+        <td class="we-bonus">${l.bonuses.map((b) => `<span>${esc(b)}</span>`).join('') || '<span class="muted">—</span>'}</td>
+        <td class="we-upg">${mats}</td></tr>`;
+    }).join('');
+  }
+
+  function upgradeRow(up) {
+    // The last plus refines into the next item of the line.
+    if (!up) return '';
+    return `<tr class="we-level we-next"><td colspan="${cols - 1}"><span class="muted">Dalej ulepsza się w:</span>
+      <a href="${esc(up.url)}">${up.icon ? `<img src="${esc(up.icon)}" alt="">` : ''}<b>${esc(up.name)}</b></a></td>
+      <td class="we-upg"><div class="we-mats">${up.step.materials.map((m) =>
+        `<a href="${esc(m.url)}" title="${esc(m.name)}">${m.icon ? `<img src="${esc(m.icon)}" alt="">` : '<span class="we-noicon"></span>'}<b>${m.count}×</b><span>${esc(m.name)}</span></a>`).join('')}
+        <small class="muted">${yang(up.step.cost)} Yang · ${up.step.chance}%</small></div></td></tr>`;
+  }
+
+  document.querySelectorAll('tr.we-row').forEach((row) => {
+    const toggle = () => {
+      const open = row.classList.toggle('open');
+      row.querySelector('.we-arrow').textContent = row.querySelector('.we-arrow').textContent ? (open ? '▾' : '▸') : '';
+      let next = row.nextElementSibling;
+      if (!open) {
+        while (next && next.classList.contains('we-level')) { const n = next.nextElementSibling; next.remove(); next = n; }
+        return;
+      }
+      fetch(api + row.dataset.vnum, {cache: 'no-store'}).then((r) => r.json()).then((d) => {
+        if (!row.classList.contains('open')) return;
+        row.insertAdjacentHTML('afterend', levelRows(d.levels) + upgradeRow(d.upgrade));
+      });
+    };
+    row.addEventListener('click', toggle);
+    row.addEventListener('keydown', (e) => { if (e.key === 'Enter') toggle(); });
+  });
+
+  const name = document.getElementById('we-name'), kind = document.getElementById('we-kind'), cls = document.getElementById('we-class');
+  const min = document.getElementById('we-min'), max = document.getElementById('we-max');
+  const count = document.getElementById('we-count');
+  function filter() {
+    const q = name.value.trim().toLowerCase().replace(/\s*\+\d+$/, ''), k = kind.value;
+    const lo = min.value === '' ? -1 : +min.value, hi = max.value === '' ? 999 : +max.value;
+    let shown = 0;
+    document.querySelectorAll('tr.we-row').forEach((row) => {
+      const ok = (!q || row.dataset.name.includes(q)) && (!k || row.dataset.kind === k) && (!cls.value || row.dataset.classes.split(' ').includes(cls.value)) &&
+                 +row.dataset.level >= lo && +row.dataset.level <= hi;
+      row.hidden = !ok;
+      if (!ok && row.classList.contains('open')) row.click();
+      shown += ok ? 1 : 0;
+    });
+    count.textContent = 'Pokazane: ' + shown;
+  }
+  [name, kind, cls, min, max].forEach((el) => el.addEventListener('input', filter));
+})();
+</script>
+{% endblock %}

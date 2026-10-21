@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% block title %}{{ guide.title }} · Poradniki · {{ panel_brand }}{% endblock %}{% block content %}
+{% extends 'wiki_base.html' %}{% block title %}{{ guide.title }} · Poradniki · {{ panel_brand }}{% endblock %}{% block wiki %}
 <link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
 <p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI SERWERA</a> · <a href="{{ url_for('wiki_guides') }}">PORADNIKI</a></p><h1>{{ guide.title }}</h1>
 {% if guide.summary %}<p class="muted">{{ guide.summary }}</p>{% endif %}
