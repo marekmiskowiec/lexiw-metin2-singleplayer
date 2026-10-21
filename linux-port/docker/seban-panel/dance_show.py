@@ -349,31 +349,31 @@ def install_dance_show(m):
             return "Skórka broni: pasuje do innego rodzaju broni niż ta w polu „Broń”."
         return None
 
-    def read_look(job):
+    def read_look(job, f=None):
         """The look vnums of the form, and the first problem with them."""
         look, problem = {}, None
         for column, _label, _fits in LOOK_SLOTS:
             try:
-                look[column] = max(0, int(request.form.get(column, "0") or 0))
+                look[column] = max(0, int((f or request.form).get(column, "0") or 0))
             except ValueError:
                 look[column] = 0
             problem = problem or look_problem(column, look[column], job)
         problem = problem or skin_problem(look.get("skin", 0), look.get("weapon", 0))
         return look, problem
 
-    def read_pos():
+    def read_pos(f=None):
         """A dancer's own place (metres in the form, cm in the table)."""
         pos = {}
         for column in ("pos_x", "pos_y"):
             try:
-                pos[column] = int(round(max(-50.0, min(50.0, float((request.form.get(column) or "0").replace(",", ".")))) * 100))
+                pos[column] = int(round(max(-50.0, min(50.0, float(((f or request.form).get(column) or "0").replace(",", ".")))) * 100))
             except ValueError:
                 pos[column] = 0
         return pos
 
-    def read_dye():
+    def read_dye(f=None):
         try:
-            dye = int(request.form.get("hair_dye", "0") or 0)
+            dye = int((f or request.form).get("hair_dye", "0") or 0)
         except ValueError:
             return 0
         return dye if dye in dict(HAIR_DYES) else 0
@@ -469,7 +469,7 @@ def install_dance_show(m):
         maps = sorted(((i, n) for i, n in m.MAP_NAMES.items()), key=lambda x: x[1])
         return render_template("dance_show.html", roster=roster, jobs=JOBS, formations=FORMATIONS, gestures=GESTURES, effects=EFFECTS, auras=AURAS, overhead=OVERHEAD_EFFECTS, hair_dyes=HAIR_DYES,
                                owners=owners(), look_slots=LOOK_SLOTS, dance_settings=read_settings(), maps=maps,
-                               show=show, status=status, status_age=age, last_beat=last_beat, scenes=scenes,
+                               show=show, status=status, status_age=age, last_beat=last_beat, scenes=scenes, current_scene=session.get("dance_scene", ""),
                                phases=PHASES, formation_names={k: lbl for k, lbl, _w in FORMATIONS},
                                manual=[{"x": int(r["pos_x"] or 0), "y": int(r["pos_y"] or 0)} for r in roster],
                                dance_csrf=m.update_csrf_token(), max_dancers=MAX_DANCERS)
@@ -511,32 +511,109 @@ def install_dance_show(m):
                 m.rows("UPDATE player.playerbot_dancer SET hair_dye=%s WHERE name=%s", (read_dye(), name))
                 flash(f"Dodano tancerza {name}. Postać dostanie przy pierwszym „Zbierz”.")
         elif action == "save" and row_id:
-            current = m.one("SELECT pid, job FROM player.playerbot_dancer WHERE id=%s", (row_id,))
-            if not current:
-                flash("Nie ma takiego tancerza.", "error")
-            elif (problem := name_problem(name, row_id)):
-                flash(problem, "error")
-            else:
-                if current.get("pid") and int(current["job"]) != job:
-                    job = int(current["job"])
-                    flash("Klasy przydzielonej postaci nie da się zmienić: usuń tancerza i dodaj nowego.", "error")
-                look, look_error = read_look(job)
-                if look_error:
-                    flash(look_error + " Wygląd nie został zapisany.", "error")
-                    m.rows("UPDATE player.playerbot_dancer SET name=%s, job=%s, level=%s, slot=%s, pos_x=%s, pos_y=%s "
-                           "WHERE id=%s", (name, job, level, slot, pos["pos_x"], pos["pos_y"], row_id))
+            for text, category in save_dancer(row_id, request.form):
+                flash(text, category)
+        elif action == "save_all":
+            # Every row of the troupe in one post (the "Zapisz wszystkich" button):
+            # each row's fields come as r<id>.<field>.
+            ids = [int(v) for v in request.form.getlist("ids") if v.isdigit()]
+            saved, problems = 0, []
+            for one_id in ids:
+                prefix = f"r{one_id}."
+                fields = {k[len(prefix):]: v for k, v in request.form.items() if k.startswith(prefix)}
+                notes = save_dancer(one_id, fields)
+                if any(category == "error" for _t, category in notes):
+                    problems += [t for t, category in notes if category == "error"]
                 else:
-                    m.rows("UPDATE player.playerbot_dancer SET name=%s, job=%s, level=%s, slot=%s, "
-                           "weapon=%s, armor=%s, costume=%s, hair=%s, skin=%s, pos_x=%s, pos_y=%s WHERE id=%s",
-                           (name, job, level, slot, look["weapon"], look["armor"], look["costume"], look["hair"],
-                            look["skin"], pos["pos_x"], pos["pos_y"], row_id))
-                m.rows("UPDATE player.playerbot_dancer SET hair_dye=%s WHERE id=%s", (read_dye(), row_id))
-                flash(f"Zapisano tancerza {name}. Nowy nick wchodzi, gdy postać jest poza grą (do ~11 minut po wylogowaniu); "
-                      "wygląd i miejsce wchodzą przy najbliższym „Zbierz”.")
+                    saved += 1
+                problems += [t for t, category in notes if category == "warning"]
+            flash(f"Zapisano tancerzy: {saved} z {len(ids)}. Wygląd i miejsca wchodzą przy najbliższym „Zbierz”.")
+            for text in problems[:8]:
+                flash(text, "error")
         elif action == "delete" and row_id:
-            m.rows("DELETE FROM player.playerbot_dancer WHERE id=%s", (row_id,))
-            flash("Usunięto tancerza. Jeśli był w grze, wyloguje się przy najbliższym odczycie.")
+            current = m.one("SELECT name, pid FROM player.playerbot_dancer WHERE id=%s", (row_id,))
+            if current and current.get("pid") and request.form.get("release") == "1":
+                freed, why = release_character(int(current["pid"]), current["name"])
+                if not freed:
+                    flash(f"Nie usunięto tancerza {current['name']}: {why}", "error")
+                    return redirect(url_for("dance_show"))
+                m.rows("DELETE FROM player.playerbot_dancer WHERE id=%s", (row_id,))
+                flash(f"Usunięto tancerza {current['name']}. Nick jest wolny: jego postać nazywa się teraz {why} "
+                      "i wraca do botów.")
+            else:
+                m.rows("DELETE FROM player.playerbot_dancer WHERE id=%s", (row_id,))
+                flash("Usunięto tancerza. Jeśli był w grze, wyloguje się przy najbliższym odczycie."
+                      + (" Jego postać zostaje w świecie pod tym samym nickiem." if current and current.get("pid") else ""))
         return redirect(url_for("dance_show"))
+
+    def release_character(pid, name):
+        """Give a dancer's character a free name, so its own name can go to a new
+        dancer; the character goes back to the bots. (True, the new name) or
+        (False, why not). Only for one out of the world long enough for the db
+        core to have let it go (the engine's own rename waits the same 11 min)."""
+        base = re.sub(r"[^A-Za-z0-9]", "", name)[:18] or "Tancerz"
+        for attempt in range(20):
+            candidate = f"{base}{(pid + attempt * 7919) % 100000}"
+            if not m.one("SELECT id FROM player.player WHERE BINARY name=BINARY %s", (candidate,)):
+                break
+        else:
+            return False, "nie znalazłem wolnego nicku."
+        with m.db() as con, con.cursor() as cur:
+            changed = cur.execute("UPDATE player.player SET name=%s WHERE id=%s "
+                                  "AND (playtime=0 OR last_play < NOW() - INTERVAL 11 MINUTE)", (candidate, pid))
+        if not changed:
+            return False, "postać jest w grze albo była w niej w ciągu ostatnich 11 minut (serwer jeszcze ją trzyma) — kliknij „Stop” i spróbuj za kilka minut."
+        return True, candidate
+
+    def save_dancer(row_id, f):
+        """One dancer's row from its fields (f: the form, or one row of "save
+        all"). A list of (message, category) to show."""
+        name = (f.get("name") or "").strip()
+        try:
+            level = max(1, min(99, int(f.get("level", "1") or 1)))
+            job = int(f.get("job", "0") or 0)
+            slot = max(0, min(999, int(f.get("slot", "0") or 0)))
+        except ValueError:
+            return [(f"{name or '?'}: poziom, klasa i kolejność muszą być liczbami.", "error")]
+        if job not in job_names:
+            job = 0
+        pos = read_pos(f)
+        current = m.one("SELECT pid, job, name FROM player.playerbot_dancer WHERE id=%s", (row_id,))
+        if not current:
+            return [("Nie ma takiego tancerza.", "error")]
+        if (problem := name_problem(name, row_id)):
+            return [(f"{current['name']}: {problem}", "error")]
+        notes, pid = [], current.get("pid")
+        if pid and int(current["job"]) != job:
+            if f.get("change_class") != "1":
+                job = int(current["job"])
+                notes.append((f"{name}: klasy nie zmieniono (potwierdź zmianę klasy).", "warning"))
+            else:
+                # A new class is a new character: the old one gives the name back
+                # and returns to the bots; the next "Zbierz" claims one of the new class.
+                freed, why = release_character(int(pid), current["name"])
+                if not freed:
+                    job = int(current["job"])
+                    notes.append((f"{name}: klasy nie zmieniono — {why}", "warning"))
+                else:
+                    m.rows("UPDATE player.playerbot_dancer SET pid=NULL, status='czeka na Zbierz (nowa klasa)' WHERE id=%s",
+                           (row_id,))
+                    notes.append((f"{name}: nowa klasa — przy najbliższym „Zbierz” dostanie postać {job_names[job]}; "
+                                  f"dawna postać nazywa się teraz {why} i wraca do botów.", "message"))
+        look, look_error = read_look(job, f)
+        if look_error:
+            notes.append((f"{name}: {look_error} Wygląd nie został zapisany.", "warning"))
+            m.rows("UPDATE player.playerbot_dancer SET name=%s, job=%s, level=%s, slot=%s, pos_x=%s, pos_y=%s "
+                   "WHERE id=%s", (name, job, level, slot, pos["pos_x"], pos["pos_y"], row_id))
+        else:
+            m.rows("UPDATE player.playerbot_dancer SET name=%s, job=%s, level=%s, slot=%s, "
+                   "weapon=%s, armor=%s, costume=%s, hair=%s, skin=%s, pos_x=%s, pos_y=%s WHERE id=%s",
+                   (name, job, level, slot, look["weapon"], look["armor"], look["costume"], look["hair"],
+                    look["skin"], pos["pos_x"], pos["pos_y"], row_id))
+        m.rows("UPDATE player.playerbot_dancer SET hair_dye=%s WHERE id=%s", (read_dye(f), row_id))
+        notes.append((f"Zapisano tancerza {name}. Nowy nick wchodzi, gdy postać jest poza grą (do ~11 minut po wylogowaniu); "
+                      "wygląd i miejsce wchodzą przy najbliższym „Zbierz”.", "message"))
+        return notes
 
     def read_form_settings():
         """The control form as settings (strings, as kept), and the first problem."""
@@ -631,10 +708,14 @@ def install_dance_show(m):
             roster = m.rows("""SELECT id, slot, name, job, level, weapon, armor, costume, hair, skin, pos_x, pos_y, hair_dye
                                FROM player.playerbot_dancer WHERE slot < 900 ORDER BY slot, id LIMIT %s""",
                             (int(s["count"]),))
+            existed = m.one("SELECT id FROM player.playerbot_dance_scene WHERE name=%s", (name,))
             m.rows("""INSERT INTO player.playerbot_dance_scene (name, settings, roster) VALUES (%s,%s,%s)
                       ON DUPLICATE KEY UPDATE settings=VALUES(settings), roster=VALUES(roster)""",
                    (name, json.dumps(s, ensure_ascii=False), json.dumps([dict(r) for r in roster], ensure_ascii=False)))
-            flash(f"Zapisano scenę „{name}”: {len(roster)} tancerzy z wyglądem, szyk, miejsce i skrypt.")
+            # The scene being edited: the name field keeps it, so the next save updates it.
+            session["dance_scene"] = name
+            flash(("Zaktualizowano" if existed else "Zapisano nową") +
+                  f" scenę „{name}”: {len(roster)} tancerzy z wyglądem, szyk, miejsce i skrypt.")
             return redirect(url_for("dance_show"))
         if not s["owner"]:
             flash("Wybierz postać, przy której ma stanąć zespół (albo która ogląda pokaz).", "error")
@@ -663,6 +744,8 @@ def install_dance_show(m):
             return redirect(url_for("dance_show"))
         if request.form.get("action") == "delete":
             m.rows("DELETE FROM player.playerbot_dance_scene WHERE id=%s", (scene["id"],))
+            if session.get("dance_scene") == scene["name"]:
+                session.pop("dance_scene", None)
             flash(f"Usunięto scenę „{scene['name']}”.")
             return redirect(url_for("dance_show"))
         try:
@@ -704,6 +787,8 @@ def install_dance_show(m):
         merged = dict(SETTINGS)
         merged.update(settings)
         write_atomic(panel_file, json.dumps(merged, ensure_ascii=False))
+        session["dance_scene"] = scene["name"]
         flash(f"Wczytano scenę „{scene['name']}”: {len(kept)} tancerzy na początku zespołu, ustawienia w sterowaniu. "
+              "Popraw, co chcesz, i kliknij „Zapisz scenę”, żeby ją zaktualizować. "
               "Kliknij „Zbierz”, żeby stanęli." + (" " + "; ".join(notes) + "." if notes else ""))
         return redirect(url_for("dance_show"))

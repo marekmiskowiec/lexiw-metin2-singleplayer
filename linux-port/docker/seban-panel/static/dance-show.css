@@ -75,3 +75,12 @@ input.ds-coord{width:80px}
   .ds-roster .ds-actions{flex-direction:row;align-items:flex-end;gap:6px}
   .ds-roster input.ds-name,.ds-roster select{width:100%;max-width:220px}
 }
+/* the troupe: several rows at once */
+.ds-bulk{border:1px solid var(--edge);border-radius:8px;padding:10px 12px;margin:10px 0;display:grid;gap:8px}
+.ds-bulk-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.ds-bulk-head label{display:inline-flex;gap:5px;align-items:center;font-size:13px}
+.ds-bulk-fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 12px}
+.ds-bulk-fields label{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.ds-sel{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:4px;font-size:12px;margin-top:4px}
+.ds-roster tr.ds-selected{background:color-mix(in srgb,var(--gold,#e8b93f) 8%,transparent)}
+.ds-changed{outline:1px solid var(--gold,#e8b93f)}
