@@ -10,6 +10,7 @@ Every original entry is copied byte for byte; the patched scripts and the new
 animation, motion and icon files are added. Nothing outside /out is written.
 """
 import os
+import re
 import struct
 import sys
 import zlib
@@ -379,6 +380,121 @@ PATCHES = {
 }
 
 
+def write_pack(out_dir, name, version, blocks, ikey):
+    """blocks: (index record template or None, file name, type, stored bytes),
+    written contiguous at 256-byte boundaries as the original packer does."""
+    index = bytearray(struct.pack("<4sII", b"EPKD", version, len(blocks)))
+    pos = 0
+    with open(os.path.join(out_dir, name + ".data"), "wb") as out:
+        for i, (rec, fname, ctype, stored) in enumerate(blocks):
+            slot = (len(stored) + 255) // 256 * 256
+            out.write(stored + b"\0" * (slot - len(stored)))
+            r = bytearray(rec) if rec else bytearray(192)
+            if not rec:
+                nb = fname.encode("latin-1")
+                r[4:165] = nb + b"\0" * (161 - len(nb))
+            struct.pack_into("<i", r, 0, i)
+            struct.pack_into("<IiiIi", r, 168, zlib.crc32(fname.encode("latin-1")) & 0xFFFFFFFF, slot, len(stored),
+                             zlib.crc32(stored) & 0xFFFFFFFF, pos)
+            r[188] = ctype
+            index += r
+            pos += slot
+    open(os.path.join(out_dir, name + ".index"), "wb").write(mcoz(bytes(index), ikey))
+    return pos
+
+
+# LEXIW_DANCE_HAIR_DYE_V1: the dyed hairstyles of the new MT2009 client - 12
+# HairData groups per race shape (gamedata/<class>_<m|w>.msm) and their
+# textures (in root). Their HairIndex values are free in this client.
+DYE_RACES = ("warrior_m", "warrior_w", "assassin_m", "assassin_w", "sura_m", "sura_w", "shaman_m", "shaman_w")
+
+
+def dye_groups(new_msm):
+    """The new client's HairData groups whose texture is a dye (pink, blue, green)."""
+    text = new_msm.replace("\r\n", "\n")
+    out = []
+    for m_ in re.finditer(r"Group HairData\d+\s*\{(.*?)\}", text, re.S):
+        body = m_.group(1)
+        if re.search(r'TargetSkin\s+"[^"]*_(pink|blue|green)\.dds"', body):
+            fields = dict(re.findall(r'(\w+)\s+("[^"]*"|\S+)', body))
+            out.append(fields)
+    return out
+
+
+def patch_msm(old_msm, groups):
+    text = old_msm.replace("\r\n", "\n")
+    used = set(int(x) for x in re.findall(r"HairIndex\s+(\d+)", text))
+    groups = [g for g in groups if int(g["HairIndex"]) not in used]
+    count_m = re.search(r"HairDataCount\s+(\d+)", text)
+    count = int(count_m.group(1))
+    text = text[:count_m.start(1)] + str(count + len(groups)) + text[count_m.end(1):]
+    # The end of "Group HairData": the brace that closes it.
+    start = text.index("Group HairData\n") if "Group HairData\n" in text else text.index("Group HairData")
+    depth, i = 0, text.index("{", start)
+    while True:
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        i += 1
+    added = "".join(
+        f"\n\tGroup HairData{count + k:02d}\n\t{{\n\t\tHairIndex\t\t\t{g['HairIndex']}\n\t\tModel\t\t\t\t{g['Model']}\n"
+        f"\t\tSourceSkin\t\t\t{g['SourceSkin']}\n\t\tTargetSkin\t\t\t{g['TargetSkin']}\n\t}}\n"
+        for k, g in enumerate(groups))
+    text = text[:i] + added + text[i:]
+    return text.replace("\n", "\r\n"), len(groups)
+
+
+def build_gamedata(gamedata_dir, extra_dir, out_dir, ikey, dkey, report):
+    magic, version, size, entries = eterpack.read_index(gamedata_dir, "gamedata")
+    raw_index = eterpack.unmcoz(open(os.path.join(gamedata_dir, "gamedata.index"), "rb").read(), ikey)
+    new_entries = {e["name"]: e for e in eterpack.read_index(extra_dir, "gamedata")[3]}
+    data_in = open(os.path.join(gamedata_dir, "gamedata.data"), "rb")
+    blocks, total = [], 0
+    for i, e in enumerate(entries):
+        rec = raw_index[12 + i * 192:12 + (i + 1) * 192]
+        data_in.seek(e["pos"])
+        stored = data_in.read(e["size"])
+        race = e["name"][len("gamedata/"):-len(".msm")] if e["name"].startswith("gamedata/") and e["name"].endswith(".msm") else ""
+        if race in DYE_RACES and e["name"] in new_entries:
+            old = eterpack.read_file(gamedata_dir, "gamedata", e).decode("latin-1")
+            if re.search(r"HairIndex\s+2121\b", old):
+                raise SystemExit("gamedata already has the dyed hair: build from the original gamedata")
+            new = eterpack.read_file(extra_dir, "gamedata", new_entries[e["name"]]).decode("latin-1")
+            text, n = patch_msm(old, dye_groups(new))
+            data = text.encode("latin-1")
+            stored = mcoz(data, dkey) if e["type"] == 2 else (mcoz(data, None) if e["type"] == 1 else data)
+            total += n
+        blocks.append((rec, e["name"], e["type"], stored))
+    size = write_pack(out_dir, "gamedata", version, blocks, ikey)
+    report.append(f"gamedata: {total} dyed hairstyles in {len(DYE_RACES)} race shapes, {size} B")
+    # Read back: every file the same but the eight shapes.
+    import shutil
+    shutil.copy(os.path.join(os.environ.get("EPK_KEYS") or os.path.join(gamedata_dir, "PackMakerLite.json")),
+                os.path.join(out_dir, "PackMakerLite.json")) if not os.path.exists(os.path.join(out_dir, "PackMakerLite.json")) else None
+    old_by_name = {e["name"]: e for e in entries}
+    bad = 0
+    for e in eterpack.read_index(out_dir, "gamedata")[3]:
+        got = eterpack.read_file(out_dir, "gamedata", e)
+        if not any(e["name"] == f"gamedata/{r}.msm" for r in DYE_RACES):
+            bad += got != eterpack.read_file(gamedata_dir, "gamedata", old_by_name[e["name"]])
+    report.append(f"gamedata mismatches {bad}")
+    if bad:
+        raise SystemExit(1)
+
+
+def dye_textures(extra_dir):
+    """The dye textures of the new client: (name, bytes)."""
+    out = []
+    for pk in ("pc_1", "pc_2", "pc2_1", "pc2_2"):
+        for e in eterpack.read_index(extra_dir, pk)[3]:
+            if re.search(r"/hair/[^/]*_(pink|blue|green)\.dds$", e["name"]):
+                out.append((e["name"], eterpack.read_file(extra_dir, pk, e)))
+    return out
+
+
 def main():
     pack_dir, kaia_dir, out_dir = sys.argv[1], sys.argv[2], sys.argv[3]
     # The root to start from (the original, also when the client already has a patched one)
@@ -477,6 +593,10 @@ def main():
         for name in HORSE_FILES:
             add(name, 0, extra(name))
             added += 1
+    # LEXIW_DANCE_HAIR_DYE_V1: the dye textures (the shapes that use them are in gamedata).
+    for name, data in dye_textures(extra_dir):
+        add(name, 0, data)
+        added += 1
     report.append(f"added {added} files")
 
     # Write: blocks contiguous, every one at a 256 boundary, as the original packer does.
@@ -512,6 +632,8 @@ def main():
                 bad += 1
     report.append(f"entries {len(entries)} -> {len(new_entries)}, mismatches {bad}")
     report.append(f"root.data {pos} B")
+    gamedata_dir = root_dir if os.path.exists(os.path.join(root_dir, "gamedata.index")) else pack_dir
+    build_gamedata(gamedata_dir, extra_dir, out_dir, ikey, dkey, report)
     open(os.path.join(out_dir, "report.txt"), "w").write("\n".join(report) + "\n")
     print("\n".join(report))
     if bad:

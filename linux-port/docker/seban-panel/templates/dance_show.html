@@ -77,18 +77,69 @@
         <label class="ds-script">Skrypt (pusty = jeden taniec u wszystkich, jak wyżej)
           <textarea name="script" rows="8" spellcheck="false" placeholder="0 taniec 5 co 1&#10;8 taniec 3 parzyści&#10;8 taniec 2 nieparzyści&#10;14 gest klask&#10;16 szyk koło&#10;20 taniec 1 co 1">{{ s.script }}</textarea>
         </label>
-        <details class="ds-help"><summary>Jak pisać skrypt</summary>
-          <p>Jedna linia = jeden krok: <b>sekunda</b> od początku skryptu, co się dzieje i — opcjonalnie — kto. Linie po <code>#</code> to komentarz.</p>
-          <ul>
-            <li><code>0 taniec 5</code> — taniec 5 (1–6; 7–24 to tańce custom z paczki Kaia — widać je tylko w kliencie z tą paczką). <code>co 1</code> na końcu: powtarzaj co sekundę, aż ci tancerze dostaną kolejny krok.</li>
-            <li><code>12 gest klask</code> — gest: {% for key, label, word in gestures %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}.</li>
-            <li><code>16 szyk koło</code> — zespół przechodzi do szyku: {% for key, label, word in formations %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}.</li>
-            <li><code>20 pauza parzyści</code> — ich powtarzany taniec się kończy.</li>
-            <li><code>4 efekt fajerwerk co 2</code> — efekt nad tancerzami (z „co N” powtarzany): {% for key, label, word in effects %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}.</li>
-            <li><code>8 aura miecz parzyści na 20</code> — świecąca aura przez N sekund (bez „na”: 30 s): {% for key, label, word in auras %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}. <code>bez aury</code> (albo <code>bez aury miecz</code>) ją zdejmuje.</li>
-            <li><code>12 przemiana 691 nieparzyści</code> — tancerz zmienia się w potwora o tym numerze (numer znajdziesz w Wiki przy potworze), <code>16 powrót</code> — wraca. Po Stop i nowym Start aury i przemiany znikają same.</li>
-            <li>Kto: <code>wszyscy</code> (domyślnie), <code>parzyści</code>, <code>nieparzyści</code>, <code>rząd 2</code>, numer <code>4</code> albo zakres <code>1-5</code> (miejsca w zespole od 1).</li>
+        <details class="ds-help"><summary>📖 Jak ułożyć układ — instrukcja</summary>
+          <h4>1. Budowa jednej linii</h4>
+          <p class="ds-formula"><span>sekunda</span> <span>polecenie</span> <span>co dokładnie</span> <span class="ds-opt">kto</span> <span class="ds-opt">co N / na N</span></p>
+          <p>Przykład <code>8 aura miecz parzyści na 20</code>: w <b>8.</b> sekundzie, <b>aura</b>, <b>miecza</b>, tylko <b>parzyści</b>, przez <b>20 s</b>. Szare części można pominąć — wtedy dotyczy wszystkich i dzieje się raz.</p>
+          <ul class="ds-tips">
+            <li>Sekundy liczą się od początku skryptu (po odliczaniu i geście startowym). Można pisać ułamki: <code>7.5</code>.</li>
+            <li>Kilka linii z tą samą sekundą dzieje się naraz (np. parzyści jedno, nieparzyści drugie).</li>
+            <li>Kolejność linii nie ma znaczenia — panel sam ułoży je po czasie.</li>
+            <li>Wszystko po <code>#</code> to komentarz, np. <code>16 szyk koło  # refren</code>.</li>
           </ul>
+
+          <h4>2. Polecenia</h4>
+          <table class="ds-help-table">
+            <thead><tr><th>Polecenie</th><th>Przykład</th><th>Co robi</th></tr></thead>
+            <tbody>
+              <tr><td>taniec</td><td><code>0 taniec 5 co 8</code></td><td>Taniec 1–24 (7–24 to tańce custom). <code>co 8</code> — zaczyna od nowa co 8 s, aż ci tancerze dostaną inny krok.</td></tr>
+              <tr><td>gest</td><td><code>12 gest klask</code></td><td>Krótka emocja, np. klask, wiwat, salto, pompka.</td></tr>
+              <tr><td>efekt</td><td><code>4 efekt serce co 2</code></td><td>Błysk: emotka nad głową albo efekt przy postaci (ognie, fajerwerk).</td></tr>
+              <tr><td>aura</td><td><code>6 aura kule na 20</code></td><td>Świecenie z umiejętności przez N sekund (bez <code>na</code>: 30 s). Kilka aur naraz to nic złego.</td></tr>
+              <tr><td>bez aury</td><td><code>20 bez aury kule</code></td><td>Zdejmuje tę aurę (bez nazwy — wszystkie).</td></tr>
+              <tr><td>przemiana</td><td><code>12 przemiana 102</code></td><td>Tancerz zmienia się w potwora o tym numerze (numer jest w Wiki przy potworze).</td></tr>
+              <tr><td>powrót</td><td><code>18 powrót</code></td><td>Koniec przemiany.</td></tr>
+              <tr><td>szyk</td><td><code>16 szyk koło</code></td><td>Zespół przechodzi do nowego szyku (jak — w polu „Zmiana szyku”).</td></tr>
+              <tr><td>pauza</td><td><code>20 pauza parzyści</code></td><td>Zatrzymuje to, co powtarzali z <code>co N</code>.</td></tr>
+            </tbody>
+          </table>
+
+          <h4>3. Kto — komu dać krok</h4>
+          <p class="muted">Piszesz to po nazwie (np. po <code>taniec 5</code>). Bez tego krok dostają wszyscy. Numery to miejsca w zespole — widać je na podglądzie szyku.</p>
+          <table class="ds-help-table ds-who">
+            <thead><tr><th>Zapis</th><th>Kto dostaje krok</th><th>Przykład</th></tr></thead>
+            <tbody>
+              <tr><td><code>wszyscy</code></td><td>cały zespół (to samo, co nic nie pisać)</td><td><code>0 taniec 5</code></td></tr>
+              <tr><td><code>parzyści</code></td><td>miejsca 2, 4, 6…</td><td><code>4 gest klask parzyści</code></td></tr>
+              <tr><td><code>nieparzyści</code></td><td>miejsca 1, 3, 5…</td><td><code>4 gest wiwat nieparzyści</code></td></tr>
+              <tr><td><code>rząd 2</code></td><td>drugi rząd (w szykach z rzędami, klinie i V)</td><td><code>8 aura miecz rząd 2</code></td></tr>
+              <tr><td><code>4</code></td><td>tylko tancerz z miejsca 4</td><td><code>10 gest salto 4</code></td></tr>
+              <tr><td><code>1-5</code></td><td>miejsca od 1 do 5</td><td><code>12 efekt serce 1-5</code></td></tr>
+            </tbody>
+          </table>
+
+          <h4>4. Słowniczek — jakie słowa wpisać</h4>
+          <p class="muted">W skrypcie piszesz słowo z lewej (pogrubione); obok jest, co to jest.</p>
+          {% macro words(title, list, note='') %}
+          <div class="ds-dict"><h5>{{ title }}{% if note %} <small class="muted">{{ note }}</small>{% endif %}</h5>
+            <ul>{% for key, label, word in list %}<li><b>{{ word }}</b><span>{{ label }}</span></li>{% endfor %}</ul></div>
+          {% endmacro %}
+          {{ words('Gesty', gestures, '— po słowie „gest”') }}
+          {{ words('Efekty nad głową', effects|selectattr('0', 'in', overhead)|list, '— po słowie „efekt”, emotki') }}
+          {{ words('Efekty przy postaci', effects|rejectattr('0', 'in', overhead)|list, '— po słowie „efekt”') }}
+          {{ words('Aury', auras, '— po słowie „aura”, świecą „na N” sekund') }}
+          {{ words('Szyki', formations, '— po słowie „szyk”') }}
+
+          <h4>5. Jak ułożyć nowy układ — krok po kroku</h4>
+          <ol class="ds-tips">
+            <li>Wybierz <b>szyk na start</b> i liczbę tancerzy; spójrz na podgląd, kto ma który numer.</li>
+            <li>Zacznij od tańca dla wszystkich: <code>0 taniec 5 co 8</code> (jeden taniec trwa ok. 6–10 s, więc <code>co 8</code> to dobry start).</li>
+            <li>Co kilka sekund dodaj „akcent”: gest, efekt albo aurę dla części zespołu.</li>
+            <li>W połowie zmień szyk albo taniec, na koniec daj gest (wiwat, hurra) i fajerwerk.</li>
+            <li>Kliknij <b>Zapisz ustawienia</b> — panel sprawdzi każdą linię; błąd pokaże na czerwono z numerem linii.</li>
+            <li><b>Zbierz</b> → <b>Start</b>. Gdy układ się podoba — <b>Zapisz jako scenę</b>, żeby wrócić do niego jednym kliknięciem.</li>
+          </ol>
+          <p class="muted">Gotowe przykłady: sceny „01 Rozgrzewka” … „20 Wielki finał” w sekcji Sceny — wczytaj, popraw skrypt i zapisz pod nową nazwą.</p>
         </details>
       </fieldset>
     </div>
@@ -151,7 +202,7 @@
 <section class="panel table-wrap">
   <h2>🩰 Zespół</h2>
   <p class="muted">Klasa i płeć są stałe od pierwszego „Zbierz” (wtedy tancerz dostaje postać). Nick i poziom można zmieniać: nowy nick wchodzi, gdy postać jest poza grą od ok. 11 minut, a poziom tylko rośnie.</p>
-  <p class="muted">Wygląd: w polu broni, zbroi, kostiumu, fryzury albo skórki broni zacznij pisać nazwę, a panel podpowie pasujące przedmioty dla klasy i płci tancerza (albo wpisz VNUM; 0 = zostaw, co ma). Kostium zakrywa zbroję, a skórka broni wymaga broni tego samego rodzaju. Numery znajdziesz w <a href="{{ url_for('wiki') }}">Wiki</a> (wpisz nazwę, przy przedmiocie jest VNUM) albo w <a href="{{ url_for('items_database') }}">Bazie przedmiotów</a>. Przedmiot zakłada się przy najbliższym „Zbierz”, a to, co tancerz nosił w tym miejscu, znika.</p>
+  <p class="muted">Wygląd: w polu broni, zbroi, kostiumu, fryzury albo skórki broni zacznij pisać nazwę, a panel podpowie pasujące przedmioty dla klasy i płci tancerza (albo wpisz VNUM; 0 = zostaw, co ma). Kostium zakrywa zbroję, a skórka broni wymaga broni tego samego rodzaju. Numery znajdziesz w <a href="{{ url_for('wiki') }}">Wiki</a> (wpisz nazwę, przy przedmiocie jest VNUM) albo w <a href="{{ url_for('items_database') }}">Bazie przedmiotów</a>. Przedmiot zakłada się przy najbliższym „Zbierz”, a to, co tancerz nosił w tym miejscu, znika. <b>Kolor włosów</b> (różowy, niebieski, zielony — 4 fryzury) przykrywa fryzurę z wyglądu; widać go tylko w kliencie z paczką z tools/kaia-dances.</p>
   <p class="muted">Miejsce: tylko dla szyku „Własne miejsca” — metry w prawo (X, ujemne w lewo) i do tyłu (Y) od punktu szyku, patrząc tak jak tancerze. Kolejność 900+ to tancerze odsunięci przez wczytaną scenę.</p>
   <table class="ds-table">
     <thead><tr><th>Kolejność</th><th>Nick</th><th>Klasa</th><th>Poziom</th><th>Wygląd (VNUM)</th><th>Miejsce (m)</th><th>Stan</th><th></th></tr></thead>
@@ -164,7 +215,7 @@
           <td><input form="{{ f }}" name="name" value="{{ r.name }}" maxlength="24" class="ds-name">{% if r.name_pending %}<small class="muted"> w grze jeszcze: {{ r.char_name }}</small>{% endif %}</td>
           <td><select form="{{ f }}" name="job" {{ 'disabled' if r.pid }}>{% for j, label in jobs %}<option value="{{ j }}" {{ 'selected' if r.job == j }}>{{ label }}</option>{% endfor %}</select>{% if r.pid %}<input form="{{ f }}" type="hidden" name="job" value="{{ r.job }}">{% endif %}</td>
           <td><input form="{{ f }}" type="number" name="level" min="1" max="99" value="{{ r.level }}" class="ds-num">{% if r.char_level %}<small class="muted"> teraz {{ r.char_level }}</small>{% endif %}</td>
-          <td class="ds-look">{% for l in r.look %}<label>{{ l.label }} <input form="{{ f }}" type="text" name="{{ l.column }}" value="{{ l.vnum }}" class="ds-vnum" data-slot="{{ l.column }}" autocomplete="off" placeholder="VNUM lub nazwa">{% if l.name %}<small class="muted">{{ l.name }}</small>{% endif %}</label>{% endfor %}</td>
+          <td class="ds-look">{% for l in r.look %}<label>{{ l.label }} <input form="{{ f }}" type="text" name="{{ l.column }}" value="{{ l.vnum }}" class="ds-vnum" data-slot="{{ l.column }}" autocomplete="off" placeholder="VNUM lub nazwa">{% if l.name %}<small class="muted">{{ l.name }}</small>{% endif %}</label>{% endfor %}<label>Kolor włosów <select form="{{ f }}" name="hair_dye">{% for value, label in hair_dyes %}<option value="{{ value }}" {{ "selected" if (r.hair_dye or 0) == value }}>{{ label }}</option>{% endfor %}</select></label></td>
           <td class="ds-pos"><label>X <input form="{{ f }}" name="pos_x" value="{{ r.pos_x_m }}" class="ds-coord" inputmode="decimal"></label><label>Y <input form="{{ f }}" name="pos_y" value="{{ r.pos_y_m }}" class="ds-coord" inputmode="decimal"></label></td>
           <td>{{ r.status or '—' }}{% if r.pid %}<br><a href="{{ url_for('player', pid=r.pid) }}"><small>postać</small></a>{% endif %}</td>
           <td class="ds-actions"><button form="{{ f }}" name="action" value="save" class="secondary">Zapisz</button>
@@ -182,6 +233,7 @@
     <label>Klasa <select name="job">{% for j, label in jobs %}<option value="{{ j }}">{{ label }}</option>{% endfor %}</select></label>
     <label>Poziom <input type="number" name="level" min="1" max="99" value="30"></label>
     {% for column, label, _fits in look_slots %}<label>{{ label }} (VNUM) <input type="text" name="{{ column }}" value="0" class="ds-vnum" data-slot="{{ column }}" autocomplete="off" placeholder="VNUM lub nazwa"></label>{% endfor %}
+    <label>Kolor włosów <select name="hair_dye">{% for value, label in hair_dyes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
     <label>Miejsce X (m) <input name="pos_x" value="0" class="ds-coord" inputmode="decimal"></label>
     <label>Miejsce Y (m) <input name="pos_y" value="0" class="ds-coord" inputmode="decimal"></label>
     <div class="ds-buttons"><button>➕ Dodaj</button></div>

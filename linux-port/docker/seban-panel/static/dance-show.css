@@ -40,3 +40,23 @@ input.ds-coord{width:80px}
 .ds-bar{margin-top:6px}
 .ds-benched{opacity:.6}
 #ds-preview{width:100%;max-width:520px;height:auto;border:1px solid var(--edge);border-radius:8px;background:color-mix(in srgb,var(--edge) 15%,transparent)}
+/* The script guide */
+.ds-help h4{margin:12px 0 4px}
+.ds-formula{display:flex;flex-wrap:wrap;gap:6px;font-family:ui-monospace,Consolas,monospace}
+.ds-formula span{border:1px solid var(--edge);border-radius:4px;padding:2px 8px;background:color-mix(in srgb,var(--gold,#e8b93f) 10%,transparent)}
+.ds-formula .ds-opt{opacity:.65;border-style:dashed;background:none}
+.ds-tips{margin:4px 0;padding-left:20px}
+.ds-help-table{width:100%;border-collapse:collapse;font-size:13px}
+.ds-help-table th,.ds-help-table td{border-top:1px solid var(--edge);padding:4px 6px;text-align:left;vertical-align:top}
+.ds-help-table td:first-child{white-space:nowrap;font-weight:600}
+.ds-words{display:flex;flex-wrap:wrap;gap:4px;align-items:baseline;margin:4px 0}
+.ds-words b{min-width:60px}
+.ds-words code{cursor:help}
+.ds-who td:nth-child(2){font-weight:normal}
+.ds-dict{margin:8px 0}
+.ds-dict h5{margin:0 0 4px;font-size:13px}
+.ds-dict ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 14px}
+.ds-dict li{display:flex;gap:8px;align-items:baseline;padding:2px 0;border-bottom:1px dotted color-mix(in srgb,var(--edge) 60%,transparent);font-size:13px}
+.ds-dict li b{font-family:ui-monospace,Consolas,monospace;min-width:92px}
+.ds-dict li span{color:var(--muted)}
+.ds-dict ul{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}.ds-dict li b{min-width:130px;white-space:nowrap}

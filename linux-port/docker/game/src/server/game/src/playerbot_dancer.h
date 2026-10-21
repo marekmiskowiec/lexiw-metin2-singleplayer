@@ -76,6 +76,9 @@ namespace
 		// Its own place in the "manual" formation (cm): to the right, back.
 		long lPosX;
 		long lPosY;
+		// A dyed hairstyle of the patched client (its HairIndex, tools/kaia-dances;
+		// LEXIW_DANCE_HAIR_DYE_V1), 0 = the hair its items give.
+		DWORD dwHairDye;
 	};
 
 	struct TPlayerBotDanceStep
@@ -199,10 +202,11 @@ namespace
 			// Its own place in the "manual" formation (LEXIW_DANCE_SHOW_V2).
 			PlayerBotDanceExec("ALTER TABLE player.playerbot_dancer "
 					"ADD COLUMN IF NOT EXISTS pos_x INT NOT NULL DEFAULT 0, "
-					"ADD COLUMN IF NOT EXISTS pos_y INT NOT NULL DEFAULT 0");
+					"ADD COLUMN IF NOT EXISTS pos_y INT NOT NULL DEFAULT 0, "
+					"ADD COLUMN IF NOT EXISTS hair_dye INT UNSIGNED NOT NULL DEFAULT 0");
 		}
 		std::unique_ptr<SQLMsg> msg(AccountDB::instance().DirectQuery(
-				"SELECT id, slot, name, job, level, IFNULL(pid,0), weapon, armor, costume, hair, skin, pos_x, pos_y "
+				"SELECT id, slot, name, job, level, IFNULL(pid,0), weapon, armor, costume, hair, skin, pos_x, pos_y, hair_dye "
 				"FROM player.playerbot_dancer ORDER BY slot, id"));
 		if (!msg.get() || msg->uiSQLErrno != 0 || !msg->Get() || !msg->Get()->pSQLResult)
 			return;
@@ -234,6 +238,9 @@ namespace
 				str_to_number(d.lPosX, row[11]);
 			if (row[12])
 				str_to_number(d.lPosY, row[12]);
+			d.dwHairDye = 0;
+			if (row[13])
+				str_to_number(d.dwHairDye, row[13]);
 			d.bJob = (BYTE)MIN(job, 7U);
 			d.bLevel = (BYTE)MINMAX(1U, level, 120U);
 			dancers.push_back(d);
@@ -1492,6 +1499,11 @@ namespace
 				if (ch->IsDead())
 					continue;
 				ApplyPlayerBotDancerLook(ch, d);
+				if (d.dwHairDye && ch->GetPart(PART_HAIR) != d.dwHairDye)
+				{
+					ch->SetPart(PART_HAIR, d.dwHairDye);
+					ch->UpdatePacket();
+				}
 				long x = 0, y = 0;
 				float rot = 0;
 				int row = 0;

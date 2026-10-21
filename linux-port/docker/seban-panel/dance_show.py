@@ -70,6 +70,9 @@ AURAS = (("sword", "Aura miecza", "miecz"), ("berserk", "Berserk", "berserk"), (
          ("flamespirit", "Ogniste kule", "kule"), ("dragon", "Pomoc smoka", "smok"), ("attackup", "Siła ataku", "atak"),
          ("feather", "Lekkie stopy", "piórko"), ("fire", "Płonięcie", "ogień"), ("poison", "Trucizna", "trucizna"))
 EFFECT_WORDS = {w: k for k, _l, w in EFFECTS}
+# The ones the client draws over the head (its emoticons).
+OVERHEAD_EFFECTS = ("heart", "hearts", "happy", "celebration", "angry", "aha", "question", "exclaim", "sweat", "money",
+                    "siren", "whirl", "doze", "alcohol", "letter", "gloom")
 AURA_WORDS = {w: k for k, _l, w in AURAS}
 WHO_WORDS = {"wszyscy": "all", "parzyści": "even", "parzysci": "even", "nieparzyści": "odd", "nieparzysci": "odd"}
 NAME_RE = re.compile(r"^[A-Za-z0-9\[\]]{2,24}$")
@@ -90,8 +93,15 @@ LOOK_DDL = ("ALTER TABLE player.playerbot_dancer ADD COLUMN IF NOT EXISTS weapon
             "ADD COLUMN IF NOT EXISTS costume INT UNSIGNED NOT NULL DEFAULT 0, "
             "ADD COLUMN IF NOT EXISTS hair INT UNSIGNED NOT NULL DEFAULT 0, "
             "ADD COLUMN IF NOT EXISTS skin INT UNSIGNED NOT NULL DEFAULT 0")
+# LEXIW_DANCE_HAIR_DYE_V1: the dyed hairstyles of the new MT2009 client (the
+# patched client from tools/kaia-dances); the value is the client's HairIndex.
+HAIR_DYES = ((0, "bez farby (fryzura z wyglądu)"),
+             (6, "Fryzura 1 · różowa"), (7, "Fryzura 1 · niebieska"), (8, "Fryzura 1 · zielona"),
+             (2101, "Fryzura 2 · różowa"), (2102, "Fryzura 2 · niebieska"), (2103, "Fryzura 2 · zielona"),
+             (2111, "Fryzura 3 · różowa"), (2112, "Fryzura 3 · niebieska"), (2113, "Fryzura 3 · zielona"),
+             (2121, "Fryzura 4 · różowa"), (2122, "Fryzura 4 · niebieska"), (2123, "Fryzura 4 · zielona"))
 POS_DDL = ("ALTER TABLE player.playerbot_dancer ADD COLUMN IF NOT EXISTS pos_x INT NOT NULL DEFAULT 0, "
-           "ADD COLUMN IF NOT EXISTS pos_y INT NOT NULL DEFAULT 0")
+           "ADD COLUMN IF NOT EXISTS pos_y INT NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS hair_dye INT UNSIGNED NOT NULL DEFAULT 0")
 SCENE_DDL = ("CREATE TABLE IF NOT EXISTS player.playerbot_dance_scene ("
              "id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, name VARCHAR(48) NOT NULL, "
              "settings MEDIUMTEXT NOT NULL, roster MEDIUMTEXT NOT NULL, "
@@ -361,6 +371,13 @@ def install_dance_show(m):
                 pos[column] = 0
         return pos
 
+    def read_dye():
+        try:
+            dye = int(request.form.get("hair_dye", "0") or 0)
+        except ValueError:
+            return 0
+        return dye if dye in dict(HAIR_DYES) else 0
+
     @app.get("/api/dance/items")
     @m.login_required
     def dance_items():
@@ -413,7 +430,7 @@ def install_dance_show(m):
     def dance_show():
         ensure_table()
         roster = list(m.rows("""SELECT d.id, d.slot, d.name, d.job, d.level, d.pid, d.status,
-                                       d.weapon, d.armor, d.costume, d.hair, d.skin, d.pos_x, d.pos_y,
+                                       d.weapon, d.armor, d.costume, d.hair, d.skin, d.pos_x, d.pos_y, d.hair_dye,
                                        p.name AS char_name, p.level AS char_level
                                 FROM player.playerbot_dancer d LEFT JOIN player.player p ON p.id = d.pid
                                 ORDER BY d.slot, d.id"""))
@@ -450,7 +467,7 @@ def install_dance_show(m):
             except ValueError:
                 scene["dancers"] = 0
         maps = sorted(((i, n) for i, n in m.MAP_NAMES.items()), key=lambda x: x[1])
-        return render_template("dance_show.html", roster=roster, jobs=JOBS, formations=FORMATIONS, gestures=GESTURES, effects=EFFECTS, auras=AURAS,
+        return render_template("dance_show.html", roster=roster, jobs=JOBS, formations=FORMATIONS, gestures=GESTURES, effects=EFFECTS, auras=AURAS, overhead=OVERHEAD_EFFECTS, hair_dyes=HAIR_DYES,
                                owners=owners(), look_slots=LOOK_SLOTS, settings=read_settings(), maps=maps,
                                show=show, status=status, status_age=age, last_beat=last_beat, scenes=scenes,
                                phases=PHASES, formation_names={k: lbl for k, lbl, _w in FORMATIONS},
@@ -491,6 +508,7 @@ def install_dance_show(m):
                        "pos_x, pos_y, status) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'czeka na Zbierz')",
                        (slot, name, job, level, look["weapon"], look["armor"], look["costume"], look["hair"], look["skin"],
                         pos["pos_x"], pos["pos_y"]))
+                m.rows("UPDATE player.playerbot_dancer SET hair_dye=%s WHERE name=%s", (read_dye(), name))
                 flash(f"Dodano tancerza {name}. Postać dostanie przy pierwszym „Zbierz”.")
         elif action == "save" and row_id:
             current = m.one("SELECT pid, job FROM player.playerbot_dancer WHERE id=%s", (row_id,))
@@ -512,6 +530,7 @@ def install_dance_show(m):
                            "weapon=%s, armor=%s, costume=%s, hair=%s, skin=%s, pos_x=%s, pos_y=%s WHERE id=%s",
                            (name, job, level, slot, look["weapon"], look["armor"], look["costume"], look["hair"],
                             look["skin"], pos["pos_x"], pos["pos_y"], row_id))
+                m.rows("UPDATE player.playerbot_dancer SET hair_dye=%s WHERE id=%s", (read_dye(), row_id))
                 flash(f"Zapisano tancerza {name}. Nowy nick wchodzi, gdy postać jest poza grą (do ~11 minut po wylogowaniu); "
                       "wygląd i miejsce wchodzą przy najbliższym „Zbierz”.")
         elif action == "delete" and row_id:
@@ -609,7 +628,7 @@ def install_dance_show(m):
             if not name:
                 flash("Wpisz nazwę sceny.", "error")
                 return redirect(url_for("dance_show"))
-            roster = m.rows("""SELECT id, slot, name, job, level, weapon, armor, costume, hair, skin, pos_x, pos_y
+            roster = m.rows("""SELECT id, slot, name, job, level, weapon, armor, costume, hair, skin, pos_x, pos_y, hair_dye
                                FROM player.playerbot_dancer WHERE slot < 900 ORDER BY slot, id LIMIT %s""",
                             (int(s["count"]),))
             m.rows("""INSERT INTO player.playerbot_dance_scene (name, settings, roster) VALUES (%s,%s,%s)
@@ -666,11 +685,13 @@ def install_dance_show(m):
                 if not name_problem(str(d.get("name", "")), row["id"]):
                     m.rows("UPDATE player.playerbot_dancer SET name=%s WHERE id=%s", (d["name"], row["id"]))
                 kept.append(int(row["id"]))
+                m.rows("UPDATE player.playerbot_dancer SET hair_dye=%s WHERE id=%s", (int(d.get("hair_dye", 0) or 0), row["id"]))
             elif not name_problem(str(d.get("name", ""))) and int(d.get("job", 0)) in job_names:
                 m.rows("INSERT INTO player.playerbot_dancer (slot, level, weapon, armor, costume, hair, skin, pos_x, pos_y, "
                        "name, job, status) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'czeka na Zbierz')",
                        values + (d["name"], int(d["job"])))
                 kept.append(int(m.one("SELECT id FROM player.playerbot_dancer WHERE name=%s", (d["name"],))["id"]))
+                m.rows("UPDATE player.playerbot_dancer SET hair_dye=%s WHERE id=%s", (int(d.get("hair_dye", 0) or 0), kept[-1]))
                 notes.append(f"{d['name']} dodany na nowo")
             else:
                 notes.append(f"{d.get('name', '?')} pominięty (nick zajęty albo inna klasa)")

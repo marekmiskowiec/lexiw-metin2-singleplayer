@@ -66,6 +66,16 @@ switch ($Action) {
             }
             "Kopia oryginału: $source"
         }
+        # The original gamedata (race shapes; the dyed hairstyles go there) sits
+        # beside the original root; a copy made before the dyes has none yet.
+        if (-not (Test-Path (Join-Path $source 'gamedata.index'))) {
+            if (Test-Path (Join-Path $pack 'gamedata.kaia')) { throw 'W kliencie jest zmieniona paczka gamedata, a w kopii nie ma oryginału.' }
+            Copy-Item (Join-Path $pack 'gamedata.index'), (Join-Path $pack 'gamedata.data') $source
+            foreach ($f in 'gamedata.index', 'gamedata.data') {
+                if ((Get-FileHash (Join-Path $pack $f)).Hash -ne (Get-FileHash (Join-Path $source $f)).Hash) { throw "Kopia $f się nie zgadza." }
+            }
+            "Kopia oryginalnej paczki gamedata: $source"
+        }
         $work = Join-Path $env:TEMP ("kaia-build-" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory $work | Out-Null
         try {
@@ -76,6 +86,9 @@ switch ($Action) {
             Copy-Item (Join-Path $work 'root.data') (Join-Path $pack 'root.data') -Force
             Copy-Item (Join-Path $work 'root.index') (Join-Path $pack 'root.index') -Force
             (Get-FileHash (Join-Path $pack 'root.index') -Algorithm SHA256).Hash | Set-Content (Join-Path $pack 'root.kaia') -Encoding ascii
+            Copy-Item (Join-Path $work 'gamedata.data') (Join-Path $pack 'gamedata.data') -Force
+            Copy-Item (Join-Path $work 'gamedata.index') (Join-Path $pack 'gamedata.index') -Force
+            (Get-FileHash (Join-Path $pack 'gamedata.index') -Algorithm SHA256).Hash | Set-Content (Join-Path $pack 'gamedata.kaia') -Encoding ascii
             'Zainstalowane. Okno postaci (C) -> Emocje -> sekcja "Tańce (custom)": taniec 7-24, salto i pompka.'
         } finally {
             Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
@@ -87,6 +100,10 @@ switch ($Action) {
         if (-not $copy) { throw 'Nie ma kopii paczki root w backups\.' }
         Copy-Item (Join-Path $copy.FullName 'root.index'), (Join-Path $copy.FullName 'root.data') $pack -Force
         Remove-Item (Join-Path $pack 'root.kaia') -ErrorAction SilentlyContinue
+        if (Test-Path (Join-Path $copy.FullName 'gamedata.index')) {
+            Copy-Item (Join-Path $copy.FullName 'gamedata.index'), (Join-Path $copy.FullName 'gamedata.data') $pack -Force
+            Remove-Item (Join-Path $pack 'gamedata.kaia') -ErrorAction SilentlyContinue
+        }
         "Przywrócono oryginalną paczkę root z $($copy.FullName)."
     }
 }
