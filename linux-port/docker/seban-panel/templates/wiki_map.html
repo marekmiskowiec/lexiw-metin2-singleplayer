@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% block title %}{{ summary.name }} · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+{% extends 'wiki_base.html' %}{% block title %}{{ summary.name }} · Wiki · {{ panel_brand }}{% endblock %}{% block wiki %}
 <link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
 {%- macro pct(value) -%}{% if value >= 10 %}{{ '%.0f'|format(value) }}%{% else %}{{ ('%.1f'|format(value)).replace('.', ',') }}%{% endif %}{%- endmacro -%}
 <p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI</a> · <a href="{{ url_for('wiki_maps') }}">MAPY</a></p>

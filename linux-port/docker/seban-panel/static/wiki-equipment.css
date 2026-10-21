@@ -1,0 +1,50 @@
+/* Lexiw: Wiki - Broń, Biżuteria, Zbroje */
+.we-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+.we-tabs a{padding:5px 12px;border:1px solid var(--edge);border-radius:999px;text-decoration:none}
+.we-tabs a.on{background:color-mix(in srgb,var(--gold,#e8b93f) 18%,transparent);border-color:var(--gold,#e8b93f);font-weight:600}
+.we-filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end}
+.we-filters label{display:flex;flex-direction:column;gap:3px;font-size:13px}
+.we-filters input[type=number]{width:90px}
+.we-filters #we-name{min-width:220px}
+.we-table{width:100%;border-collapse:collapse}
+.we-table th{text-align:left;white-space:nowrap}
+.we-table td{vertical-align:middle;padding:6px 8px;border-top:1px solid color-mix(in srgb,var(--edge) 60%,transparent)}
+.we-row{cursor:pointer}
+.we-row:hover,.we-row.open{background:color-mix(in srgb,var(--gold,#e8b93f) 7%,transparent)}
+.we-item{display:flex;align-items:center;gap:8px;min-width:220px}
+.we-arrow{width:12px;color:var(--muted);flex:0 0 12px}
+.we-icon{flex:0 0 32px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid var(--edge);border-radius:4px;background:color-mix(in srgb,var(--edge) 25%,transparent)}
+.we-icon img{max-width:32px;max-height:32px}
+.we-names{display:flex;flex-direction:column;line-height:1.25}
+.we-names a{font-weight:600}
+.we-names small{font-size:12px}
+.we-num{white-space:nowrap;font-variant-numeric:tabular-nums}
+.we-bonus{font-size:13px}
+.we-bonus span{display:block;line-height:1.35}
+.we-level td{background:color-mix(in srgb,var(--edge) 14%,transparent);font-size:13px}
+.we-level-mats td{border-top:0;padding-top:0}
+.we-plus{display:inline-block;min-width:32px;text-align:center;font-weight:700;padding:2px 6px;border-radius:4px;background:color-mix(in srgb,var(--gold,#e8b93f) 16%,transparent);text-decoration:none}
+.we-mats{display:inline-flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+.we-mats a{display:inline-flex;align-items:center;gap:4px;text-decoration:none}
+.we-mats img{width:22px;height:22px;object-fit:contain}
+@media (max-width:640px){.we-item{min-width:160px}.we-filters #we-name{min-width:0;width:100%}}
+.we-tabs a{color:var(--text)}
+.we-tabs a.on{color:var(--gold,#e8b93f)}
+.we-plus{color:var(--gold,#e8b93f)!important}
+/* One row per plus, its upgraders in their own column (as the MT2009 wiki) */
+.we-level td{padding:8px;vertical-align:middle;border-top:1px solid color-mix(in srgb,var(--edge) 45%,transparent)}
+.we-plus-cell{padding-left:44px!important}
+.we-plus{min-width:38px;font-size:13px}
+.we-upg{min-width:230px}
+.we-upg .we-mats{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.we-upg .we-mats a{gap:6px;font-size:13px}
+.we-upg .we-mats a b{color:var(--gold,#e8b93f)}
+.we-upg .we-mats img,.we-noicon{width:24px;height:24px;border:1px solid var(--edge);border-radius:3px;background:color-mix(in srgb,var(--edge) 25%,transparent);display:inline-block}
+.we-upg small{font-size:11px}
+.we-row .we-upg small{font-size:11px}
+.we-upg .we-mats a span{color:var(--text)}
+.we-cls{display:flex;flex-wrap:wrap;gap:3px;margin-top:2px}
+.we-cls i{font-style:normal;font-size:10px;padding:0 5px;border-radius:3px;border:1px solid var(--edge);color:var(--muted)}
+.we-next td{background:color-mix(in srgb,var(--gold,#e8b93f) 8%,transparent)}
+.we-next a{display:inline-flex;align-items:center;gap:6px;margin-left:6px}
+.we-next a img{width:28px;height:28px}

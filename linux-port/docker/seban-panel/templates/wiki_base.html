@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{# The wiki's pages: the side menu of categories on the left (as the MT2009 wiki), the page on the right. #}
+{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki-nav.css') }}">
+<div class="wiki-layout">
+  <aside class="wiki-nav" aria-label="Kategorie wiki">
+    <h3>🧭 Szybka nawigacja</h3>
+    <a class="wiki-nav-link {{ 'on' if request.endpoint == 'wiki' }}" href="{{ url_for('wiki') }}">🏠 Strona główna wiki</a>
+    <h3>📂 Kategorie</h3>
+    {% for cat in wiki_nav() %}
+      {% set open = cat['items']|selectattr(1, 'equalto', request.path)|list %}
+      <details class="wiki-cat" {{ 'open' if open }}>
+        <summary><span>{{ cat.icon }} {{ cat.title }}</span><b>({{ cat['items']|length }})</b></summary>
+        <ul>{% for label, url in cat['items'] %}<li><a href="{{ url }}" class="{{ 'on' if url == request.path }}">{{ label }}</a></li>{% endfor %}</ul>
+      </details>
+    {% endfor %}
+  </aside>
+  <div class="wiki-main">{% block wiki %}{% endblock %}</div>
+</div>
+{% endblock %}

@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% block title %}Osobowości botów · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+{% extends 'wiki_base.html' %}{% block title %}Osobowości botów · Wiki · {{ panel_brand }}{% endblock %}{% block wiki %}
 <link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
 {%- macro card(item) -%}
 <article class="wiki-personality" id="{{ item.anchor }}">

@@ -11125,6 +11125,8 @@ install_item_grants(app, db, login_required, game_text)
 import sys  # noqa: E402
 from wiki import install_wiki  # noqa: E402
 install_wiki(sys.modules[__name__])
+from wiki_equipment import install_wiki_equipment  # noqa: E402
+install_wiki_equipment(sys.modules[__name__])
 from market import install_market  # noqa: E402
 install_market(sys.modules[__name__])
 from wiki_guides import install_guides  # noqa: E402

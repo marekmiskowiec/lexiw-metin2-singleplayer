@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% block title %}Poradniki · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+{% extends 'wiki_base.html' %}{% block title %}Poradniki · Wiki · {{ panel_brand }}{% endblock %}{% block wiki %}
 <link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
 <p class="eyebrow"><a href="{{ url_for('wiki') }}">WIKI SERWERA</a></p><h1>Poradniki</h1>
 <p class="muted">Krótkie opisy tego, jak ten świat działa: jak szukać, jak czytać mapy i kim są bossowie. Każdy poradnik to zwykły plik Markdown w folderze <code>wiki_guides</code> panelu.</p>

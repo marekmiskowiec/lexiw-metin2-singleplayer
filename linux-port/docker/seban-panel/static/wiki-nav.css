@@ -1,0 +1,19 @@
+/* Lexiw: the wiki's side menu of categories */
+.wiki-layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;align-items:start}
+.wiki-nav{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;padding:12px;border:1px solid var(--edge);border-radius:10px;background:color-mix(in srgb,var(--edge) 12%,transparent)}
+.wiki-nav h3{font-size:13px;margin:6px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--edge)}
+.wiki-nav h3:not(:first-child){margin-top:16px}
+.wiki-nav-link{display:block;padding:6px 8px;border-radius:6px;text-decoration:none;color:var(--text)}
+.wiki-nav-link.on,.wiki-nav-link:hover{background:color-mix(in srgb,var(--gold,#e8b93f) 14%,transparent)}
+.wiki-cat summary{display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;padding:7px 8px;border-radius:6px;font-weight:600;list-style:none}
+.wiki-cat summary::-webkit-details-marker{display:none}
+.wiki-cat summary::before{content:'▸';color:var(--muted);margin-right:4px}
+.wiki-cat[open] summary::before{content:'▾'}
+.wiki-cat summary span{flex:1}
+.wiki-cat summary b{color:var(--muted);font-weight:normal;font-size:13px}
+.wiki-cat summary:hover{background:color-mix(in srgb,var(--gold,#e8b93f) 10%,transparent)}
+.wiki-cat ul{list-style:none;margin:2px 0 8px;padding:0 0 0 18px}
+.wiki-cat li a{display:block;padding:4px 8px;border-radius:5px;font-size:13px;text-decoration:none;color:var(--text)}
+.wiki-cat li a:hover{background:color-mix(in srgb,var(--edge) 30%,transparent)}
+.wiki-cat li a.on{background:color-mix(in srgb,var(--gold,#e8b93f) 16%,transparent);color:var(--gold,#e8b93f);font-weight:600}
+@media (max-width:900px){.wiki-layout{grid-template-columns:1fr}.wiki-nav{position:static;max-height:none}}

@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% block title %}{{ mob.name }} · Wiki · {{ panel_brand }}{% endblock %}{% block content %}
+{% extends 'wiki_base.html' %}{% block title %}{{ mob.name }} · Wiki · {{ panel_brand }}{% endblock %}{% block wiki %}
 <link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
 {%- macro pct(value) -%}{% if value is none %}—{% elif value >= 10 %}{{ '%.0f'|format(value) }}%{% elif value >= 1 %}{{ ('%.1f'|format(value)).replace('.', ',') }}%{% elif value > 0 %}{{ ('%.3g'|format(value)).replace('.', ',') }}%{% else %}0%{% endif %}{%- endmacro -%}
 {%- macro num(value) -%}{{ '{:,}'.format(value|int).replace(',', ' ') }}{%- endmacro -%}
