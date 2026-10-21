@@ -137,7 +137,7 @@
             <li>Co kilka sekund dodaj „akcent”: gest, efekt albo aurę dla części zespołu.</li>
             <li>W połowie zmień szyk albo taniec, na koniec daj gest (wiwat, hurra) i fajerwerk.</li>
             <li>Kliknij <b>Zapisz ustawienia</b> — panel sprawdzi każdą linię; błąd pokaże na czerwono z numerem linii.</li>
-            <li><b>Zbierz</b> → <b>Start</b>. Gdy układ się podoba — <b>Zapisz jako scenę</b>, żeby wrócić do niego jednym kliknięciem.</li>
+            <li><b>Zbierz</b> → <b>Start</b>. Gdy układ się podoba — <b>Zapisz scenę</b>, żeby wrócić do niego jednym kliknięciem.</li>
           </ol>
           <p class="muted">Gotowe przykłady: sceny „01 Rozgrzewka” … „20 Wielki finał” w sekcji Sceny — wczytaj, popraw skrypt i zapisz pod nową nazwą.</p>
         </details>
@@ -151,8 +151,8 @@
         <button name="command" value="stop" class="secondary">⏹ Stop</button>
         <button name="command" value="save" class="secondary" title="Zapisuje pola bez wysyłania do gry.">💾 Zapisz ustawienia</button>
       </div>
-      <label>Scena <input name="scene_name" maxlength="48" placeholder="np. Finał z kołem"></label>
-      <button name="command" value="save_scene" class="secondary" title="Zapisuje te ustawienia, skrypt i pierwszych tancerzy zespołu (z wyglądem i miejscami) pod tą nazwą.">🎞️ Zapisz jako scenę</button>
+      <label>Scena <input name="scene_name" maxlength="48" value="{{ current_scene }}" placeholder="np. Finał z kołem" title="Ta sama nazwa zaktualizuje scenę, nowa nazwa zapisze nową."></label>
+      <button name="command" value="save_scene" class="secondary" title="Zapisuje te ustawienia, skrypt i pierwszych tancerzy zespołu (z wyglądem i miejscami) pod tą nazwą: ta sama nazwa aktualizuje scenę, nowa nazwa zapisuje nową.">🎞️ Zapisz scenę</button>
     </div>
   </form>
 
@@ -193,15 +193,28 @@
       <button name="action" value="delete" class="secondary" onclick="return confirm('Usunąć tę scenę?')">Usuń</button>
     </div>
   </form>
-  <p class="muted">Wczytanie ustawia sterowanie i kolejność zespołu (tancerze sceny na początku, z jej wyglądem i miejscami; reszta na koniec). Nie zmienia nic w grze, dopóki nie klikniesz „Zbierz”.</p>
+  <p class="muted">Wczytanie ustawia sterowanie i kolejność zespołu (tancerze sceny na początku, z jej wyglądem i miejscami; reszta na koniec). Nie zmienia nic w grze, dopóki nie klikniesz „Zbierz”. Żeby edytować scenę: wczytaj ją, popraw skrypt, ustawienia albo tancerzy i kliknij „Zapisz scenę” — jej nazwa jest już wpisana{% if current_scene %} (teraz: <b>{{ current_scene }}</b>){% endif %}; nowa nazwa zapisze kopię.</p>
   {% else %}
-  <p class="muted">Nie ma jeszcze scen. Ustaw zespół, szyk i skrypt, wpisz nazwę przy „Zapisz jako scenę”.</p>
+  <p class="muted">Nie ma jeszcze scen. Ustaw zespół, szyk i skrypt, wpisz nazwę przy „Zapisz scenę”.</p>
   {% endif %}
 </section>
 
 <section class="panel table-wrap">
   <h2>🩰 Zespół</h2>
-  <p class="muted">Klasa i płeć są stałe od pierwszego „Zbierz” (wtedy tancerz dostaje postać). Nick i poziom można zmieniać: nowy nick wchodzi, gdy postać jest poza grą od ok. 11 minut, a poziom tylko rośnie.</p>
+  <p class="muted">Przy pierwszym „Zbierz” tancerz dostaje postać swojej klasy i płci. Nick i poziom można zmieniać: nowy nick wchodzi, gdy postać jest poza grą od ok. 11 minut, a poziom tylko rośnie. <b>Zmiana klasy</b> tancerza z postacią (po potwierdzeniu) oddaje jego postać botom pod innym nickiem, a przy następnym „Zbierz” dostaje on postać nowej klasy z tym samym nickiem i wyglądem; <b>Usuń</b> pyta, czy zwolnić nick. Oba działają, gdy postać jest poza grą od ok. 11 minut (najpierw „Stop”).</p>
+  <div class="ds-bulk" id="ds-bulk">
+    <div class="ds-bulk-head"><b>Wielu naraz</b> <label><input type="checkbox" id="ds-sel-all"> zaznacz wszystkich</label> <span class="muted" id="ds-sel-count">zaznaczeni: 0</span></div>
+    <div class="ds-bulk-fields">
+      <label>Poziom <input type="number" min="1" max="99" data-bulk="level" placeholder="bez zmian"></label>
+      {% for column, label, _fits in look_slots %}<label>{{ label }} (VNUM) <input type="number" min="0" data-bulk="{{ column }}" placeholder="bez zmian"></label>{% endfor %}
+      <label>Kolor włosów <select data-bulk="hair_dye"><option value="">bez zmian</option>{% for value, label in hair_dyes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="ds-buttons">
+      <button type="button" class="secondary" id="ds-bulk-fill" title="Wpisuje wypełnione pola zaznaczonym tancerzom (bez zapisu) — sprawdź i kliknij „Zapisz wszystkich”.">✍️ Wpisz zaznaczonym</button>
+      <button type="button" id="ds-save-all" title="Zapisuje wszystkie zmiany w zespole jednym kliknięciem.">💾 Zapisz wszystkich</button>
+    </div>
+    <p class="muted">Wypełnij tylko pola do zmiany, zaznacz tancerzy i kliknij „Wpisz zaznaczonym”, potem „Zapisz wszystkich”. „Zapisz wszystkich” zapisuje też zmiany wpisane ręcznie w kilku wierszach. 0 w polu wyglądu = zostaw, co ma.</p>
+  </div>
   <p class="muted">Wygląd: w polu broni, zbroi, kostiumu, fryzury albo skórki broni zacznij pisać nazwę, a panel podpowie pasujące przedmioty dla klasy i płci tancerza (albo wpisz VNUM; 0 = zostaw, co ma). Kostium zakrywa zbroję, a skórka broni wymaga broni tego samego rodzaju. Numery znajdziesz w <a href="{{ url_for('wiki') }}">Wiki</a> (wpisz nazwę, przy przedmiocie jest VNUM) albo w <a href="{{ url_for('items_database') }}">Bazie przedmiotów</a>. Przedmiot zakłada się przy najbliższym „Zbierz”, a to, co tancerz nosił w tym miejscu, znika. <b>Kolor włosów</b> (różowy, niebieski, zielony — 4 fryzury) przykrywa fryzurę z wyglądu; widać go tylko w kliencie z paczką z tools/kaia-dances.</p>
   <p class="muted">Miejsce: tylko dla szyku „Własne miejsca” — metry w prawo (X, ujemne w lewo) i do tyłu (Y) od punktu szyku, patrząc tak jak tancerze. Kolejność 900+ to tancerze odsunięci przez wczytaną scenę.</p>
   <table class="ds-table ds-roster">
@@ -209,17 +222,17 @@
     <tbody>
     {% for r in roster %}
       {% set f = 'dancer-' ~ r.id %}
-      <tr class="{{ 'ds-benched' if r.slot >= 900 }}">
-          <td data-label="Kolejność" class="ds-c-slot"><form id="{{ f }}" method="post" action="{{ url_for('dance_roster') }}"><input type="hidden" name="dance_csrf" value="{{ dance_csrf }}"><input type="hidden" name="id" value="{{ r.id }}"></form>
+      <tr class="{{ 'ds-benched' if r.slot >= 900 }}" data-dancer="{{ r.id }}" data-form="{{ f }}">
+          <td data-label="Kolejność" class="ds-c-slot"><form id="{{ f }}" method="post" action="{{ url_for('dance_roster') }}"><input type="hidden" name="dance_csrf" value="{{ dance_csrf }}"><input type="hidden" name="id" value="{{ r.id }}"><input type="hidden" name="release" value="0"><input type="hidden" name="change_class" value="0"></form><label class="ds-sel" title="Zaznacz do edycji wielu naraz"><input type="checkbox" class="ds-sel-box" value="{{ r.id }}"> zaznacz</label>
             <input form="{{ f }}" type="number" name="slot" min="0" max="999" value="{{ r.slot }}" class="ds-num"></td>
           <td data-label="Nick" class="ds-c-name"><input form="{{ f }}" name="name" value="{{ r.name }}" maxlength="24" class="ds-name">{% if r.name_pending %}<small class="muted"> w grze jeszcze: {{ r.char_name }}</small>{% endif %}</td>
-          <td data-label="Klasa" class="ds-c-job"><select form="{{ f }}" name="job" {{ 'disabled' if r.pid }}>{% for j, label in jobs %}<option value="{{ j }}" {{ 'selected' if r.job == j }}>{{ label }}</option>{% endfor %}</select>{% if r.pid %}<input form="{{ f }}" type="hidden" name="job" value="{{ r.job }}">{% endif %}</td>
+          <td data-label="Klasa" class="ds-c-job"><select form="{{ f }}" name="job" class="ds-job" data-job="{{ r.job }}" data-has-pid="{{ 1 if r.pid else 0 }}">{% for j, label in jobs %}<option value="{{ j }}" {{ 'selected' if r.job == j }}>{{ label }}</option>{% endfor %}</select></td>
           <td data-label="Poziom" class="ds-c-level"><input form="{{ f }}" type="number" name="level" min="1" max="99" value="{{ r.level }}" class="ds-num">{% if r.char_level %}<small class="muted"> teraz {{ r.char_level }}</small>{% endif %}</td>
           <td data-label="Wygląd (VNUM)" class="ds-look">{% for l in r.look %}<label>{{ l.label }} <input form="{{ f }}" type="text" name="{{ l.column }}" value="{{ l.vnum }}" class="ds-vnum" data-slot="{{ l.column }}" autocomplete="off" placeholder="VNUM lub nazwa">{% if l.name %}<small class="muted">{{ l.name }}</small>{% endif %}</label>{% endfor %}<label>Kolor włosów <select form="{{ f }}" name="hair_dye">{% for value, label in hair_dyes %}<option value="{{ value }}" {{ "selected" if (r.hair_dye or 0) == value }}>{{ label }}</option>{% endfor %}</select></label></td>
           <td data-label="Miejsce (m)" class="ds-pos"><label>X <input form="{{ f }}" name="pos_x" value="{{ r.pos_x_m }}" class="ds-coord" inputmode="decimal"></label><label>Y <input form="{{ f }}" name="pos_y" value="{{ r.pos_y_m }}" class="ds-coord" inputmode="decimal"></label></td>
           <td data-label="Stan" class="ds-c-state">{{ r.status or '—' }}{% if r.pid %}<br><a href="{{ url_for('player', pid=r.pid) }}"><small>postać</small></a>{% endif %}</td>
           <td class="ds-actions"><button form="{{ f }}" name="action" value="save" class="secondary">Zapisz</button>
-            <button form="{{ f }}" name="action" value="delete" class="secondary" onclick="return confirm('Usunąć tancerza {{ r.name }}?')">Usuń</button></td>
+            <button form="{{ f }}" name="action" value="delete" class="secondary" data-name="{{ r.name }}" data-has-pid="{{ 1 if r.pid else 0 }}" onclick="return dsDelete(this)">Usuń</button></td>
       </tr>
     {% else %}
       <tr><td colspan="8" class="muted">Nie ma jeszcze tancerzy. Dodaj pierwszego poniżej.</td></tr>
@@ -256,7 +269,11 @@
       if (q.length < 2 || /^\d+$/.test(q)) { box.hidden = true; return; }
       timer = setTimeout(() => {
         const form = input.form;
-        const job = form && form.elements['job'] ? form.elements['job'].value : '0';
+        // A dancer with a character has the class twice (a locked select and a
+        // hidden copy): elements['job'] is then a list whose .value is empty,
+        // which read as a male Warrior - so take the field that is sent.
+        const jobField = form ? [...form.elements].find((e) => e.name === 'job' && !e.disabled) : null;
+        const job = jobField ? jobField.value : '0';
         const weapon = form && form.elements['weapon'] ? form.elements['weapon'].value : '0';
         const url = api + '?slot=' + encodeURIComponent(input.dataset.slot) + '&job=' + encodeURIComponent(job) +
                     '&weapon=' + encodeURIComponent(/^\d+$/.test(weapon) ? weapon : '0') + '&q=' + encodeURIComponent(q);
@@ -362,6 +379,105 @@
   }
   ['count', 'formation'].forEach((k) => form.elements[k].addEventListener('input', draw));
   draw();
+})();
+</script>
+<script>
+(function () {
+  // The troupe: class change, delete with the name freed, several rows at once,
+  // one save for all - and the page coming back where it was after a save.
+  const SCROLL_KEY = 'lexiw-dance-scroll';
+  try {
+    const y = sessionStorage.getItem(SCROLL_KEY);
+    if (y !== null) { sessionStorage.removeItem(SCROLL_KEY); window.scrollTo(0, Number(y) || 0); }
+  } catch (e) {}
+  const keepScroll = () => { try { sessionStorage.setItem(SCROLL_KEY, String(window.scrollY)); } catch (e) {} };
+  document.addEventListener('submit', keepScroll, true);
+
+  const rows = [...document.querySelectorAll('.ds-roster tr[data-dancer]')];
+  const formOf = (tr) => document.getElementById(tr.dataset.form);
+
+  // A class change of a dancer with a character asks first; yes sets change_class.
+  rows.forEach((tr) => {
+    const sel = tr.querySelector('select.ds-job');
+    if (!sel) return;
+    sel.addEventListener('change', () => {
+      const form = formOf(tr);
+      if (sel.dataset.hasPid !== '1' || sel.value === sel.dataset.job) { form.elements['change_class'].value = '0'; return; }
+      const name = tr.querySelector('input[name=name]').value;
+      if (confirm(`Zmienić klasę tancerza ${name}?\n\nJego obecna postać dostanie inny nick i wróci do botów, a przy następnym „Zbierz” ${name} dostanie postać nowej klasy (ten sam nick i wygląd). Działa, gdy postać jest poza grą od ok. 11 minut.\n\nZmiana wejdzie po kliknięciu „Zapisz”.`)) {
+        form.elements['change_class'].value = '1';
+      } else {
+        sel.value = sel.dataset.job;
+        form.elements['change_class'].value = '0';
+      }
+    });
+  });
+
+  window.dsDelete = function (button) {
+    const name = button.dataset.name;
+    if (!confirm(`Usunąć tancerza ${name}?`)) return false;
+    const form = document.getElementById(button.getAttribute('form'));
+    form.elements['release'].value = '0';
+    if (button.dataset.hasPid === '1') {
+      form.elements['release'].value = confirm(`Zwolnić nick „${name}”?\n\nTAK (OK): postać dostanie inny nick i wróci do botów, a „${name}” będzie wolny dla nowego tancerza (postać musi być poza grą od ok. 11 minut).\nNIE (Anuluj): postać zostaje w świecie pod nickiem „${name}”.`) ? '1' : '0';
+    }
+    return true;
+  };
+
+  // Several at once.
+  const boxes = rows.map((tr) => tr.querySelector('.ds-sel-box')).filter(Boolean);
+  const count = document.getElementById('ds-sel-count');
+  const all = document.getElementById('ds-sel-all');
+  const recount = () => {
+    const n = boxes.filter((b) => b.checked).length;
+    if (count) count.textContent = 'zaznaczeni: ' + n;
+    rows.forEach((tr) => tr.classList.toggle('ds-selected', !!tr.querySelector('.ds-sel-box:checked')));
+  };
+  boxes.forEach((b) => b.addEventListener('change', recount));
+  if (all) all.addEventListener('change', () => { boxes.forEach((b) => { b.checked = all.checked; }); recount(); });
+  const fill = document.getElementById('ds-bulk-fill');
+  if (fill) fill.addEventListener('click', () => {
+    const chosen = rows.filter((tr) => tr.querySelector('.ds-sel-box:checked'));
+    if (!chosen.length) { alert('Zaznacz tancerzy (pole „zaznacz” przy kolejności).'); return; }
+    const values = [...document.querySelectorAll('[data-bulk]')].filter((el) => el.value !== '');
+    if (!values.length) { alert('Wypełnij przynajmniej jedno pole „Wielu naraz”.'); return; }
+    chosen.forEach((tr) => {
+      const form = formOf(tr);
+      values.forEach((el) => {
+        const field = [...form.elements].find((e) => e.name === el.dataset.bulk);
+        if (field) { field.value = el.value; field.classList.add('ds-changed'); }
+      });
+    });
+    alert(`Wpisano w ${chosen.length} wierszach. Sprawdź i kliknij „Zapisz wszystkich”.`);
+  });
+
+  // One save for every row.
+  const saveAll = document.getElementById('ds-save-all');
+  if (saveAll) saveAll.addEventListener('click', () => {
+    if (!rows.length) return;
+    const post = document.createElement('form');
+    post.method = 'post';
+    // getAttribute: the rows' forms have a field named "action", which hides .action
+    post.setAttribute('action', formOf(rows[0]).getAttribute('action'));
+    const add = (name, value) => {
+      const i = document.createElement('input');
+      i.type = 'hidden'; i.name = name; i.value = value;
+      post.appendChild(i);
+    };
+    add('dance_csrf', formOf(rows[0]).elements['dance_csrf'].value);
+    add('action', 'save_all');
+    rows.forEach((tr) => {
+      const id = tr.dataset.dancer;
+      add('ids', id);
+      [...formOf(tr).elements].forEach((e) => {
+        if (!e.name || ['dance_csrf', 'id', 'action', 'release'].includes(e.name) || e.disabled) return;
+        add(`r${id}.${e.name}`, e.value);
+      });
+    });
+    document.body.appendChild(post);
+    keepScroll();
+    post.submit();
+  });
 })();
 </script>
 {% endblock %}
