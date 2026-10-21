@@ -1,0 +1,65 @@
+{% extends 'base.html' %}{% block title %}Decyzje botów · {{ panel_brand }}{% endblock %}{% block content %}
+<style>{{ explain_css|safe }}
+table.dc-table{width:100%;border-collapse:collapse}
+table.dc-table > tbody > tr > td{font-size:13px;vertical-align:top;padding:6px 8px;border-top:1px solid color-mix(in srgb,var(--edge) 55%,transparent)}
+table.dc-table > tbody > tr.dc-unusual > td:first-child{box-shadow:inset 3px 0 0 #ef4444}
+.dc-filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end}
+.dc-filters label{display:flex;flex-direction:column;gap:3px;font-size:13px}
+</style>
+<p class="eyebrow">GRACZE I BOTY</p><h1>Decyzje botów</h1>
+<p class="muted">Co boty zakładały i co wystawiały w sklepach, i dlaczego — każdy wiersz zapisał rdzeń gry w chwili decyzji (log.playerbot_equip, log.playerbot_listing). Domyślnie nietypowe decyzje z ostatniej doby; „?” rozwija pełne wyjaśnienie. {{ state_text }}</p>
+
+<section class="panel">
+<form method="get" class="dc-filters">
+  <label>Okres<select name="hours">{% for h in hour_choices %}<option value="{{ h }}" {{ 'selected' if h == hours }}>ostatnie {{ h }} h</option>{% endfor %}</select></label>
+  <label>Rodzaj<select name="kind">{% for key, label in kind_choices %}<option value="{{ key }}" {{ 'selected' if key == kind }}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Oznaczenie<select name="flag">{% for key, label in flag_choices %}<option value="{{ key }}" {{ 'selected' if key == flag }}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Bot (nick)<input type="text" name="bot" value="{{ bot_text }}" maxlength="32"></label>
+  <button>Pokaż</button>
+</form>
+</section>
+
+<section class="panel table-wrap" data-table-tools="off">
+{% if missing %}<p class="muted">W bazie nie ma jeszcze tabel wyjaśnień (log.playerbot_equip, log.playerbot_listing).</p>
+{% elif not rows %}<p class="muted">Brak decyzji pasujących do filtrów.</p>
+{% else %}
+<p class="muted">Pokazane: {{ rows|length }}{% if capped %} — limit, zawęź okres albo filtr{% endif %}.
+  <button type="button" class="m2ex-btn" onclick="dcCopyAiAll()">🤖 Kopiuj wszystkie dla AI</button></p>
+<table class="dc-table"><tbody>
+<tr><th>Czas</th><th>Bot</th><th>Rodzaj</th><th>Co</th><th>Oznaczenia</th><th></th></tr>
+{% for r in rows %}
+<tr class="{{ 'dc-unusual' if r.unusual or r.why.anomalies }}">
+  <td class="muted" style="white-space:nowrap">{{ r.time }}</td>
+  <td><a href="{{ url_for('player', pid=r.pid) }}">{{ r.name }}</a></td>
+  <td>{{ r.kind_label }}</td>
+  <td>{{ r.what }}</td>
+  <td>{% for f in r.why.flags %}<span class="m2ex-flag{{ ' unusual' if f.unusual }}">{{ f.label }}</span>{% endfor %}{% for a in r.why.anomalies %}<span class="m2ex-flag anomaly">⚑ {{ a.label }}</span>{% endfor %}</td>
+  <td><button type="button" class="m2ex-q" title="Dlaczego?" onclick="dcToggle({{ loop.index0 }})">?</button></td>
+</tr>
+<tr id="dcWhy{{ loop.index0 }}" class="dc-why" style="display:none"><td colspan="6"></td></tr>
+{% endfor %}
+</tbody></table>
+{% endif %}
+</section>
+<div id="mapToast" style="display:none;position:fixed;bottom:25px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #38bdf8;color:#f8fafc;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:999999"></div>
+<script>
+var I18N = {{ messages|tojson }};
+var DC_ROWS = {{ rows|tojson }};
+var DC_BOTS = {{ bots|tojson }};
+{{ explain_js|safe }}
+function dcToggle(i) {
+  var row = document.getElementById('dcWhy' + i), r = DC_ROWS[i];
+  if (!row || !r) return;
+  if (row.style.display !== 'none') { row.style.display = 'none'; return; }
+  row.cells[0].innerHTML = '<div class="m2ex-box">' + exHtml(r.why, true) +
+      '<div style="text-align:right;margin-top:4px"><button type="button" class="m2ex-btn" onclick="dcCopy(' + i + ')">📋 ' +
+      exEsc(I18N.ex_copy) + '</button><button type="button" class="m2ex-btn" onclick="dcCopyAi(' + i + ')">🤖 ' +
+      exEsc(I18N.ex_copy_ai) + '</button></div></div>';
+  row.style.display = '';
+}
+function dcCopy(i) { var r = DC_ROWS[i]; if (r) exCopy(exText(r.why, r.name, r.pid, r.item)); }
+function dcAiItem(r) { return {ex: r.why, bot: DC_BOTS[String(r.pid)] || {pid: r.pid, name: r.name}, item: r.item}; }
+function dcCopyAi(i) { var r = DC_ROWS[i]; if (r) exCopyAi([dcAiItem(r)]); }
+function dcCopyAiAll() { exCopyAi(DC_ROWS.map(dcAiItem)); }
+</script>
+{% endblock %}

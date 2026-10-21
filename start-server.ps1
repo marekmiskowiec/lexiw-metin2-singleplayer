@@ -424,7 +424,6 @@ function Get-DotEnvFromContainers {
         $service = Get-ObjectPropertyValue $container.Config.Labels 'com.docker.compose.service'
         $bindKey = ''
         if ($service -eq 'game') { $bindKey = 'M2_HOST_BIND_ADDRESS' }
-        elseif ($service -eq 'panel') { $bindKey = 'M2_PANEL_BIND_ADDRESS' }
         if (-not $bindKey -or $values.ContainsKey($bindKey) -or $null -eq $container.HostConfig.PortBindings) { continue }
         foreach ($property in $container.HostConfig.PortBindings.PSObject.Properties) {
             foreach ($binding in @($property.Value)) {
@@ -986,9 +985,9 @@ function Assert-NoForeignPortOwners {
     $statePath = Join-Path $PSScriptRoot '.m2install.json'
     $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
     $project = [string]$state.projectName
-    $panelPort = Get-DotEnvValue -Content $content -Name 'M2_PANEL_PUBLIC_PORT'
+    $panelPort = Get-DotEnvValue -Content $content -Name 'M2_SEBAN_PANEL_PORT'
     $authPort = Get-DotEnvValue -Content $content -Name 'M2_AUTH_PORT'
-    if ($panelPort -notmatch '^\d+$') { $panelPort = '7788' }
+    if ($panelPort -notmatch '^\d+$') { $panelPort = '7790' }
     if ($authPort -notmatch '^\d+$') { $authPort = '11000' }
     Assert-NoForeignPortOwner -Port ([int]$panelPort) -Project $project
     Assert-NoForeignPortOwner -Port ([int]$authPort) -Project $project
@@ -1165,14 +1164,10 @@ if ((Test-Path -LiteralPath $overlaySource -PathType Container) -and
     # speed_boost.quest is not here on purpose: prepare-context rewrites a line
     # in it rather than copying it, and this script renders that file itself
     # further down.
+    # Lexiw: the classic panel is gone (LEXIW_ONE_PANEL_V1); only the Seban
+    # panel's version is staged.
     $stagedPairs = @(
-        @{ From = 'files\admin_panel.py';       To = 'linux-port\docker\panel\app\admin_panel.py' },
-        @{ From = 'VERSION';                    To = 'linux-port\docker\panel\app\VERSION' },
-        @{ From = 'VERSION';                    To = 'linux-port\docker\seban-panel\VERSION' },
-        @{ From = 'CHANGELOG.md';               To = 'linux-port\docker\panel\app\CHANGELOG.md' },
-        @{ From = 'files\items.json';           To = 'linux-port\docker\panel\app\items.json' },
-        @{ From = 'files\favicon.png';          To = 'linux-port\docker\panel\app\favicon.png' },
-        @{ From = 'files\web_admin_schema.sql'; To = 'linux-port\docker\panel\schema\web_admin_schema.sql' }
+        @{ From = 'VERSION';                    To = 'linux-port\docker\seban-panel\VERSION' }
     )
     # The chest data from serverfiles\ on r40250 only - see
     # Sync-M2PlayerbotOverlay: on mt2009 the package ships docker\game\*.txt
@@ -1208,29 +1203,6 @@ if ((Test-Path -LiteralPath $overlaySource -PathType Container) -and
         if ($toHash -ne (Get-FileHash -LiteralPath $from -Algorithm SHA256).Hash) {
             Copy-Item -LiteralPath $from -Destination $to -Force
             $syncedFiles++
-        }
-    }
-
-    # /static is a directory, and prepare-context copies it whole so that adding
-    # an icon set is only ever a matter of putting one there. Same rule here.
-    $staticSource = Join-Path $PSScriptRoot 'files\static'
-    $staticStaged = Join-Path $PSScriptRoot 'linux-port\docker\panel\app\static'
-    if (Test-Path -LiteralPath $staticSource -PathType Container) {
-        foreach ($asset in Get-ChildItem -LiteralPath $staticSource -Recurse -File) {
-            $relative = $asset.FullName.Substring($staticSource.Length).TrimStart('\')
-            $target = Join-Path $staticStaged $relative
-            $targetParent = Split-Path -Parent $target
-            if (-not (Test-Path -LiteralPath $targetParent -PathType Container)) {
-                New-Item -ItemType Directory -Path $targetParent -Force | Out-Null
-            }
-            $targetHash = $null
-            if (Test-Path -LiteralPath $target -PathType Leaf) {
-                $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
-            }
-            if ($targetHash -ne (Get-FileHash -LiteralPath $asset.FullName -Algorithm SHA256).Hash) {
-                Copy-Item -LiteralPath $asset.FullName -Destination $target -Force
-                $syncedFiles++
-            }
         }
     }
 
@@ -1449,7 +1421,7 @@ try {
         }
     }
     $wantedPorts = @()
-    foreach ($pair in @(@('M2_PANEL_PUBLIC_PORT', 7788), @('M2_SEBAN_PANEL_PORT', 7790),
+    foreach ($pair in @(@('M2_SEBAN_PANEL_PORT', 7790),
                         @('M2_ITEMSHOP_PUBLIC_PORT', 7791), @('M2_AUTH_PORT', 11000),
                         @('M2_DB_PUBLISH_PORT', 3306))) {
         $raw = [string]$portValues[$pair[0]]
@@ -1532,7 +1504,7 @@ try {
         try {
             $ErrorActionPreference = 'Continue'
             Write-Host '--- ostatnie linie logow kontenerow ---' -ForegroundColor DarkGray
-            foreach ($svc in @('playerbot-migrate', 'mariadb', 'game', 'panel')) {
+            foreach ($svc in @('playerbot-migrate', 'mariadb', 'game', 'seban-panel')) {
                 Write-Host "[$svc]" -ForegroundColor DarkGray
                 & docker compose logs --no-color --no-log-prefix --tail 40 $svc 2>&1 |
                     ForEach-Object { Write-Host "  $_" }

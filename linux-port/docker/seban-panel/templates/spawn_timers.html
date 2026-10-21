@@ -1,0 +1,99 @@
+{% extends 'base.html' %}{% block title %}Timery spawnów · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('spawn-timers.css') }}">
+<p class="eyebrow">ŚWIAT</p><h1>Timery spawnów</h1>
+<p class="muted">Gdzie teraz stoją Metiny, bossowie, minibossy, rudy i kwiaty — prosto z serwera, odświeżane co 15 sekund. Filtr rodzajów jak na mapie spawnów: zaznacz dowolne, „tylko” pokazuje jeden rodzaj, „Wszystko” / „Nic” — wszystkie albo żaden (wybór zapamiętuje się w przeglądarce). Przy żywych są współrzędne jak w grze i komenda <code>/warp</code> do skopiowania (teleport GM, także na inną mapę). Przy pustych odliczanie do następnego sprawdzenia: wtedy punkt na pewno postawi nowego (czas nie liczy się od zbicia — <a href="{{ url_for('wiki_guide', slug='bossowie-i-metiny') }}#jak-liczy-sie-respawn">jak to działa</a>).</p>
+
+<section class="panel st-filters">
+  <div class="st-kinds"><button type="button" class="st-all" data-all="1">Wszystko</button><button type="button" class="st-all" data-all="0">Nic</button>
+    {% for key, label in kinds %}{% if counts[key] %}<span class="st-kind-pair"><label class="st-kind k-{{ key }}"><input type="checkbox" checked value="{{ key }}"><i></i>{{ label }} ({{ counts[key] }})</label><button type="button" class="st-only" data-kind="{{ key }}" title="Pokaż tylko ten rodzaj">tylko</button></span>{% endif %}{% endfor %}</div>
+  <label>Mapa <select id="st-map"><option value="">Wszystkie</option>{% for number, name in maps %}<option value="{{ number }}">{{ name }}</option>{% endfor %}</select></label>
+  <label>Stan <select id="st-state"><option value="">Wszystkie</option><option value="alive">Tylko żywe</option><option value="empty">Tylko puste (czekają)</option></select></label>
+  <label>Szukaj <input id="st-q" placeholder="np. Metin Smutku, Żyła Złota"></label>
+  <span class="muted" id="st-status"></span>
+</section>
+
+<section class="panel table-wrap" data-table-tools="off">
+  <table class="st-table">
+    <thead><tr><th>Mapa</th><th>Kan.</th><th>Co</th><th>Stan</th><th>Gdzie (X, Y jak w grze)</th><th>Następne sprawdzenie</th></tr></thead>
+    <tbody id="st-body"></tbody>
+  </table>
+</section>
+<script>
+(function () {
+  let data = {{ data|tojson }};
+  const labels = {{ dict(kinds)|tojson }};
+  const api = "{{ url_for('api_spawn_timers') }}";
+  const body = document.getElementById('st-body');
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const kinds = [...document.querySelectorAll('.st-kind input')];
+  const map = document.getElementById('st-map'), st = document.getElementById('st-state'), q = document.getElementById('st-q');
+  let skew = data.now - Date.now() / 1000;  // the server's clock vs ours
+
+  function left(at) {
+    if (!at) return '—';
+    const s = Math.round(at - (Date.now() / 1000 + skew));
+    if (s <= 0) return '<b>teraz</b>';
+    const m = Math.floor(s / 60), r = s % 60;
+    return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m}:${String(r).padStart(2, '0')}`;
+  }
+  function copyBtn(cmd) {
+    return cmd ? `<button type="button" class="st-copy" data-cmd="${esc(cmd)}" title="Kopiuj komendę">${esc(cmd)}</button>` : '';
+  }
+  function render() {
+    const on = new Set(kinds.filter((k) => k.checked).map((k) => k.value));
+    const term = q.value.trim().toLowerCase();
+    const rows = data.points.filter((p) => on.has(p.kind) && (!map.value || String(p.map) === map.value) &&
+      (!st.value || (st.value === 'alive') === (p.alive.length > 0)) &&
+      (!term || p.names.join(' ').toLowerCase().includes(term) || p.map_name.toLowerCase().includes(term)));
+    body.innerHTML = rows.map((p) => {
+      const alive = p.alive.length > 0;
+      const where = alive ? p.alive.map((a) => `<div><b>${a.x}, ${a.y}</b>${p.alive.length > 1 || a.name !== p.name ? ` <small>${esc(a.name)}</small>` : ''} ${copyBtn(a.warp)}</div>`).join('')
+        : `<div class="muted">obszar ${esc(p.area)}</div><div>${copyBtn(p.center_warp)} <small class="muted">środek</small></div>`;
+      return `<tr class="${alive ? 'st-alive' : 'st-empty'}"><td>${esc(p.map_name)}</td><td class="st-num">${p.channel}</td>
+        <td><span class="st-dot k-${p.kind}"></span><b>${esc(p.name)}</b> <small class="muted">poz. ${p.level} · ${esc(labels[p.kind])}</small>
+          ${p.names.length > 1 ? `<br><small class="muted">losuje: ${esc(p.names.slice(0, 6).join(', '))}${p.names.length > 6 ? '…' : ''}</small>` : ''}</td>
+        <td>${alive ? '<span class="st-badge on">żyje</span>' : '<span class="st-badge">pusty</span>'}</td>
+        <td>${where}</td>
+        <td class="st-num st-left" data-at="${p.next_at || ''}">${alive ? '<span class="muted">żyje — zegar tyka, ale nic nie zmieni</span>' : left(p.next_at)}</td></tr>`;
+    }).join('') || '<tr><td colspan="6" class="muted">Nic nie pasuje do filtrów.</td></tr>';
+    const stamps = Object.values(data.written || {});
+    document.getElementById('st-status').textContent = data.fresh
+      ? `Pokazane: ${rows.length} · stan z serwera sprzed ${Math.max(0, Math.round(Date.now() / 1000 + skew - Math.min(...stamps)))} s`
+      : (stamps.length ? 'Serwer od dawna nie podał stanu — czy gra działa?' : 'Brak danych z serwera — gra nie działa albo nie ma jeszcze nowego silnika.');
+  }
+  function tick() {
+    body.querySelectorAll('tr.st-empty .st-left').forEach((td) => { td.innerHTML = left(Number(td.dataset.at) || null); });
+  }
+  body.addEventListener('click', (e) => {
+    const b = e.target.closest('.st-copy');
+    if (!b) return;
+    navigator.clipboard && navigator.clipboard.writeText(b.dataset.cmd).then(() => {
+      b.classList.add('done'); setTimeout(() => b.classList.remove('done'), 1200);
+    });
+  });
+  // Kinds filter as on the spawn map: any set, "tylko" one alone, Wszystko / Nic;
+  // the choice is remembered in this browser.
+  const KEY = 'lexiw-timers-kinds';
+  function setKinds(on, save = true) {
+    kinds.forEach((k) => { k.checked = on.has(k.value); k.closest('label').classList.toggle('off', !k.checked); });
+    if (save) try { localStorage.setItem(KEY, JSON.stringify([...on])); } catch (e) {}
+    render();
+  }
+  const saved = () => new Set(kinds.filter((k) => k.checked).map((k) => k.value));
+  [map, st, q].forEach((el) => el.addEventListener('input', render));
+  kinds.forEach((k) => k.addEventListener('change', () => setKinds(saved())));
+  document.querySelectorAll('.st-only').forEach((b) => b.addEventListener('click', () => setKinds(new Set([b.dataset.kind]))));
+  document.querySelectorAll('.st-all').forEach((b) => b.addEventListener('click', () =>
+    setKinds(new Set(b.dataset.all === '1' ? kinds.map((k) => k.value) : []))));
+  try {
+    const stored = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (Array.isArray(stored)) setKinds(new Set(stored), false);
+  } catch (e) {}
+  setInterval(tick, 1000);
+  setInterval(() => fetch(api, {cache: 'no-store'}).then((r) => r.json()).then((d) => {
+    data = d; skew = d.now - Date.now() / 1000; render();
+  }).catch(() => {}), 15000);
+  render();
+})();
+</script>
+{% endblock %}

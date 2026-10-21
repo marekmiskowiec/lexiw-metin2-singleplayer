@@ -468,7 +468,7 @@ def install_dance_show(m):
                 scene["dancers"] = 0
         maps = sorted(((i, n) for i, n in m.MAP_NAMES.items()), key=lambda x: x[1])
         return render_template("dance_show.html", roster=roster, jobs=JOBS, formations=FORMATIONS, gestures=GESTURES, effects=EFFECTS, auras=AURAS, overhead=OVERHEAD_EFFECTS, hair_dyes=HAIR_DYES,
-                               owners=owners(), look_slots=LOOK_SLOTS, settings=read_settings(), maps=maps,
+                               owners=owners(), look_slots=LOOK_SLOTS, dance_settings=read_settings(), maps=maps,
                                show=show, status=status, status_age=age, last_beat=last_beat, scenes=scenes,
                                phases=PHASES, formation_names={k: lbl for k, lbl, _w in FORMATIONS},
                                manual=[{"x": int(r["pos_x"] or 0), "y": int(r["pos_y"] or 0)} for r in roster],

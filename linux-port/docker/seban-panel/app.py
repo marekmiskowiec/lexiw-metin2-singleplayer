@@ -4334,7 +4334,6 @@ M2_CLASSIC = os.environ.get("M2_EDITION", "plus").strip().lower() == "classic"
 
 @app.context_processor
 def globals_for_templates():
-    tieru_url = os.environ.get("TIERU_PANEL_URL", "http://127.0.0.1:7788")
     item_icon = item_icon_url
     current_settings = settings()
     ui_language = current_settings.get("ui_language", "pl")
@@ -4372,7 +4371,7 @@ def globals_for_templates():
         if not rank:
             return escape(label)
         return Markup('<span class="top-level-badge" title="Top 10 poziomu · #%d">%s</span>') % (rank, escape(label))
-    return {"tieru_url": tieru_url, "discord_url": MT2009_PLUS_DISCORD_URL, "website_url": MT2009_PLUS_WEBSITE_URL, "panel_brand": brand, "settings": current_settings, "map_name": map_name, "item_icon": item_icon, "job_name": job_name, "class_profile": class_profile, "class_portrait": class_portrait, "empire_info": empire_info, "empire_flag": empire_flag, "static_asset_url": static_asset_url, "level_badge": level_badge, "top_level_rank": lambda pid: top_level_rank_map().get(int(pid or 0)), "feature_enabled": lambda name: panel_feature_enabled(name, current_settings), "panel_features": panel_feature_states(current_settings), "class_label": class_label, "ui_language": "pl", "i18n_payload": None, "ds_kind_count": 7 if ENGINE_MT2009 else 6, "m2_classic": M2_CLASSIC,
+    return {"discord_url": MT2009_PLUS_DISCORD_URL, "website_url": MT2009_PLUS_WEBSITE_URL, "panel_brand": brand, "settings": current_settings, "map_name": map_name, "item_icon": item_icon, "job_name": job_name, "class_profile": class_profile, "class_portrait": class_portrait, "empire_info": empire_info, "empire_flag": empire_flag, "static_asset_url": static_asset_url, "level_badge": level_badge, "top_level_rank": lambda pid: top_level_rank_map().get(int(pid or 0)), "feature_enabled": lambda name: panel_feature_enabled(name, current_settings), "panel_features": panel_feature_states(current_settings), "class_label": class_label, "ui_language": "pl", "i18n_payload": None, "ds_kind_count": 7 if ENGINE_MT2009 else 6, "m2_classic": M2_CLASSIC,
             "panel_tagline": PANEL_BRAND_TAGLINE, "repo_url": LEXIW_REPOSITORY_URL, "panel_attribution": PANEL_ATTRIBUTION}
 
 
@@ -6375,6 +6374,15 @@ def full_plus9_equipment_ids(player_ids):
             slots.setdefault(int(item["owner_id"]), set()).add(int(item["pos"]))
     required = set(PLUS9_EQUIPMENT_SLOTS)
     return {pid for pid, positions in slots.items() if positions == required}
+
+
+@app.route("/players/<int:pid>")
+@login_required
+def player_from_game(pid):
+    """The in-game GM "Podglad" opens M2_GM_PANEL_URL + players/<pid> - the
+    classic panel's address of a character card, kept so the game needs no
+    change now that this panel is the only one (LEXIW_ONE_PANEL_V1)."""
+    return redirect(url_for("player", pid=pid))
 
 
 @app.route("/player/<int:pid>")
@@ -11139,6 +11147,8 @@ from hall_of_fame import install_hall_of_fame  # noqa: E402
 install_hall_of_fame(sys.modules[__name__])
 from dance_show import install_dance_show  # noqa: E402
 install_dance_show(sys.modules[__name__])
+from spawn_timers import install_spawn_timers  # noqa: E402
+install_spawn_timers(sys.modules[__name__])
 
 
 if __name__ == "__main__":
@@ -11168,3 +11178,9 @@ def _warm_slow_pages():
 
 
 threading.Thread(target=_warm_slow_pages, name="warm-slow-pages", daemon=True).start()
+from panel_docs import install_panel_docs  # noqa: E402
+install_panel_docs(sys.modules[__name__])
+from world_modules import install_world_modules  # noqa: E402
+install_world_modules(sys.modules[__name__])
+from decisions_page import install_decisions_page  # noqa: E402
+install_decisions_page(sys.modules[__name__])

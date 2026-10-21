@@ -40,7 +40,7 @@
 {%- for it in g['items'] %}<a class="sn-link{% if it.ep == nav_active and (not it.get('args') or it.args == request.view_args) %} is-active{% endif %}" href="{{ url_for(it.ep, **it.get('args', {})) }}" title="{{ it.desc }}"{% if it.ep == nav_ep and (not it.get('args') or it.args == request.view_args) %} aria-current="page"{% endif %}>{{ it.label }}</a>{% endfor -%}
 </div></details>
 {%- endfor %}
-<details class="sn-group sn-group--ext" data-group="linki" open><summary><span class="sn-ico" aria-hidden="true">↗</span><span class="sn-label">Linki zewnętrzne</span><span class="sn-chev" aria-hidden="true"></span></summary><div class="sn-items"><a class="sn-link" href="{{ tieru_url }}" target="_blank" rel="noopener">Panel klasyczny ↗</a><a class="sn-link" href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">Repozytorium na GitHubie ↗</a></div></details>
+<details class="sn-group sn-group--ext" data-group="linki" open><summary><span class="sn-ico" aria-hidden="true">↗</span><span class="sn-label">Linki zewnętrzne</span><span class="sn-chev" aria-hidden="true"></span></summary><div class="sn-items"><a class="sn-link" href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">Repozytorium na GitHubie ↗</a></div></details>
 </div>
 <p class="sn-credit">{{ panel_attribution }}.</p>
 <form class="nav-logout" action="{{ url_for('logout') }}" method="post"><button class="quiet">Wyloguj</button></form></aside>

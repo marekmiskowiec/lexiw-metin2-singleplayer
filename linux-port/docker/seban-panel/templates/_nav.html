@@ -20,6 +20,7 @@
   {'id': 'swiat', 'icon': '🗺', 'label': 'Świat', 'items': [
     {'ep': 'maps', 'label': 'Aktywność map', 'desc': 'natężenie na mapach w czasie, mapa cieplna', 'kw': 'mapy heatmapa natezenie mapa cieplna'},
     {'ep': 'respawns', 'index': 1, 'label': 'Respawny', 'desc': 'tempo i liczebność potworów, metiny, bossy', 'kw': 'spawn potwory metiny bossy respawn'},
+    {'ep': 'spawn_timers', 'label': 'Timery spawnów', 'desc': 'gdzie teraz stoją Metiny, bossowie, rudy i kwiaty, za ile pojawią się nowe, komenda /warp', 'kw': 'timer timery metin boss ruda zyla kwiat gdzie stoi warp teleport koordynaty respawn'},
     {'ep': 'world_feed', 'label': 'Wiadomości ze świata', 'desc': 'oś czasu zdarzeń w grze', 'kw': 'feed news ogloszenia wydarzenia'},
     {'ep': 'live_chat', 'label': 'Czat na żywo', 'desc': 'protokół wiadomości z gry', 'kw': 'chat rozmowy wiadomosci'},
   ]},
@@ -33,6 +34,7 @@
     {'ep': 'bot_progress', 'label': 'Rozwój botów', 'desc': 'poziomy botów, tempo awansu, kto stoi w miejscu', 'kw': 'rozwoj poziomy tempo awans exp levelowanie ile godzin ściana'},
     {'ep': 'bot_deaths', 'label': 'Śmierci botów', 'desc': 'co i gdzie zabija boty, na jakich poziomach', 'kw': 'smierci zgony ginie zabija potwory niebezpieczne'},
     {'ep': 'bot_traps', 'label': 'Pętle śmierci', 'desc': 'boty, które giną w kółko w tym samym miejscu, i ich tempo awansu', 'kw': 'petla smierci utknal ginie w kolko loch malp awans tempo'},
+    {'ep': 'decisions_page', 'label': 'Decyzje botów', 'desc': 'co boty zakładały i wystawiały w sklepach i dlaczego, nietypowe decyzje i anomalie', 'kw': 'decyzje wyjasnienia dlaczego zalozyl wystawil sklep cena anomalia nietypowe ekwipunek'},
     {'ep': 'bot_health', 'label': 'Zdrowie botów', 'desc': 'wyniki osobowości, czas botów, powody podróży, porównanie przed i po zmianie', 'kw': 'zdrowie botow osobowosc persona wyniki podroz czas migawka porownanie przed po'},
     {'ep': 'bot_progression', 'index': 1, 'label': 'Progresja botów', 'desc': 'kto stoi i dlaczego, checklista, postoje w wioskach', 'kw': 'postoj checklista wedkowanie przejscia mapy grinder'},
     {'ep': 'bot_names', 'index': 1, 'label': 'Nazwy botów', 'desc': 'kolejka nicków, blokady, priorytety', 'kw': 'nick nazwy kolejka'},
@@ -61,10 +63,12 @@
   ]},
   {'id': 'ustawienia', 'icon': '⚙', 'label': 'Ustawienia', 'items': [
     {'ep': 'manage', 'index': 1, 'label': 'Gra i serwer', 'desc': 'raty, restart, zachowanie botów, aktualizator', 'kw': 'zarzadzanie rates mnozniki restart suwaki ustawienia'},
+    {'ep': 'world_modules', 'index': 1, 'label': 'Moduły świata', 'desc': 'Arezzo, Seon-Hae, alchemia i szarfy, życie potworów, Dzieci Kwiaty, Wielkanoc', 'kw': 'arezzo seonhae seon-hae bonus 6 7 alchemia smocze kamienie odlamki cor szarfy zycie potworow hp wytrzymalosc dzieci kwiaty flower wielkanoc easter zajac'},
     {'ep': 'manage_panel', 'index': 1, 'label': 'Panel webowy', 'desc': 'wygląd, motyw, odznaki, ogłoszenia', 'kw': 'motyw kolorystyka wyglad nazwa panelu'},
     {'ep': 'world_reset', 'index': 1, 'label': 'Reset świata', 'desc': 'reset botów albo całego świata', 'kw': 'reset wipe'},
   ]},
   {'id': 'narzedzia', 'icon': '🛠', 'label': 'Narzędzia', 'items': [
+    {'ep': 'panel_docs', 'label': 'Instrukcja panelu', 'desc': 'co jest gdzie, co można ustawić, czego brakuje, stary panel a nowy', 'kw': 'instrukcja dokumentacja pomoc help gdzie co ustawic stary panel brakuje opis'},
     {'ep': 'character_creator', 'label': 'Kreator postaci', 'desc': 'nowa postać na wybranym koncie', 'kw': 'stworz postac'},
     {'ep': 'gm_commands', 'label': 'Komendy GM', 'desc': 'ściąga komend GM', 'kw': 'gm komendy'},
     {'ep': 'system_cores', 'label': 'Rdzenie gry', 'desc': 'CPU, pamięć i boty każdego rdzenia, wiek statusu', 'kw': 'rdzenie rdzen core cpu obciazenie boty kanal game1 limit'},

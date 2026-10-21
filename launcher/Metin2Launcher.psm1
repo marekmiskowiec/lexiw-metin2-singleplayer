@@ -1634,27 +1634,14 @@ function Sync-M2PlayerbotOverlay {
         Write-Warning "Brak $seedSource - playerbots_seed.sql nie zostal odswiezony."
     }
 
-    # The panel's build context, the same way. start-server.ps1 stages these
-    # too, but below its -IdentityOnly return - and this function is what the
-    # launcher's own build path runs, so a player who only ever clicked GRAJ or
-    # AKTUALIZUJ had a panel built from whatever VERSION and CHANGELOG the
-    # installer left there: ten releases later the classic panel still said
-    # 1.29.0 and offered "Zobacz, co przynosi" for a version it was running.
-    # Rebuilding the image could not help, because the file it bakes in was
-    # the stale one.
-    foreach ($pair in @(
-            @{ From = 'VERSION';                    To = 'linux-port\docker\panel\app\VERSION' },
-            @{ From = 'CHANGELOG.md';               To = 'linux-port\docker\panel\app\CHANGELOG.md' },
-            @{ From = 'files\admin_panel.py';       To = 'linux-port\docker\panel\app\admin_panel.py' },
-            @{ From = 'files\items.json';           To = 'linux-port\docker\panel\app\items.json' },
-            @{ From = 'files\favicon.png';          To = 'linux-port\docker\panel\app\favicon.png' },
-            @{ From = 'files\web_admin_schema.sql'; To = 'linux-port\docker\panel\schema\web_admin_schema.sql' }) +
-            # The two quests from files\ on r40250 only. The mt2009 package ships
-            # its own docker\game\quest\web_admin.quest - the live rates, respawn
-            # speed and count, difficulty and Auto Lowy commands - and this put
-            # r40250's over it at every update, so none of those ran on an
-            # install made by the launcher (27 September).
-            $(if ((Get-M2ServerEngine -ServerRoot $ServerRoot) -eq 'r40250') { @(
+    # Lexiw: the classic panel's build context is gone with the panel
+    # (LEXIW_ONE_PANEL_V1); what is left is the r40250 quests below.
+    # The two quests from files\ on r40250 only. The mt2009 package ships
+    # its own docker\game\quest\web_admin.quest - the live rates, respawn
+    # speed and count, difficulty and Auto Lowy commands - and this put
+    # r40250's over it at every update, so none of those ran on an
+    # install made by the launcher (27 September).
+    foreach ($pair in $(if ((Get-M2ServerEngine -ServerRoot $ServerRoot) -eq 'r40250') { @(
             @{ From = 'files\web_admin.quest';      To = 'linux-port\docker\game\quest\web_admin.quest' },
             @{ From = 'files\high_risk.quest';      To = 'linux-port\docker\game\quest\high_risk.quest' }) } else { @() })) {
         $panelSource = Join-Path $ServerRoot $pair.From
@@ -1671,26 +1658,6 @@ function Sync-M2PlayerbotOverlay {
         if ($panelStagedHash -ne (Get-FileHash -LiteralPath $panelSource -Algorithm SHA256).Hash) {
             Copy-Item -LiteralPath $panelSource -Destination $panelStaged -Force
             $copied++
-        }
-    }
-    $staticSource = Join-Path $ServerRoot 'files\static'
-    $staticStaged = Join-Path $ServerRoot 'linux-port\docker\panel\app\static'
-    if (Test-Path -LiteralPath $staticSource -PathType Container) {
-        foreach ($asset in Get-ChildItem -LiteralPath $staticSource -Recurse -File) {
-            $relative = $asset.FullName.Substring($staticSource.Length).TrimStart('\')
-            $assetStaged = Join-Path $staticStaged $relative
-            $assetParent = Split-Path -Parent $assetStaged
-            if (-not (Test-Path -LiteralPath $assetParent -PathType Container)) {
-                New-Item -ItemType Directory -Path $assetParent -Force | Out-Null
-            }
-            $assetHash = $null
-            if (Test-Path -LiteralPath $assetStaged -PathType Leaf) {
-                $assetHash = (Get-FileHash -LiteralPath $assetStaged -Algorithm SHA256).Hash
-            }
-            if ($assetHash -ne (Get-FileHash -LiteralPath $asset.FullName -Algorithm SHA256).Hash) {
-                Copy-Item -LiteralPath $asset.FullName -Destination $assetStaged -Force
-                $copied++
-            }
         }
     }
 

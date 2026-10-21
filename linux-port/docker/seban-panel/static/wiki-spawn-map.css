@@ -2,7 +2,7 @@
 .wsm-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:6px 0 10px}
 .wsm-key{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px}
 .wsm-key i{width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid #0008}
-.wsm-map{position:relative;width:min(100%,640px);aspect-ratio:1;background:#1a1d22 center/100% 100% no-repeat;border:1px solid var(--edge);border-radius:8px;overflow:visible}
+.wsm-map{position:relative;width:min(100%,500px,68vh);aspect-ratio:1;background:#1a1d22 center/100% 100% no-repeat;border:1px solid var(--edge);border-radius:8px;overflow:visible}
 .wsm-pt{position:absolute;transform:translate(-50%,-50%);border-radius:50%;cursor:help}
 .wsm-pt[hidden]{display:none}
 .wsm-mob{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.55)}
@@ -42,3 +42,4 @@
 .wsm-only,.wsm-all{font-size:11px;padding:2px 7px;margin-left:-10px;border:1px solid var(--edge);border-radius:999px;background:none;color:var(--muted);cursor:pointer}
 .wsm-all{margin-left:0;font-size:12px;padding:4px 10px}
 .wsm-only:hover,.wsm-all:hover{color:var(--gold,#e8b93f);border-color:var(--gold,#e8b93f)}
+.wsm-areas{position:absolute;inset:0;overflow:hidden;border-radius:8px;pointer-events:none}

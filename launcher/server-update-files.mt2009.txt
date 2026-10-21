@@ -8,24 +8,14 @@
 # docker-compose.deploy.yml as docker-compose.yml.
 
 # ---- engine-agnostic, from the r40250 tree (one copy, shared) ---------------
-files/admin_panel.py
-files/items.json
-files/favicon.png
-files/web_admin_schema.sql
 files/web_admin.quest
 files/high_risk.quest
 files/speed_boost.quest
-files/static/*
 linux-port/docker/seban-panel/*
 linux-port/docker/itemshop/*
-linux-port/docker/panel/app/admin_panel.py
 # The panel's Dockerfile COPYs schema/ too, and nothing on a Linux install
 # stages it - a build from the package alone stopped at "/schema: not found"
 # (DUDU's VPS, 18 September). update.sh stages the rest (stage_panel_context).
-linux-port/docker/panel/schema/web_admin_schema.sql
-linux-port/docker/panel/bin/*
-linux-port/docker/panel/Dockerfile
-linux-port/docker/panel/.dockerignore
 linux-port/docker/updater/Dockerfile
 linux-port/docker/updater/bin/*
 # The playerbot sources: the overlay is the source of truth, the staged copy

@@ -203,9 +203,9 @@ services:
       M2_TEST_SERVER: "${M2_TEST_SERVER:-0}"
       M2_MALL_URL: "${M2_MALL_URL:-${M2_PUBLIC_ADDRESS:-127.0.0.1}:${M2_ITEMSHOP_PUBLIC_PORT:-7791}}"
       # Where a GM's "Podglad" (the player window's preview) opens <url>players/<pid>:
-      # the classic panel's character card, which the package pointed at its
-      # author's own panel.mt2009.pl (playerbotify.py, apply_gm_panel_url).
-      M2_GM_PANEL_URL: "${M2_GM_PANEL_URL:-http://127.0.0.1:${M2_PANEL_PUBLIC_PORT:-7788}/}"
+      # the Seban panel's character card (its /players/<pid> leads there) - the
+      # classic panel that held it is gone (LEXIW_ONE_PANEL_V1).
+      M2_GM_PANEL_URL: "${M2_GM_PANEL_URL:-http://127.0.0.1:${M2_SEBAN_PANEL_PORT:-7790}/}"
       M2_LOG_KEEP_DAYS: "${M2_LOG_KEEP_DAYS:-7}"
       M2_TABLE_POSTFIX: "${M2_TABLE_POSTFIX:-}"
       M2_ADMINPAGE_PASSWORD: "${M2_ADMINPAGE_PASSWORD:-}"
@@ -290,214 +290,6 @@ services:
     networks: [backend]
 
   # ==== services shared with linux-port (rendered by port/composify.py) ====
-  panel:
-    build:
-      context: ./panel
-      dockerfile: Dockerfile
-    image: ${M2_IMAGE_NAMESPACE:-metin2}/panel:latest
-    container_name: "${M2_CONTAINER_PREFIX:-metin2}-panel"
-    restart: unless-stopped
-
-    depends_on:
-      mariadb:
-        condition: service_healthy
-      playerbot-migrate:
-        condition: service_completed_successfully
-
-    environment:
-      M2_DB_HOST: mariadb
-      M2_DB_PORT: "3306"
-      M2_DB_USER: "${M2_DB_USER:-metin2}"
-      M2_DB_PASSWORD: "${M2_DB_PASSWORD:?set M2_DB_PASSWORD in .env}"
-
-      # Blank on first run means "generate one and print it once".
-      M2_PANEL_PASSWORD: "${M2_PANEL_PASSWORD:-}"
-      M2_PANEL_PORT: "7788"
-      M2PANEL_ENGINE: mt2009
-      M2_EDITION: "${M2_EDITION:-plus}"
-      # The address the panel is published on, and the explicit answer to
-      # "may anybody else reach it": empty lets the panel decide from the
-      # address (loopback = local, no passphrase), 0 or 1 overrides that.
-      M2PANEL_BIND_ADDRESS: "${M2_PANEL_BIND_ADDRESS:-${M2_HOST_BIND_ADDRESS:-0.0.0.0}}"
-      M2PANEL_LOCAL_ONLY: "${M2_PANEL_LOCAL_ONLY:-}"
-      M2_PANEL_BIND: "0.0.0.0"
-
-      # So the panel can answer "is the game up" by probing the game container
-      # rather than by reading its own socket table, which in a container shows
-      # nothing about the game at all.
-      M2_GAME_HOST: game
-      M2_PANEL_STATUS_PORTS: "${M2_PANEL_STATUS_PORTS:-11000,13000}"
-
-      M2_BRAND: "${M2_BRAND:-}"
-      M2_CLIENT_NAME: "${M2_CLIENT_NAME:-}"
-      M2_CLIENT_URL: "${M2_CLIENT_URL:-}"
-      # 180, not 45: r40250 gives a character four inventory pages. At 45 the
-      # panel only looks at the first page and refuses to give an item to
-      # anyone whose first page is full.
-      M2_INVENTORY_SLOTS: "${M2_INVENTORY_SLOTS:-180}"
-      # player.item.count is TINYINT UNSIGNED. Without this the panel allows
-      # 65535 and MySQL truncates in silence -- 1000 potions become 255.
-      M2_MAX_ITEM_COUNT: "${M2_MAX_ITEM_COUNT:-255}"
-      # The same MAX_LEVEL the game core is given, so the panel offers what the
-      # server will actually accept. It matters because the server does not say
-      # no: a level above gPlayerMaxLevel makes PointChange return without a
-      # word, and everything upstream reports success. Passed as M2PANEL_* on
-      # purpose -- the panel reads the environment before its config file, so
-      # this reaches an install whose m2panel.conf was written long ago.
-      M2PANEL_MAX_LEVEL: "${M2_MAX_LEVEL:-120}"
-      # 1 when this server is reachable only from the machine it runs on -- the
-      # Windows installer sets it, and so does install.sh --local. The panel
-      # then tells the operator that nobody else can join, instead of telling
-      # them to hand the address out. It cannot be inferred from the bind
-      # address: a public server behind nginx also binds the panel to 127.0.0.1.
-      M2_LOCAL_ONLY: "${M2_LOCAL_ONLY:-0}"
-      # Where players write when something needs adjusting. Empty means the
-      # front page leaves the line out entirely -- better than pointing your
-      # players at whatever address happened to be in the source.
-      M2_CONTACT_EMAIL: "${M2_CONTACT_EMAIL:-}"
-      # The supporters' password for /register. Empty = registration as before.
-      M2PANEL_REGISTER_ACCESS_CODE: "${M2_REGISTER_ACCESS_CODE:-}"
-      # What the supporters' sign-up page tells players to add in the launcher:
-      # the server address and the login / first channel port.
-      M2PANEL_REGISTER_GAME_ADDRESS: "${M2_REGISTER_GAME_ADDRESS:-}"
-      M2PANEL_GAME_ADDRESS: "${M2_CLIENT_ADDRESS:-${M2_PUBLIC_ADDRESS:-}}"
-      M2PANEL_LOGIN_PORT: "${M2_CLIENT_AUTH_PORT:-${M2_AUTH_PORT:-11000}}"
-      M2PANEL_GAME_PORT_RANGE: "${M2_GAME_PORT_RANGE:-13000-13002}"
-
-      # ---- the client that runs in a browser ------------------------------
-      # Off. With it off the panel offers nothing, serves nothing under /play
-      # and never contacts the bridge, which is what a server without a browser
-      # client wants. Even set to 1 the button appears only once a browser
-      # client has actually been placed on the panel's data volume, because
-      # until then there would be nothing behind it.
-      M2PANEL_BROWSER_PLAY: "${M2_BROWSER_PLAY:-0}"
-      # Where the built browser client is, on the panel's own volume.
-      M2PANEL_BROWSER_DIR: "/usr/local/m2panel/browser"
-      # The bridge's own port on the host, for the case where there is no proxy
-      # in front: the panel then tells the page to dial this machine there.
-      # Behind nginx the page is told the panel's own address and port instead,
-      # because nginx routes /to/ and /ping through -- the client cannot be
-      # given a path, only host:port, so same-origin is the only way it gets a
-      # certificate. See admin_panel.py, bridge_endpoint().
-      M2PANEL_BRIDGE_PORT: "${M2_BRIDGE_PORT:-7789}"
-      # Where the panel itself asks the bridge which ports it will connect to,
-      # over this network. Not what the browser is told -- see above.
-      M2PANEL_BRIDGE_HOST: "wsbridge"
-      # Whether nginx is in front, which the panel cannot find out for itself:
-      # Docker's port forwarder rewrites the source address, so a proxied
-      # request does not arrive from the loopback address it was sent to. The
-      # installer sets this when it configures nginx -- and in that arrangement
-      # it publishes the panel's port on 127.0.0.1 alone, so the X-Forwarded-*
-      # headers this makes the panel believe cannot reach it from anywhere
-      # else. Without a domain there is no nginx and this stays 0.
-      M2PANEL_TRUST_PROXY: "${M2_TRUST_PROXY:-0}"
-      # How much game data the page keeps in memory, in MB. The thing that
-      # decides whether the game stutters -- see admin_panel.py, where the
-      # number is explained. 0 leaves the page's own default (96) alone.
-      M2PANEL_BROWSER_CACHE_MB: "${M2_BROWSER_CACHE_MB:-768}"
-
-      # Server rates. The panel runs M2PANEL_RATES_SCRIPT when somebody saves
-      # the rates page and reads M2PANEL_RATES_STATUS back to report how it
-      # went -- the same two settings it uses on FreeBSD, pointed at the
-      # container versions. The script here only writes a request into the
-      # spool the game container is watching; see panel/bin/apply_rates.sh.
-      #
-      # The script deliberately does NOT live on the panel-data volume: an
-      # existing stack keeps its volume across an upgrade, so a file shipped
-      # there in a new image would never appear.
-      M2PANEL_RATES_SCRIPT: "/usr/local/bin/apply_rates.sh"
-      M2PANEL_RATES_STATUS: "/opt/m2spool/rates.status"
-      M2PANEL_RATES_SPOOL: "/opt/m2spool"
-
-      # Game master ranks travel over the same spool: the panel writes the row
-      # into common.gmlist itself and then drops a note here, and m2-gm in the
-      # game container tells the running server to re-read the list. The panel
-      # is kept away from that socket on purpose -- it also accepts SHUTDOWN.
-      M2PANEL_GM_SPOOL: "/opt/m2spool"
-
-      # And the language the game speaks. The panel asks; m2-lang in the game
-      # container swaps the four files and restarts the cores, because they read
-      # them only while they boot. lang.status is how the panel knows which
-      # language is live -- including on the download page, where it is the one
-      # thing a player cannot find out before downloading a gigabyte.
-      M2PANEL_LANG_SPOOL: "/opt/m2spool"
-
-      # Once a day the panel asks the project's repository what the newest
-      # published version is, and says so in the admin area when it is behind.
-      # This is the ONLY part of this stack that contacts the internet by
-      # itself. Set M2_UPDATE_CHECK=0 and it contacts nothing at all; nothing
-      # else about the panel changes. The panel's own patch-log page explains
-      # this in the operator's language, including what GitHub gets to see.
-      M2PANEL_UPDATE_CHECK: "${M2_UPDATE_CHECK:-1}"
-
-      # Whether the panel may offer a button that installs an update. Off, and
-      # meant to stay off on anything with a public address: see UPDATING.md.
-      # Even set to 1 it does nothing on its own -- the work is done by the
-      # `updater' service below, which is in a profile and is not started by
-      # `docker compose up -d'.
-      M2PANEL_UPDATE_APPLY: "${M2_UPDATE_APPLY:-0}"
-      M2PANEL_UPDATE_SPOOL: "/opt/m2update"
-      # The one command that updates THIS install, shown on the update page.
-      # The installers know it -- they know the URL they were fetched from and
-      # the options they were given -- so they write it here and the panel just
-      # repeats it. Empty falls back to the by-hand sequence, which is right for
-      # a stack somebody assembled themselves. On Windows this is the entire
-      # update mechanism: the installer is idempotent, so running it again is
-      # the update, and nothing has to sit in the background waiting to do it.
-      M2PANEL_UPDATE_COMMAND: "${M2_UPDATE_COMMAND:-}"
-
-      TZ: "${M2_TZ:-UTC}"
-
-    ports:
-      # Keep the host address separate from the numeric port.  Older installers
-      # encoded "127.0.0.1:7788" in M2_PANEL_PUBLIC_PORT; once the common host
-      # bind variable was introduced that produced an invalid two-address
-      # mapping such as "0.0.0.0:127.0.0.1:7788:7788".
-      # Falling back to M2_HOST_BIND_ADDRESS keeps older local .env files
-      # loopback-only until their next installer/update run adds the new key.
-      - "${M2_PANEL_BIND_ADDRESS:-${M2_HOST_BIND_ADDRESS:-0.0.0.0}}:${M2_PANEL_PUBLIC_PORT:-7788}:7788/tcp"
-
-    volumes:
-      # m2panel.conf: the admin password hash, per-install salt and Flask
-      # session secret. Generated on first run and then never regenerated --
-      # losing it logs everyone out and forgets the password.
-      - panel-conf:/usr/local/etc
-      # client.zip (the game client offered to players) and downloads.db (the
-      # per-IP download quota). client.zip is ~1.2 GB and is uploaded by the
-      # operator, not shipped in the image.
-      - panel-data:/usr/local/m2panel
-      # Read-only access to server logs for live bot inspection
-      - game-var:/opt/metin2/var:ro
-      # The other end of the rate spool. Same volume, same path as in the game
-      # container, so a request written here is the file read over there.
-      - rates-spool:/opt/m2spool
-
-      # The same arrangement again for updates: the panel leaves a request in
-      # here, the updater (below, and only when the operator starts it) reads
-      # it and writes back how it is going. A directory, not the Docker socket
-      # -- the panel is the internet-facing process in this stack and the
-      # socket is root on the host.
-      - update-spool:/opt/m2update
-
-    networks: [backend]
-
-  # ---------------------------------------------------------------------------
-  # The game client players download.
-  #
-  # A one-shot tool, not a service. It has a profile, so `docker compose up'
-  # never starts it; it is run on purpose:
-  #
-  #     docker compose run --rm client-builder
-  #
-  # It fetches the server-file archive (a MEGA share link, over a gigabyte),
-  # writes M2_PUBLIC_ADDRESS into the client inside it, and puts the result on
-  # the panel's data volume, which is what makes the panel's "Download the game"
-  # button work.
-  #
-  # It is safe to run again. The download and the built client stay in their own
-  # cache volume, so changing the address afterwards rewrites one file inside an
-  # existing zip and copies it across -- seconds, and nothing is downloaded.
-  # ---------------------------------------------------------------------------
   seban-panel:
     build:
       context: ./seban-panel
@@ -518,9 +310,6 @@ services:
       PLAYERBOTS_LOGIN_PORT: "11000"
       PLAYERBOTS_WORLD_PORT: "${M2_GAME_PORT_BASE:-13000}"
       PLAYERBOTS_STATUS_GLOB: "/opt/metin2/var/channel*/*/playerbot_status.tsv"
-      # Opened by the visitor's browser, so the address the classic panel is
-      # reachable at from outside - not a container name.
-      TIERU_PANEL_URL: "${M2_SEBAN_TIERU_PANEL_URL:-http://127.0.0.1:${M2_PANEL_PUBLIC_PORT:-7788}}"
       # Its own secret when .env has one; otherwise the admin-page secret
       # every .env already carries, so no install runs on the upstream default.
       SEBAN_SESSION_SECRET: "${M2_SEBAN_SESSION_SECRET:-${M2_ADMINPAGE_PASSWORD:-change-this-before-public-use}}"
@@ -669,8 +458,6 @@ services:
 volumes:
   db-data:
   update-spool:
-  panel-data:
-  panel-conf:
   game-var:
   rates-spool:
 

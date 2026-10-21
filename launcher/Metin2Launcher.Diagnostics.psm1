@@ -543,10 +543,11 @@ function Get-M2PanelPort {
 
     $envPath = Join-Path $ServerRoot 'linux-port\docker\.env'
     if (Test-Path -LiteralPath $envPath -PathType Leaf) {
-        $match = Select-String -LiteralPath $envPath -Pattern '^M2_PANEL_PUBLIC_PORT=(\d+)$' | Select-Object -First 1
+        # Lexiw: the Seban panel is the only web panel (LEXIW_ONE_PANEL_V1).
+        $match = Select-String -LiteralPath $envPath -Pattern '^M2_SEBAN_PANEL_PORT=(\d+)$' | Select-Object -First 1
         if ($match) { return [int]$match.Matches[0].Groups[1].Value }
     }
-    return 7788
+    return 7790
 }
 
 function Get-M2ListeningProcess {
@@ -691,8 +692,7 @@ function Get-M2StackHostPorts {
     # database are reached through the port .env publishes.
     $ports = @()
     foreach ($entry in @(
-            @{ Key = 'M2_PANEL_PUBLIC_PORT'; Default = 7788; Name = 'panel WWW'; ClientFixed = $false },
-            @{ Key = 'M2_SEBAN_PANEL_PORT'; Default = 7790; Name = 'panel zaawansowany'; ClientFixed = $false },
+            @{ Key = 'M2_SEBAN_PANEL_PORT'; Default = 7790; Name = 'panel WWW'; ClientFixed = $false },
             @{ Key = 'M2_ITEMSHOP_PUBLIC_PORT'; Default = 7791; Name = 'ItemShop'; ClientFixed = $false },
             @{ Key = 'M2_AUTH_PORT'; Default = 11000; Name = 'serwer logowania'; ClientFixed = $true },
             @{ Key = 'M2_DB_PUBLISH_PORT'; Default = 3306; Name = 'baza danych'; ClientFixed = $false })) {

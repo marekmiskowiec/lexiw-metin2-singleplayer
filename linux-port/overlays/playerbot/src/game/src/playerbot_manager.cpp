@@ -275,6 +275,8 @@ namespace { bool HandlePlayerBotConversationWith(DWORD playerPID, const char* pl
 // LEXIW_DANCE_SHOW_V1: the operator's dance troupe ("Show tanca" in the panel):
 // after the companion, whose identity pick, spawn path and placement it uses.
 #include "playerbot_dancer.h"
+#include "regen.h"
+#include "playerbot_spawn_export.h" // LEXIW_SPAWN_TIMERS_V1
 // Iwakura's social personalities: the companion's phase and its invitations
 // to people, a companion Shaman's party buffs, and the mercenary's contracts.
 #include "playerbot_companions.h"
@@ -3076,6 +3078,7 @@ namespace
 		// them starts Update and ends this clock (playerbot_sidekick.h).
 		ManagePlayerBotSidekicks(dwNow);
 		ManagePlayerBotDancers(dwNow); // LEXIW_DANCE_SHOW_V1: the operator's dance troupe
+		ExportPlayerBotWorldSpawns(dwNow); // LEXIW_SPAWN_TIMERS_V1: the panel's spawn timers
 		// MT2009_PLUS_SHOUTERS_V1: and the shouters, whatever the population.
 		ManagePlayerBotShouters(dwNow);
 #if defined(PLAYERBOT_ENGINE_MT2009)
@@ -6090,6 +6093,7 @@ void CPlayerBotManager::Update()
 	// (playerbot_sidekick.h).
 	ManagePlayerBotSidekicks(dwNow);
 	ManagePlayerBotDancers(dwNow); // LEXIW_DANCE_SHOW_V1: the operator's dance troupe
+	ExportPlayerBotWorldSpawns(dwNow); // LEXIW_SPAWN_TIMERS_V1: the panel's spawn timers
 	// MT2009_PLUS_SHOUTERS_V1: the shouters of the first villages.
 	ManagePlayerBotShouters(dwNow);
 	// MT2009_PLUS_L30_WEAPON_DROPPER_V1: two or three island droppers a kingdom.
