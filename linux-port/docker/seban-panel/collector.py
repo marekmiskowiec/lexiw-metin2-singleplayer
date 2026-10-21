@@ -763,7 +763,73 @@ def collect(con, previous):
             cur.execute("INSERT IGNORE INTO player.web_seban_metric_snapshot VALUES (%s,%s,%s)",
                         (now, f"act_{int(action)}", count))
         check_plus9_refines(cur)
+        prune_logs(cur, now)
     return previous
+
+
+# Lexiw: the log database is most of every backup, and most of it is noise
+# nothing reads - every pick-up of yang (5 million rows in two weeks), every
+# socket read-out, every split stack. Once an hour that noise is cut to its
+# last days; what the panels read (refines, deaths, Metins and bosses,
+# trades, skill-ups, the bots' decisions) stays for good.
+LOG_NOISE_HOWS = ("GET_GOLD", "INFO_SOCKET", "GET", "SYSTEM", "INFO_ATTR", "ITEM_SPLIT",
+                  "PARTY_DESTROY", "UNIQUE_EXPIRE", "REAL_TIME_EXPIRE", "READ_SUCCESS",
+                  "READ_FAIL", "REMOVE (REFINE SUCCESS)")
+LOG_NOISE_DAYS = 3
+# log tables no panel reads: a week, for a look by hand after something odd
+LOG_UNREAD_TABLES = ("item_meta_log", "loginlog", "quest_reward_log", "request_info_log",
+                     "gold_session_log", "quest_state_log")
+LOG_UNREAD_DAYS = 7
+PRUNE_BATCH = 50000
+PRUNE_SECONDS = 90
+_last_prune = {"hour": None}
+
+
+def prune_batches(cur, sql, params, deadline):
+    """Delete in batches until done or out of time: log.log is MyISAM, and one
+    long DELETE would hold its lock while the game cores wait to log."""
+    total = 0
+    while time.time() < deadline:
+        cur.execute(sql + f" LIMIT {PRUNE_BATCH}", params)
+        total += cur.rowcount
+        if cur.rowcount < PRUNE_BATCH:
+            break
+    return total
+
+
+def prune_logs(cur, now):
+    hour = now.replace(minute=0)
+    if _last_prune["hour"] == hour:
+        return
+    _last_prune["hour"] = hour
+    deadline = time.time() + PRUNE_SECONDS
+    # A timed event still running counts its chests (GET) and its yang
+    # (GET_GOLD) from log.log when it ends: nothing of its window goes.
+    cur.execute("SELECT MIN(started_at) FROM player.web_seban_event_runs WHERE ended_at IS NULL")
+    open_since = cur.fetchone()[0]
+    cutoff = f"%s - INTERVAL {LOG_NOISE_DAYS} DAY"
+    params = (now,)
+    if open_since:
+        cutoff = f"LEAST({cutoff}, %s)"
+        params = (now, open_since)
+    marks = ",".join(["%s"] * len(LOG_NOISE_HOWS))
+    done = {"log": prune_batches(cur, f"DELETE FROM log.log WHERE how IN ({marks}) AND time < {cutoff}",
+                                 LOG_NOISE_HOWS + params, deadline)}
+    cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='log'")
+    present = {row[0] for row in cur.fetchall()}
+    for table in LOG_UNREAD_TABLES:
+        if table in present:
+            done[table] = prune_batches(cur, f"DELETE FROM log.{table} WHERE time < %s - INTERVAL {LOG_UNREAD_DAYS} DAY",
+                                        (now,), deadline)
+    # the panel's own copies: where each bot stood (the stuck check looks
+    # minutes back) and the world's item totals (charts of 14 days)
+    done["position"] = prune_batches(cur, "DELETE FROM player.web_seban_bot_position_snapshot "
+                                     "WHERE captured_at < %s - INTERVAL 2 DAY", (now,), deadline)
+    done["items"] = prune_batches(cur, "DELETE FROM player.web_seban_item_snapshot "
+                                  "WHERE captured_at < %s - INTERVAL 15 DAY", (now,), deadline)
+    gone = {k: v for k, v in done.items() if v}
+    if gone:
+        print(f"[seban-collector] old log rows removed: {gone}", flush=True)
 
 
 def main():

@@ -1,0 +1,7 @@
+{% extends 'base.html' %}{% block title %}Instrukcja panelu · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('wiki.css') }}">
+<p class="eyebrow">NARZĘDZIA</p><h1>Instrukcja panelu</h1>
+<p class="muted">Co jest gdzie w tym panelu, co na której stronie można ustawić, co ma jeszcze tylko stary panel i czego brakuje. ✏️ przy stronie znaczy, że coś się na niej ustawia; ⚡ — że zmiana działa od razu, 🔁 — że wymaga restartu serwera.</p>
+<nav class="panel guide-toc"><h3>Spis treści</h3><ul>{% for t in toc %}<li><a href="#{{ t.id }}">{{ t.name }}</a></li>{% endfor %}</ul></nav>
+<article class="panel guide-body">{{ body|safe }}</article>
+{% endblock %}

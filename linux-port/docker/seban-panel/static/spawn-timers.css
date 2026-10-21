@@ -1,0 +1,29 @@
+/* Lexiw: Timery spawnów (LEXIW_SPAWN_TIMERS_V1) */
+.st-filters{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end}
+.st-filters label{display:flex;flex-direction:column;gap:3px;font-size:13px}
+.st-kinds{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+.st-kind{flex-direction:row!important;align-items:center;gap:6px!important;padding:4px 10px;border:1px solid var(--edge);border-radius:999px;cursor:pointer;user-select:none}
+.st-kind input{display:none!important}
+.st-kind.off{opacity:.4;text-decoration:line-through}
+.st-kind i,.st-dot{width:11px;height:11px;border-radius:50%;display:inline-block;border:2px solid #0006}
+.st-dot{margin-right:4px;vertical-align:-1px}
+.k-metin i,.st-dot.k-metin{background:#e0443e}
+.k-boss i,.st-dot.k-boss{background:#f2c34d}
+.k-miniboss i,.st-dot.k-miniboss{background:#c46cf0}
+.k-ore i,.st-dot.k-ore{background:#9fe3e8;border-radius:2px}
+.k-flower i,.st-dot.k-flower{background:#ff8fc8}
+.st-table{width:100%;border-collapse:collapse}
+.st-table th{text-align:left;white-space:nowrap}
+.st-table td{padding:6px 8px;border-top:1px solid color-mix(in srgb,var(--edge) 55%,transparent);vertical-align:middle;font-size:13px}
+.st-num{white-space:nowrap;font-variant-numeric:tabular-nums}
+.st-alive{background:color-mix(in srgb,#63c993 7%,transparent)}
+.st-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;border:1px solid var(--edge);color:var(--muted)}
+.st-badge.on{color:#63c993;border-color:#63c993}
+.st-copy{font-family:ui-monospace,Consolas,monospace;font-size:11px;padding:1px 6px;border:1px solid var(--edge);border-radius:4px;background:none;color:var(--muted);cursor:copy;margin-left:4px}
+.st-copy:hover{color:var(--gold,#e8b93f);border-color:var(--gold,#e8b93f)}
+.st-copy.done{color:#63c993;border-color:#63c993}
+.st-copy.done::after{content:' ✓'}
+.st-kind-pair{display:inline-flex;align-items:center;gap:4px}
+.st-only,.st-all{font-size:11px;padding:2px 7px;border:1px solid var(--edge);border-radius:999px;background:none;color:var(--muted);cursor:pointer}
+.st-all{font-size:12px;padding:4px 10px}
+.st-only:hover,.st-all:hover{color:var(--gold,#e8b93f);border-color:var(--gold,#e8b93f)}

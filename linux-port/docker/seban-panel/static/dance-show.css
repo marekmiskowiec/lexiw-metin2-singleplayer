@@ -60,3 +60,18 @@ input.ds-coord{width:80px}
 .ds-dict li b{font-family:ui-monospace,Consolas,monospace;min-width:92px}
 .ds-dict li span{color:var(--muted)}
 .ds-dict ul{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}.ds-dict li b{min-width:130px;white-space:nowrap}
+/* The roster: each dancer a card - eight columns never fit beside the menu. */
+@supports (display:grid){
+  .ds-roster,.ds-roster tbody{display:block;width:100%}
+  .ds-roster thead{display:none}
+  .ds-roster tr{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px;padding:12px 0;border-top:1px solid var(--edge)}
+  .ds-roster td{display:flex;flex-direction:column;gap:3px;padding:0;border:0;min-width:0}
+  .ds-roster td[data-label]::before{content:attr(data-label);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .ds-roster td[colspan]{grid-column:1/-1}
+  .ds-roster .ds-look{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));min-width:0}
+  .ds-roster .ds-look::before{grid-column:1/-1}
+  .ds-roster .ds-pos{flex-direction:row;flex-wrap:wrap;align-items:flex-end;gap:8px}
+  .ds-roster .ds-pos::before{width:100%}
+  .ds-roster .ds-actions{flex-direction:row;align-items:flex-end;gap:6px}
+  .ds-roster input.ds-name,.ds-roster select{width:100%;max-width:220px}
+}

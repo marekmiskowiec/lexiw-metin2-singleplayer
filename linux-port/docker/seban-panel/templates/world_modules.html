@@ -1,0 +1,71 @@
+{% extends 'base.html' %}{% block title %}Moduły świata · {{ panel_brand }}{% endblock %}{% block content %}
+<link rel="stylesheet" href="{{ static_asset_url('world-modules.css') }}">
+<p class="eyebrow">ADMINISTRACJA GRY</p><h1>Moduły świata</h1>
+<p class="muted">Dodatkowe systemy świata: Arezzo, Seon-Hae, alchemia i szarfy, życie potworów, Dzieci Kwiaty i Wielkanoc. Każda zmiana działa od razu, bez restartu (gra potwierdza ją w kilka sekund) i zostaje po restarcie.</p>
+
+<section class="panel" id="arezzo"><p class="eyebrow">MODUŁ DOBROWOLNY · NA ŻYWO</p><h2>🗺️ Arezzo</h2>
+  <p class="muted">Dolina Cyklopów, Pustkowie Faraona, Zaczarowany Las oraz lochy Biblioteka Wiedzy, Wzgórze Wukonga, Ruiny Skorpiona i Starożytna Dżungla. Włączone: strony w Teleporterze i Pierścieniu, portal do Zaczarowanego Lasu po Strażniku En-Tai, strażnicy wejść do lochów i lochy w oknie „Wyprawy” (X). Wyłączone: nic z tego nie widać, a kto stoi na mapie Arezzo albo w jej lochu, w kilka sekund wraca do miasta.</p>
+  <form action="{{ url_for('world_arezzo') }}" method="post" class="manage-form">
+    <label class="checkbox-row"><span>Moduł Arezzo</span><input type="checkbox" name="on" value="1" {{ 'checked' if s.arezzo }}><small>włączony</small></label>
+    <button>Zapisz</button>
+  </form>
+</section>
+
+<section class="panel" id="seonhae"><p class="eyebrow">MODUŁ DOBROWOLNY · NA ŻYWO</p><h2>💎 Seon-Hae: 6. i 7. bonus</h2>
+  <p class="muted">Gracz oddaje Seon-Hae (NPC 20095 w pierwszych wioskach) broń, zbroję albo biżuterię z pięcioma bonusami, Odłamki poziomu przedmiotu (39070–39077, 39081; 2% szansy za każdy, do 10) i Suplementy (72064–72067; do 5, do +50%). Seon-Hae trzyma przedmiot przez ustawiony czas. Wyłączenie zatrzymuje tylko nowe zlecenia — przedmiot, który już trzyma, zawsze można odebrać.</p>
+  <form action="{{ url_for('world_seonhae') }}" method="post" class="manage-form wm-form">
+    <label class="checkbox-row"><span>Seon-Hae przyjmuje przedmioty</span><input type="checkbox" name="on" value="1" {{ 'checked' if s.seonhae }}><small>włączony</small></label>
+    <label>Czas pracy (minuty, 0 = 24 godziny)<input type="number" name="wait" min="0" max="10080" value="{{ s.seonhae_wait }}"></label>
+    <fieldset class="wm-lv"><legend>Szanse poziomów 6. i 7. bonusu (wagi, najlepiej w sumie 100; też Zaczarowanie 71051)</legend>
+      {% for v in s.seonhae_lv %}<label>lv{{ loop.index }}<input type="number" name="lv{{ loop.index }}" min="0" max="100" value="{{ v }}"></label>{% endfor %}
+    </fieldset>
+    <label class="wm-wide">Drop Odłamków i Suplementów (tylko prawdziwi gracze, tylko gdy Seon-Hae jest włączony; puste = wartości domyślne)
+      <textarea name="drops" rows="12" spellcheck="false">{{ seonhae_drops }}</textarea></label>
+    <p class="muted wm-wide"><code>additive_chance N</code> — % szansy na Suplement z Metina lub bossa map z <code>additive_map &lt;mapa&gt; &lt;vnum suplementu&gt; &lt;ile&gt;</code>; <code>mob &lt;vnum potwora&gt; &lt;vnum suplementu&gt; &lt;ile&gt;</code> — jeden potwór zamiast reguły mapy; <code>shard_chance N</code> — % na Odłamek ze zwykłego potwora map z <code>shard_map &lt;mapa&gt;</code>; <code>shard &lt;vnum&gt; &lt;waga&gt;</code> — kolor odłamka.</p>
+    <button>Zapisz Seon-Hae</button>
+  </form>
+</section>
+
+<section class="panel" id="smocze-kamienie"><p class="eyebrow">ALCHEMIA I SZARFY · NA ŻYWO</p><h2>🐉 Alchemia, Smocze Kamienie i szarfy</h2>
+  <p class="muted">Wyłączenie zatrzymuje tylko nowe przedmioty — to, co gracze już mają, zostaje, a plecak alchemii dalej działa. Od 30 poziomu Alchemik (M1 każdego królestwa) daje Moc Smoczego Oka: potwory upuszczają Odłamki Smoczego Kamienia, a każde 10 podniesionych samo zamienia się w Cor Draconis — tyle razy dziennie, ile ustawisz. Boty liczą tak samo.</p>
+  <form action="{{ url_for('world_dragon_stone') }}" method="post" class="manage-form wm-form">
+    <label class="checkbox-row"><span>Alchemia (Cor Draconis z Metinów i bossów, odłamki u Alchemika)</span><input type="checkbox" name="alchemy" value="1" {{ 'checked' if s.alchemy }}><small>włączona</small></label>
+    <label class="checkbox-row"><span>Szarfy z bossów i skrzyń bossów (łączenie u Uriela działa zawsze)</span><input type="checkbox" name="sashes" value="1" {{ 'checked' if s.sashes }}><small>włączone</small></label>
+    <label>Szansa na odłamek z potwora, % (1–100, domyślnie 10)<input type="number" name="ds_drop" min="1" max="100" value="{{ s.ds_drop }}"></label>
+    <label>Cor Draconis z odłamków dziennie (1–20, domyślnie 5)<input type="number" name="ds_cor_day" min="1" max="20" value="{{ s.ds_cor_day }}"></label>
+    <button>Zapisz</button>
+  </form>
+</section>
+
+<section class="panel" id="zycie-potworow"><p class="eyebrow">TRUDNOŚĆ · NA ŻYWO</p><h2>❤️ Życie potworów</h2>
+  <p class="muted">Ile życia mają potwory, bossowie i Metiny: 100% = jak w grze, mniej = każdy pada po mniejszej liczbie ciosów (doświadczenie i drop z jednego zabicia bez zmian, więc gra idzie szybciej — także botom). NPC, żyły rud, krzaki ziół i bramy w lochach bez zmian. Stojące potwory przeliczają się, gdy się ruszą.</p>
+  <form action="{{ url_for('world_mob_hp') }}" method="post" class="manage-form wm-form">
+    <label>Życie potworów, % (10–300)<input type="number" name="pct" min="10" max="300" value="{{ s.mob_hp }}" list="wm-hp"></label>
+    <datalist id="wm-hp"><option value="100"><option value="80"><option value="50"><option value="150"><option value="200"></datalist>
+    <button>Zapisz</button>
+  </form>
+</section>
+
+<section class="panel" id="dzieci-kwiaty"><p class="eyebrow">EVENT · W CIĄGU 5 S</p><h2>🌸 Dzieci Kwiaty</h2>
+  <p class="muted">Gdy event trwa (włączasz go w <a href="{{ url_for('events') }}">Planerze eventów</a>), każdy potwór zabity przez gracza (nie bota) może dać Nasiona Kwiatów. Nasiona zamieniają się w losowe latorośle pięciu kwiatów, a latorośle jednego kwiatu — w nagrodę za ten kwiat. Po końcu eventu przez 7 dni można wymieniać to, co zostało.</p>
+  <form action="{{ url_for('world_flower') }}" method="post" class="manage-form wm-form">
+    {% for key, _d, lo, hi, label in flower_keys %}<label>{{ label }}<input type="number" name="{{ key }}" min="{{ lo }}" max="{{ hi }}" value="{{ flower[key] }}"></label>{% endfor %}
+    <label class="checkbox-row"><span>Kwiaty działają też przez 7 dni po evencie</span><input type="checkbox" name="use_after_event" value="1" {{ 'checked' if flower.use_after_event }}><small>tak</small></label>
+    <fieldset class="wm-wide wm-rewards"><legend>Nagrody za kwiaty (VNUM i ilość za jedną wymianę; zawartość pudełek 83023–83027 zmieniasz w <a href="{{ url_for('chests') }}">Szkatułkach</a>)</legend>
+      {% for i in range(1, 6) %}<div><b>{{ flower_names[i - 1] }}</b>
+        <label>VNUM<input type="number" name="reward_vnum_{{ i }}" min="1" value="{{ flower.rewards[i][0] }}"></label>
+        <label>Ilość<input type="number" name="reward_count_{{ i }}" min="1" max="1000" value="{{ flower.rewards[i][1] }}"></label></div>{% endfor %}
+    </fieldset>
+    <button>Zapisz Dzieci Kwiaty</button>
+  </form>
+</section>
+
+<section class="panel" id="wielkanoc"><p class="eyebrow">EVENT · NA ŻYWO</p><h2>🐇 Wielkanoc</h2>
+  <p class="muted">Dwa niezależne przełączniki eventu wielkanocnego (Planer eventów włącza i wyłącza oba naraz według harmonogramu).</p>
+  <form action="{{ url_for('world_easter') }}" method="post" class="manage-form wm-form">
+    <label class="checkbox-row"><span>Metiny wielkanocne — zabicie Metina lub potwora może przywołać Metina wielkanocnego, który upuszcza jajka</span><input type="checkbox" name="drop" value="1" {{ 'checked' if s.easter_drop }}><small>włączone</small></label>
+    <label class="checkbox-row"><span>Wielkanocny Zając — NPC na mapach 1/21/41, u którego wymienia się jajka na nagrody</span><input type="checkbox" name="rabbit" value="1" {{ 'checked' if s.easter_rabbit }}><small>włączony</small></label>
+    <button>Zapisz</button>
+  </form>
+</section>
+{% endblock %}

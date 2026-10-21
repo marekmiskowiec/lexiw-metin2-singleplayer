@@ -21,8 +21,10 @@
     <label class="wsm-key k-{{ key }}{{ '' if on else ' off' }}"><input type="checkbox" {{ 'checked' if on }} data-kind="{{ key }}"><i></i>{{ label }} ({{ n }})</label>{% endif %}{% endfor %}
   </div>
   <div class="wsm-map" style="{% if map_image %}background-image:url('{{ map_image }}');{% endif %}">
+    {# the areas in a layer of their own, cut at the map's edge; the tips may stick out #}
+    <div class="wsm-areas">{% for p in points %}{% set on = (wsm_kinds|selectattr(0, 'equalto', p.kind)|first)[2] %}
+    {% if p.kind not in ('mob', 'npc') and (p.rx > 0 or p.ry > 0) %}<span class="wsm-area wsm-{{ p.kind }}" data-kind="{{ p.kind }}" style="left:{{ p.x }}%;top:{{ p.y }}%;width:{{ p.rx * 2 }}%;height:{{ p.ry * 2 }}%" {{ '' if on else 'hidden' }}></span>{% endif %}{% endfor %}</div>
     {% for p in points %}{% set on = (wsm_kinds|selectattr(0, 'equalto', p.kind)|first)[2] %}
-    {% if p.kind not in ('mob', 'npc') and (p.rx > 0 or p.ry > 0) %}<span class="wsm-area wsm-{{ p.kind }}" data-kind="{{ p.kind }}" style="left:{{ p.x }}%;top:{{ p.y }}%;width:{{ p.rx * 2 }}%;height:{{ p.ry * 2 }}%" {{ '' if on else 'hidden' }}></span>{% endif %}
     <span class="wsm-pt wsm-{{ p.kind }}" data-kind="{{ p.kind }}" style="left:{{ p.x }}%;top:{{ p.y }}%;{% if p.kind == 'mob' %}width:max(6px, {{ p.rx * 2 }}%);height:max(6px, {{ p.ry * 2 }}%);{% endif %}" tabindex="0" {{ '' if on else 'hidden' }}>
       <span class="wsm-tip"><b>{{ p.name }}</b> · poz. {{ p.level }}{% if p.group %} · grupa{% endif %}<br>{% if p.group and p.names|length > 1 %}{{ p.names|join(', ') }}<br>{% endif %}respawn {{ p.time }}{% if p.count != '1' %} · ×{{ p.count }}{% endif %}{% if p.kind == 'orefixed' %}<br>stałe miejsce botów-górników — silnik stawia nową żyłę, gdy zniknie{% endif %}{% if p.rx > 0 or p.ry > 0 %}<br>obszar ±{{ (p.rx * summary_width / 10000)|round|int }} m{% endif %}</span>
     </span>{% endfor %}
