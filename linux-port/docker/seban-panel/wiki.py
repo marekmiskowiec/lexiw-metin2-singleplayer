@@ -18,7 +18,7 @@ import re
 import time
 from collections import defaultdict
 
-from flask import abort, jsonify, render_template, request
+from flask import abort, jsonify, render_template, request, url_for
 
 from wiki_guides import guide_list, search_guides
 
@@ -55,6 +55,15 @@ RESISTS = (("resist_sword", "Miecze"), ("resist_twohand", "Broń dwuręczna"), (
            ("resist_elect", "Błyskawice"), ("resist_magic", "Magia"), ("resist_wind", "Wiatr"), ("resist_poison", "Trucizna"))
 ENCHANTS = (("enchant_poison", "Otrucie"), ("enchant_stun", "Omdlenie"), ("enchant_slow", "Spowolnienie"),
             ("enchant_critical", "Cios krytyczny"), ("enchant_penetrate", "Cios przeszywający"), ("enchant_curse", "Klątwa"))
+# LEXIW_WIKI_SPAWN_MAP_V1: the map pictures the heat map uses (static/maps, heatmap.js).
+MAP_BACKGROUNDS = {21: "chunjo-m1", 23: "chunjo-m2", 24: "guild-map-02", 25: "easy-monkey", 61: "mount-sohan",
+                   62: "doyyumhwaji", 64: "orc-valley", 63: "yongbi-desert", 104: "spider-dungeon-v1", 108: "medium-monkey.webp",
+                   109: "hard-monkey.webp", 65: "hwang-temple", 71: "spider-dungeon-v1", 4: "shinsoo-guild", 44: "jinno-guild",
+                   5: "easy-monkey", 45: "easy-monkey", 1: "shinsoo-m1", 3: "shinsoo-m2", 41: "jinno-m1", 43: "jinno-m2",
+                   67: "trent-forest", 68: "trent02-red-forest", 66: "deviltower", 72: "grotto-v1", 73: "grotto-v2",
+                   209: "ochao-temple", 360: "arezzo-cyclops-valley", 361: "arezzo-pharaoh-wastes",
+                   362: "arezzo-enchanted-forest", 363: "arezzo-library", 364: "arezzo-wukong-hill",
+                   365: "arezzo-scorpion-ruins", 366: "arezzo-ancient-jungle"}
 SPAWN_FILES = {"regen.txt": "Potwory", "stone.txt": "Metiny", "boss.txt": "Bossowie", "npc.txt": "NPC"}
 
 # The three kingdoms' first and second villages, one page each: the same
@@ -550,8 +559,6 @@ def install_wiki(m):
         """map number -> its folder (map/index)."""
         return {number: folder for folder, numbers in map_indexes().items() for number in numbers}
 
-    m.wiki_map_dirs = map_dirs  # LEXIW: the wiki's side menu lists the maps
-
     def map_spawns(folder):
         """Everything a map's files put down: [(mob, entry)]."""
         return [(vnum, entry) for vnum, entries in spawn_index().items() for entry in entries if entry["dir"] == folder]
@@ -692,19 +699,25 @@ def install_wiki(m):
     @m.login_required
     def wiki_maps():
         """The maps this world runs, with what lives on them - the three
-        kingdoms' M1 and M2 as one line each."""
+        kingdoms' M3 and Loch Małp as one line each; M1 and M2 per kingdom."""
         dirs, mobs = map_dirs(), m.drop_mob_rows()
         maps, regions_done = [], set()
         for number in sorted(m.MAP_NAMES):
             if number not in dirs:
                 continue
-            region = FAMILY_OF_MAP.get(number)
+            # The first and second villages are listed per kingdom (each its own
+            # map and spawn map); M3 and Loch Małp stay as one line.
+            region = FAMILY_OF_MAP.get(number) if FAMILY_OF_MAP.get(number) not in ("m1", "m2") else None
             if region:
                 if region not in regions_done:
                     regions_done.add(region)
                     maps.append(region_summary(region, mobs))
                 continue
             maps.append(map_summary(number, dirs[number], mobs))
+        # The villages first, kingdom by kingdom (M1, M2), then M3 and Loch Małp.
+        villages = [1, 3, 21, 23, 41, 43]
+        maps.sort(key=lambda e: (0, villages.index(e["number"])) if e.get("number") in villages
+                  else (1, 0) if e.get("number") is None else (2, 0))
         return render_template("wiki_maps.html", maps=maps, spawn_files_ready=spawn_dir.is_dir())
 
     @app.route("/wiki/region/<key>")
@@ -741,6 +754,71 @@ def install_wiki(m):
         return render_template("wiki_region.html", key=key, family=family, summary=region_summary(key, mobs),
                                sections=sections, npcs=npc_rows, spawn_files_ready=spawn_dir.is_dir())
 
+    def map_points(folder, number, mobs):
+        """LEXIW_WIKI_SPAWN_MAP_V1: every spawn point of the map's files, placed
+        on its picture: (x, y) and the spread as % of the map, what stands
+        there (a group by its strongest member) and when it comes back."""
+        bounds = m.MAP_BOUNDS.get(number)
+        if not bounds:
+            return []
+        width, height = bounds[2], bounds[3]
+        groups = _groups(_read(spawn_dir / "group.txt"), lambda t: int(t[-1]) if t[-1].isdigit() else None)
+        group_groups = _groups(_read(spawn_dir / "group_group.txt"),
+                               lambda t: int(t[1]) if len(t) > 1 and t[0].isdigit() and t[1].isdigit() else None)
+        # What a point is, from its strongest member: the five kinds the map
+        # shows first, then ordinary monsters and NPCs.
+        def spawn_kind(mob):
+            name = (mob.get("name") or "").strip().lower()
+            if mob["kind"] == "metin":
+                return "metin"
+            # The world's ranks: 4 is a boss (Boss), 5 the strongest (Król) -
+            # the first the miniboss, the second the boss of the map.
+            if mob["kind"] == "boss":
+                return "boss" if int(mob.get("rank") or 0) >= 5 else "miniboss"
+            if name.startswith("żyła"):
+                return "ore"
+            if "kwiat" in name or "grzyb" in name:
+                return "flower"
+            return "mob" if int(mob.get("type") or 0) == 0 else "npc"
+        rank = {"boss": 6, "metin": 5, "miniboss": 4, "ore": 3, "flower": 3, "mob": 1, "npc": 0}
+        points = []
+        for file_name in SPAWN_FILES:
+            for raw in _read(spawn_dir / "map" / folder / file_name).replace("\r", "").split("\n"):
+                t = raw.split()
+                if len(t) < 11 or t[0].startswith(("#", "//")) or not t[10].isdigit():
+                    continue
+                kind_char, vnum = t[0][0].lower(), int(t[10])
+                if kind_char in ("m", "s"):
+                    members = [vnum]
+                elif kind_char == "g":
+                    members = groups.get(vnum, [])
+                elif kind_char == "r":
+                    members = [mob for group in group_groups.get(vnum, []) for mob in groups.get(group, [])]
+                else:
+                    continue
+                known = [mobs[v] for v in members if v in mobs]
+                if not known:
+                    continue
+                lead = max(known, key=lambda mob: (rank[spawn_kind(mob)], mob["level"]))
+                kind = spawn_kind(lead)
+                if kind == "mob":
+                    continue  # ordinary monsters: the tables below list them
+                try:
+                    cx, cy, sx, sy = (int(t[1]), int(t[2]), int(t[3]), int(t[4]))
+                except ValueError:
+                    continue
+                start, end = spawn_seconds(t[7])
+                points.append({
+                    "x": round(cx * 100 / width * 100, 2), "y": round(cy * 100 / height * 100, 2),
+                    "rx": round(sx * 100 / width * 100, 2), "ry": round(sy * 100 / height * 100, 2),
+                    "kind": kind, "vnum": lead["vnum"], "name": lead["name"], "level": lead["level"],
+                    "group": len(set(members)) > 1 or kind_char in ("g", "r"),
+                    "names": sorted({mob["name"] for mob in known})[:6],
+                    "time": spawn_time_text(start, end), "count": t[9] if t[9].isdigit() else "1"})
+        order = {"mob": 0, "npc": 1, "flower": 2, "ore": 2, "miniboss": 3, "metin": 4, "boss": 5}
+        points.sort(key=lambda p: order.get(p["kind"], 0))
+        return points
+
     @app.route("/wiki/map/<int:number>")
     @m.login_required
     def wiki_map(number):
@@ -761,7 +839,11 @@ def install_wiki(m):
         region = FAMILY_OF_MAP.get(number)
         return render_template("wiki_map.html", summary=map_summary(number, folder, mobs), sections=sections,
                                region=region, region_name=MAP_FAMILIES[region]["name"] if region else None,
-                               active=number in m.MAP_NAMES, spawn_files_ready=spawn_dir.is_dir())
+                               active=number in m.MAP_NAMES, spawn_files_ready=spawn_dir.is_dir(),
+                               points=map_points(folder, number, mobs), summary_width=(m.MAP_BOUNDS.get(number) or (0, 0, 0, 0))[2], map_image=(
+                                   url_for("static", filename="maps/" + (MAP_BACKGROUNDS[number] if "." in MAP_BACKGROUNDS[number]
+                                                                         else MAP_BACKGROUNDS[number] + ".png"))
+                                   if number in MAP_BACKGROUNDS else None))
 
     @app.route("/wiki/mob/<int:vnum>")
     @m.login_required

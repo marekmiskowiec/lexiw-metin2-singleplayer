@@ -1,0 +1,37 @@
+/* Lexiw: the wiki's spawn map (LEXIW_WIKI_SPAWN_MAP_V1) */
+.wsm-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:6px 0 10px}
+.wsm-key{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px}
+.wsm-key i{width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid #0008}
+.wsm-map{position:relative;width:min(100%,640px);aspect-ratio:1;background:#1a1d22 center/100% 100% no-repeat;border:1px solid var(--edge);border-radius:8px;overflow:visible}
+.wsm-pt{position:absolute;transform:translate(-50%,-50%);border-radius:50%;cursor:help}
+.wsm-pt[hidden]{display:none}
+.wsm-mob{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.55)}
+.wsm-metin{width:13px;height:13px;background:#e0443e;border:2px solid #fff;box-shadow:0 0 6px #e0443e;z-index:2}
+.wsm-boss{width:16px;height:16px;background:#f2c34d;border:2px solid #3b2a00;box-shadow:0 0 8px #f2c34d;z-index:3}
+.wsm-npc{width:9px;height:9px;background:#63a8e8;border:1px solid #fff;z-index:1}
+.wsm-key.k-mob i{background:rgba(255,255,255,.35)}
+.wsm-key.k-metin i{background:#e0443e}
+.wsm-key.k-boss i{background:#f2c34d}
+.wsm-key.k-npc i{background:#63a8e8}
+.wsm-tip{display:none;position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);white-space:nowrap;background:#111c;color:#fff;font-size:12px;padding:5px 8px;border-radius:6px;pointer-events:none;z-index:10;line-height:1.35}
+.wsm-pt:hover .wsm-tip,.wsm-pt:focus .wsm-tip{display:block}
+.wsm-pt:hover{z-index:9}
+.wsm-key input{display:none!important}
+.wsm-key{padding:4px 10px;border:1px solid var(--edge);border-radius:999px;user-select:none}
+.wsm-key.off{opacity:.4;text-decoration:line-through}
+.wsm-mob{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.4)}
+/* the five kinds the map is for, and the area each may appear in */
+.wsm-miniboss{width:11px;height:11px;background:#c46cf0;border:2px solid #fff;z-index:2}
+.wsm-flower{width:10px;height:10px;background:#ff8fc8;border:2px solid #fff;z-index:2}
+.wsm-ore{width:10px;height:10px;background:#9fe3e8;border:2px solid #263238;border-radius:2px;transform:translate(-50%,-50%) rotate(45deg);z-index:2}
+.wsm-key.k-miniboss i{background:#c46cf0}
+.wsm-key.k-flower i{background:#ff8fc8}
+.wsm-key.k-ore i{background:#9fe3e8;border-radius:2px}
+.wsm-area{position:absolute;transform:translate(-50%,-50%);border-radius:50%;border:2px dashed;pointer-events:none;z-index:1;min-width:6px;min-height:6px}
+.wsm-area.wsm-metin{border-color:#e0443e;background:rgba(224,68,62,.12)}
+.wsm-area.wsm-boss{border-color:#f2c34d;background:rgba(242,195,77,.12)}
+.wsm-area.wsm-miniboss{border-color:#c46cf0;background:rgba(196,108,240,.1)}
+.wsm-area.wsm-flower{border-color:#ff8fc8;background:rgba(255,143,200,.08)}
+.wsm-area.wsm-ore{border-color:#9fe3e8;background:rgba(159,227,232,.08);transform:translate(-50%,-50%)}
+.wsm-area[hidden]{display:none}
+.wsm-key{display:inline-flex!important;flex-direction:row!important;white-space:nowrap}

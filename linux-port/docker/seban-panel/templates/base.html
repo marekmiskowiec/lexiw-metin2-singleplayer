@@ -25,19 +25,19 @@
 {%- set nav_ep = request.endpoint or '' -%}
 {%- set nav_active = nav_parents.get(nav_ep, nav_ep) -%}
 {%- set nav = namespace(group=None, item=None, palette=[]) -%}
-{%- for g in nav_groups %}{% for it in g['items'] %}{% if it.ep == nav_active %}{% set nav.group = g %}{% set nav.item = it %}{% endif %}{% set _ = nav.palette.append({'l': it.label, 'g': g.label, 'i': g.icon, 'd': it.desc, 'k': it.kw, 'u': url_for(it.ep)}) %}{% endfor %}{% endfor -%}
+{%- for g in nav_groups %}{% for it in g['items'] %}{% if it.ep == nav_active and (not it.get('args') or it.args == request.view_args) %}{% set nav.group = g %}{% set nav.item = it %}{% endif %}{% set _ = nav.palette.append({'l': it.label, 'g': g.label, 'i': g.icon, 'd': it.desc, 'k': it.kw, 'u': url_for(it.ep, **it.get('args', {}))}) %}{% endfor %}{% endfor -%}
 {%- set _ = nav.palette.insert(0, {'l': 'Pulpit', 'g': 'Start', 'i': '⌂', 'd': 'mapa świata na żywo, statystyki, rankingi', 'k': 'dashboard start strona glowna', 'u': url_for('dashboard')}) -%}
 {%- for s in nav_sections %}{% set _ = nav.palette.append({'l': s.label, 'g': ('Gra i serwer' if s.ep == 'manage' else 'Panel webowy') ~ (' · ' ~ s.part if s.part else ''), 'i': '§', 'd': 'sekcja strony ustawień', 'k': 'ustawienia sekcja', 'u': url_for(s.ep) ~ '#' ~ s.anchor}) %}{% endfor -%}
 {%- set nav_page_sections = nav_sections|selectattr('ep', 'equalto', nav_ep)|list -%}
 {%- set nav.index = [] -%}
-{%- for g in nav_groups %}{% for it in g['items'] if it.get('index') %}{% set _ = nav.index.append({'u': url_for(it.ep), 'l': it.label, 'g': g.label}) %}{% endfor %}{% endfor -%}
+{%- for g in nav_groups %}{% for it in g['items'] if it.get('index') %}{% set _ = nav.index.append({'u': url_for(it.ep, **it.get('args', {})), 'l': it.label, 'g': g.label}) %}{% endfor %}{% endfor -%}
 <aside class="site-nav sn" id="site-nav"><a class="brand brand--mark" href="{{ url_for('dashboard') }}"><img class="brand-mark" src="{{ static_asset_url('branding/lexiw-mark.svg') }}" alt="" width="34" height="34"><span class="brand-words">{{ panel_brand }}<span>{{ panel_tagline }}</span></span></a>
 <button type="button" class="sn-search" data-cmdk-open aria-label="Szukaj w panelu (Ctrl+K)"><span aria-hidden="true">⌕</span><span class="sn-search-label">Szukaj w panelu…</span><kbd>Ctrl K</kbd></button>
 <div class="sn-nav" role="navigation" aria-label="Menu panelu">
 <a class="sn-link sn-top{% if nav_active == 'dashboard' %} is-active{% endif %}" href="{{ url_for('dashboard') }}"{% if nav_ep == 'dashboard' %} aria-current="page"{% endif %}><span class="sn-ico" aria-hidden="true">⌂</span><span class="sn-label">Pulpit</span></a>
 {%- for g in nav_groups %}
-<details class="sn-group{% if nav.group and nav.group.id == g.id %} has-active{% endif %}" data-group="{{ g.id }}"{% if nav.group and nav.group.id == g.id %} open{% endif %}><summary><span class="sn-ico" aria-hidden="true">{{ g.icon }}</span><span class="sn-label">{{ g.label }}</span><span class="sn-chev" aria-hidden="true"></span></summary><div class="sn-items">
-{%- for it in g['items'] %}<a class="sn-link{% if it.ep == nav_active %} is-active{% endif %}" href="{{ url_for(it.ep) }}" title="{{ it.desc }}"{% if it.ep == nav_ep %} aria-current="page"{% endif %}>{{ it.label }}</a>{% endfor -%}
+<details class="sn-group{% if nav.group and nav.group.id == g.id %} has-active{% endif %}" data-group="{{ g.id }}"{% if nav.group and nav.group.id == g.id %} open{% endif %}><summary><span class="sn-ico" aria-hidden="true">{{ g.icon }}</span><span class="sn-label">{{ g.label }}</span><span class="sn-count">({{ g['items']|length }})</span><span class="sn-chev" aria-hidden="true"></span></summary><div class="sn-items">
+{%- for it in g['items'] %}<a class="sn-link{% if it.ep == nav_active and (not it.get('args') or it.args == request.view_args) %} is-active{% endif %}" href="{{ url_for(it.ep, **it.get('args', {})) }}" title="{{ it.desc }}"{% if it.ep == nav_ep and (not it.get('args') or it.args == request.view_args) %} aria-current="page"{% endif %}>{{ it.label }}</a>{% endfor -%}
 </div></details>
 {%- endfor %}
 <details class="sn-group sn-group--ext" data-group="linki" open><summary><span class="sn-ico" aria-hidden="true">↗</span><span class="sn-label">Linki zewnętrzne</span><span class="sn-chev" aria-hidden="true"></span></summary><div class="sn-items"><a class="sn-link" href="{{ tieru_url }}" target="_blank" rel="noopener">Panel klasyczny ↗</a><a class="sn-link" href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">Repozytorium na GitHubie ↗</a></div></details>
@@ -47,7 +47,7 @@
 <main>{%- set nav_detail = (self.title()|striptags).split(' · ')[0]|trim -%}
 {%- if nav.item and nav_detail == nav.item.label and request.view_args %}{% set nav_detail = '#' ~ (request.view_args.values()|join(' · ')) %}{% endif -%}
 <div class="page-topbar"><ol class="crumbs" aria-label="Jesteś tutaj"><li><a href="{{ url_for('dashboard') }}">⌂ Pulpit</a></li>
-{%- if nav.group %}<li><span>{{ nav.group.icon }} {{ nav.group.label }}</span></li>{% if nav_ep == nav_active %}<li aria-current="page"><span>{{ nav.item.label }}</span></li>{% else %}<li><a href="{{ url_for(nav.item.ep) }}">{{ nav.item.label }}</a></li><li aria-current="page"><span>{{ nav_detail }}</span></li>{% endif %}
+{%- if nav.group %}<li><span>{{ nav.group.icon }} {{ nav.group.label }}</span></li>{% if nav_ep == nav_active %}<li aria-current="page"><span>{{ nav.item.label }}</span></li>{% else %}<li><a href="{{ url_for(nav.item.ep, **nav.item.get('args', {})) }}">{{ nav.item.label }}</a></li><li aria-current="page"><span>{{ nav_detail }}</span></li>{% endif %}
 {%- elif nav_ep != 'dashboard' %}<li aria-current="page"><span>{{ nav_detail }}</span></li>{% endif -%}
 </ol><button type="button" class="cmdk-trigger" data-cmdk-open aria-label="Szukaj w panelu (Ctrl+K)"><span aria-hidden="true">⌕</span><span class="cmdk-trigger-label">Szukaj stron i sekcji</span><kbd>Ctrl K</kbd></button></div>
 {%- if nav_page_sections %}{% set toc = namespace(part=None) %}

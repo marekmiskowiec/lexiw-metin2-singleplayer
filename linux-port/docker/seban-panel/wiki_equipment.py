@@ -172,30 +172,6 @@ def install_wiki_equipment(m):
                                weapons=item_type == 1, jewels=category == "bizuteria",
                                categories=[(k, c[0]) for k, c in CATEGORIES.items()])
 
-    # The wiki's side menu (templates/wiki_base.html): categories with how
-    # many pages each holds, as the MT2009 wiki has them.
-    @app.template_global()
-    def wiki_nav():
-        from wiki import MAP_FAMILIES
-        from wiki_guides import guide_list
-        guides = guide_list()
-        maps = [("Wszystkie mapy", url_for("wiki_maps"))]
-        maps += [(family["name"], url_for("wiki_region", key=key)) for key, family in MAP_FAMILIES.items()]
-        family_maps = {n for family in MAP_FAMILIES.values() for n in family["numbers"]}
-        try:
-            dirs = m.wiki_map_dirs()
-        except Exception:
-            dirs = {}
-        maps += sorted(((name, url_for("wiki_map", number=number)) for number, name in m.MAP_NAMES.items()
-                        if number in dirs and number not in family_maps), key=lambda x: x[0])
-        return [
-            {"icon": "📖", "title": "Poradniki", "items": [(g["title"], url_for("wiki_guide", slug=g["slug"])) for g in guides]},
-            {"icon": "🛡️", "title": "Ekwipunek", "items": [
-                (f"{CATEGORIES[key][0]} ({len(list_items(key))})", url_for("wiki_equipment", category=key)) for key in CATEGORIES]},
-            {"icon": "🗺️", "title": "Mapy", "items": maps},
-            {"icon": "🤖", "title": "Boty", "items": [("Osobowości botów", url_for("wiki_bots"))]},
-        ]
-
     @app.get("/api/wiki/equipment/<int:vnum>")
     @m.login_required
     def api_wiki_equipment(vnum):
