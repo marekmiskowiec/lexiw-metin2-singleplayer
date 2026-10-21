@@ -498,17 +498,10 @@ namespace
 		return GetPlayerBotKaiaDance(name) != 0;
 	}
 
-	void SendPlayerBotEmotion(LPCHARACTER ch, const std::string& emotion)
+	// A client command ("danceN <vid> 0", "kaia_dance <vid> <n>", ...) to
+	// everybody who sees the dancer.
+	void SendPlayerBotDanceCommand(LPCHARACTER ch, const char* chatbuf, int len)
 	{
-		if (!IsPlayerBotDanceEmotion(emotion))
-			return;
-		char chatbuf[64];
-		const int kaia = GetPlayerBotKaiaDance(emotion);
-		int len = kaia ? snprintf(chatbuf, sizeof(chatbuf), "kaia_dance %u %d", (DWORD)ch->GetVID(), kaia)
-			: snprintf(chatbuf, sizeof(chatbuf), "%s %u %u", emotion.c_str(), (DWORD)ch->GetVID(), 0U);
-		if (len < 0 || len >= (int)sizeof(chatbuf))
-			len = sizeof(chatbuf) - 1;
-		++len;
 		TPacketGCChat pack_chat;
 		memset(&pack_chat, 0, sizeof(pack_chat));
 		pack_chat.header = HEADER_GC_CHAT;
@@ -519,6 +512,19 @@ namespace
 		buf.write(&pack_chat, sizeof(TPacketGCChat));
 		buf.write(chatbuf, len);
 		ch->PacketAround(buf.read_peek(), buf.size());
+	}
+
+	void SendPlayerBotEmotion(LPCHARACTER ch, const std::string& emotion)
+	{
+		if (!IsPlayerBotDanceEmotion(emotion))
+			return;
+		char chatbuf[64];
+		const int kaia = GetPlayerBotKaiaDance(emotion);
+		int len = kaia ? snprintf(chatbuf, sizeof(chatbuf), "kaia_dance %u %d", (DWORD)ch->GetVID(), kaia)
+			: snprintf(chatbuf, sizeof(chatbuf), "%s %u %u", emotion.c_str(), (DWORD)ch->GetVID(), 0U);
+		if (len < 0 || len >= (int)sizeof(chatbuf))
+			len = sizeof(chatbuf) - 1;
+		SendPlayerBotDanceCommand(ch, chatbuf, len + 1);
 	}
 
 	// A dancer that has never had an identity gets one in the owner's kingdom,
@@ -670,6 +676,8 @@ namespace
 		}
 	}
 
+	void ClearPlayerBotDancerLook(LPCHARACTER ch);
+
 	void LogOutPlayerBotDancer(DWORD pid, const char* why)
 	{
 		LPCHARACTER ch = CHARACTER_MANAGER::instance().FindByPID(pid);
@@ -677,6 +685,8 @@ namespace
 		{
 			if (ch->GetParty())
 				LeavePlayerBotParty(ch);
+			// The show's auras and monster shape are not kept (LEXIW_DANCE_EFFECTS_V1).
+			ClearPlayerBotDancerLook(ch);
 			ch->Save();
 		}
 		sys_log(0, "PLAYERBOT_DANCE: logging out pid=%u why=%s", pid, why);
@@ -955,6 +965,170 @@ namespace
 		return 1;
 	}
 
+	// LEXIW_DANCE_EFFECTS_V1: the show's effects. An "effect" is one burst over
+	// a dancer (the engine's special effects or a client effect file); an
+	// "aura" an affect whose flag the client draws (a skill's glow), on its
+	// own affect type so several can be on at once and all go at the end; a
+	// "poly" turns the dancer into a monster until "unpoly".
+	struct TPlayerBotDanceEffect
+	{
+		const char* szName;
+		int iSpecial;			// SE_*, or -1
+		const char* szFile;		// a client .mse, or NULL
+	};
+	const TPlayerBotDanceEffect PLAYERBOT_DANCE_EFFECTS[] = {
+		{ "firework", SE_CHINA_FIREWORK, NULL },
+		{ "spintop", SE_SPIN_TOP, NULL },
+		{ "success", SE_SUCCESS, NULL },
+		{ "critical", SE_CRITICAL, NULL },
+		{ "penetrate", SE_PENETRATE, NULL },
+		{ "hpup", SE_HPUP_RED, NULL },
+		{ "spup", SE_SPUP_BLUE, NULL },
+		{ "speedup", SE_SPEEDUP_GREEN, NULL },
+		{ "dxup", SE_DXUP_PURPLE, NULL },
+		{ "cape", SE_BRAVERY_CAPE, NULL },
+		{ "flameblow", SE_FLAME_BLOW, NULL },
+		{ "firecracker", -1, "d:/ymir work/effect/etc/firecracker/firecracker_xmas.mse" },
+		// Over the head: the client's emoticons, in slots the patched game.py
+		// registers ("kaia_emote <vid> <name>", tools/kaia-dances).
+		{ "heart", -1, "emo:" },
+		{ "happy", -1, "emo:" },
+		{ "celebration", -1, "emo:" },
+		{ "angry", -1, "emo:" },
+		{ "aha", -1, "emo:" },
+		{ "question", -1, "emo:" },
+		{ "exclaim", -1, "emo:" },
+		{ "sweat", -1, "emo:" },
+		{ "money", -1, "emo:" },
+		{ "siren", -1, "emo:" },
+		{ "whirl", -1, "emo:" },
+		{ "doze", -1, "emo:" },
+		{ "alcohol", -1, "emo:" },
+		{ "letter", -1, "emo:" },
+		{ "gloom", -1, "emo:" },
+		{ "hearts", -1, "emo:" },
+		{ "levelup", -1, "d:/ymir work/effect/etc/levelup_1/level_up.mse" },
+		{ "levelup2", -1, "d:/ymir work/effect/etc/levelup_2/2.mse" },
+		{ "start", -1, "d:/ymir work/effect/etc/compete/start.mse" },
+		{ "snowflake", -1, "d:/ymir work/effect/etc/buff/buff_snowflower.mse" },
+		{ "flash", -1, "d:/ymir work/effect/hit/gyeonggong_boom.mse" },
+		{ "lightning", -1, "d:/ymir work/effect/hit/blow_electric/light_3_body.mse" },
+		{ "fire_red", -1, "d:/ymir work/effect/background/moonlight_fire_red.mse" },
+		{ "fire_blue", -1, "d:/ymir work/effect/background/moonlight_fire_blue.mse" },
+		{ "fire_green", -1, "d:/ymir work/effect/background/moonlight_fire_green.mse" },
+		{ "fire_violet", -1, "d:/ymir work/effect/background/moonlight_fire_violet.mse" },
+		{ "fire_yellow", -1, "d:/ymir work/effect/background/moonlight_fire_yellow.mse" },
+		{ "bats", -1, "d:/ymir work/effect/background/moonlight_eff_bat.mse" },
+		{ "smoke", -1, "d:/ymir work/effect/background/moonlight_smoke_01.mse" },
+		{ NULL, -1, NULL }
+	};
+
+	struct TPlayerBotDanceAura
+	{
+		const char* szName;
+		DWORD dwFlag;
+	};
+	const TPlayerBotDanceAura PLAYERBOT_DANCE_AURAS[] = {
+		{ "sword", AFF_SKILL_SWORD_AURA },
+		{ "berserk", AFF_SKILL_BERSERK },
+		{ "strongbody", AFF_SKILL_STRONG_BODY },
+		{ "blade", AFF_SKILL_ENCHANTED_BLADE },
+		{ "terror", AFF_SKILL_TERROR },
+		{ "armor", AFF_SKILL_ENCHANTED_ARMOR },
+		{ "blessing", AFF_SKILL_BLESSING },
+		{ "reflect", AFF_SKILL_REFLECT },
+		{ "swiftness", AFF_SKILL_SWIFTNESS },
+		{ "manashield", AFF_SKILL_MANASHIELD },
+		{ "flamespirit", AFF_SKILL_FLAME_SPIRIT },
+		{ "dragon", AFF_SKILL_DRAGON_HELP },
+		{ "attackup", AFF_SKILL_ATTACK_UP },
+		{ "feather", AFF_SKILL_FEATHER_WALK },
+		{ "fire", AFF_FIRE },
+		{ "poison", AFF_POISON },
+		{ NULL, 0 }
+	};
+	// The aura i is affect type PLAYERBOT_DANCE_AFFECT_BASE + i (free in
+	// EAffectTypes, which ends in the 500s).
+	const DWORD PLAYERBOT_DANCE_AFFECT_BASE = 960;
+
+	DWORD PlayPlayerBotDanceEffect(LPCHARACTER ch, const std::string& name)
+	{
+		if (!ch || !ch->GetSectree() || ch->IsDead())
+			return 0;
+		for (int i = 0; PLAYERBOT_DANCE_EFFECTS[i].szName; ++i)
+		{
+			const TPlayerBotDanceEffect& e = PLAYERBOT_DANCE_EFFECTS[i];
+			if (name != e.szName)
+				continue;
+			if (e.iSpecial >= 0)
+				ch->EffectPacket(e.iSpecial);
+			else if (!strcmp(e.szFile, "emo:"))
+			{
+				char chatbuf[64];
+				int len = snprintf(chatbuf, sizeof(chatbuf), "kaia_emote %u %s", (DWORD)ch->GetVID(), e.szName);
+				if (len < 0 || len >= (int)sizeof(chatbuf))
+					len = sizeof(chatbuf) - 1;
+				SendPlayerBotDanceCommand(ch, chatbuf, len + 1);
+			}
+			else
+			{
+				char file[MAX_EFFECT_FILE_NAME];
+				memset(file, 0, sizeof(file));
+				strlcpy(file, e.szFile, sizeof(file));
+				ch->SpecificEffectPacket(file);
+			}
+			return 1;
+		}
+		return 0;
+	}
+
+	void ClearPlayerBotDancerLook(LPCHARACTER ch)
+	{
+		for (int i = 0; PLAYERBOT_DANCE_AURAS[i].szName; ++i)
+			if (ch->FindAffect(PLAYERBOT_DANCE_AFFECT_BASE + i))
+				ch->RemoveAffect(PLAYERBOT_DANCE_AFFECT_BASE + i);
+		if (ch->IsPolymorphed())
+			ch->SetPolymorph(0);
+	}
+
+	void SetPlayerBotDancerLook(LPCHARACTER ch, const std::string& action, const std::string& arg, DWORD dwMs)
+	{
+		if (action == "poly")
+		{
+			DWORD vnum = 0;
+			str_to_number(vnum, arg.c_str());
+			if (vnum && CMobManager::instance().Get(vnum))
+			{
+				if (ch->IsStateMove())
+					ch->Stop();
+				ch->SetPolymorph(vnum, true);
+			}
+			return;
+		}
+		if (action == "unpoly")
+		{
+			if (ch->IsPolymorphed())
+				ch->SetPolymorph(0);
+			return;
+		}
+		for (int i = 0; PLAYERBOT_DANCE_AURAS[i].szName; ++i)
+		{
+			const bool all = action == "noaura" && (arg.empty() || arg == "-");
+			if (!all && arg != PLAYERBOT_DANCE_AURAS[i].szName)
+				continue;
+			const DWORD type = PLAYERBOT_DANCE_AFFECT_BASE + i;
+			if (action == "noaura")
+			{
+				if (ch->FindAffect(type))
+					ch->RemoveAffect(type);
+				continue;
+			}
+			const long seconds = MINMAX(1L, (long)(dwMs ? dwMs / 1000 : 30), 3600L);
+			ch->AddAffect(type, POINT_NONE, 0, PLAYERBOT_DANCE_AURAS[i].dwFlag, seconds, 0, true);
+			return;
+		}
+	}
+
 	void RunPlayerBotDanceStep(const TPlayerBotDanceStep& step, const std::vector<DWORD>& order,
 			const std::vector<const TPlayerBotDancer*>& rows, const TPlayerBotDanceShow& show, DWORD dwNow)
 	{
@@ -985,11 +1159,24 @@ namespace
 				s_mapPlayerBotDanceLoops.erase(order[i]);
 				continue;
 			}
-			done += SendPlayerBotDanceEmotion(CHARACTER_MANAGER::instance().FindByPID(order[i]), step.strArg);
+			LPCHARACTER who = CHARACTER_MANAGER::instance().FindByPID(order[i]);
+			if (step.strAction == "aura" || step.strAction == "noaura" || step.strAction == "poly" ||
+					step.strAction == "unpoly")
+			{
+				if (who && who->GetSectree() && !who->IsDead())
+				{
+					SetPlayerBotDancerLook(who, step.strAction, step.strArg, step.dwEvery);
+					++done;
+				}
+				continue;
+			}
+			const bool effect = step.strAction == "effect";
+			const std::string loopName = effect ? "fx:" + step.strArg : step.strArg;
+			done += effect ? PlayPlayerBotDanceEffect(who, step.strArg) : SendPlayerBotDanceEmotion(who, step.strArg);
 			if (step.dwEvery)
 			{
 				TPlayerBotDanceLoop& loop = s_mapPlayerBotDanceLoops[order[i]];
-				loop.strEmotion = step.strArg;
+				loop.strEmotion = loopName;
 				loop.dwEvery = step.dwEvery;
 				loop.dwNext = dwNow + step.dwEvery;
 			}
@@ -1018,6 +1205,13 @@ namespace
 			s_nPlayerBotDanceNextStep = 0;
 			s_dwPlayerBotDanceBeats = 0;
 			s_mapPlayerBotDanceLoops.clear();
+			// Every take starts plain: no aura or monster shape from the last one.
+			for (size_t i = 0; i < order.size(); ++i)
+			{
+				LPCHARACTER ch = order[i] ? CHARACTER_MANAGER::instance().FindByPID(order[i]) : NULL;
+				if (ch)
+					ClearPlayerBotDancerLook(ch);
+			}
 			// A script that changed the formation: back to the starting one.
 			if (s_strPlayerBotDanceFormationNow != show.strFormation)
 			{
@@ -1071,7 +1265,9 @@ namespace
 			TPlayerBotDanceLoop& loop = it->second;
 			if (dwNow < loop.dwNext)
 				continue;
-			looped += SendPlayerBotDanceEmotion(CHARACTER_MANAGER::instance().FindByPID(it->first), loop.strEmotion);
+			LPCHARACTER looper = CHARACTER_MANAGER::instance().FindByPID(it->first);
+			looped += loop.strEmotion.compare(0, 3, "fx:") == 0 ? PlayPlayerBotDanceEffect(looper, loop.strEmotion.substr(3))
+				: SendPlayerBotDanceEmotion(looper, loop.strEmotion);
 			loop.dwNext += loop.dwEvery;
 			if (loop.dwNext <= dwNow)
 				loop.dwNext = dwNow + loop.dwEvery;

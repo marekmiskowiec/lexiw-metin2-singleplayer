@@ -20,6 +20,13 @@ import eterpack  # noqa: E402
 FIRST, LAST = 7, 24
 FOLDERS = ("pc/warrior", "pc/assassin", "pc/sura", "pc/shaman",
            "pc2/warrior", "pc2/assassin", "pc2/sura", "pc2/shaman")
+HORSE_FILES = tuple("d:/ymir work/npc/" + f for f in (
+    "horse/horse_dark.dds", "horse/horse_dark.gr2", "horse/horse_dark.msm",
+    "horse/horse_normal_armor01_dark.dds", "horse/horse_normal_armor02_dark.dds",
+    "horse2/horse2_dark.gr2", "horse2/horse2_dark.msm", "horse2/horse2_king_dark.gr2", "horse2/horse2_king_dark.msm",
+    "horse2/horse_normal_armor01_dark.dds", "horse2/horse_normal_armor01_king_dark.dds",
+    "horse2/horse_normal_armor02_dark.dds", "horse2/horse_normal_armor02_king_dark.dds",
+    "pony/pony_dark.gr2", "pony/pony_dark.msm"))
 
 
 def L(text):
@@ -200,6 +207,55 @@ def RegisterKaiaDanceAnis():
 		except Exception, msg:
 			import dbg
 			dbg.TraceError("KAIA_DANCES race %d: %s" % (race, msg))
+	RegisterLexiwHorses()
+
+# LEXIW_HORSE31_V1: konie z nowego klienta MT2009 na wolnych vnumach serwera
+# (jego 20110-20123 to tu dzik, wilk, tygrys i lew): Kon Szturmowy (poziom 31)
+# i ciemne skorki Ironman. Modele "_dark" sa w tej paczce root.
+LEXIW_HORSE_SRC = (("pony_dark", "pony"), ("horse_dark", "horse"), ("horse2_dark", "horse2"),
+	("horse2_king_dark", "horse2"), ("horse2_king_normal", "horse2"), ("horse2_king_member", "horse2"))
+LEXIW_HORSE_RACES = ((20310, "horse2_king_normal"), (20311, "horse2_king_member"), (20314, "pony_dark"),
+	(20315, "horse_dark"), (20316, "horse2_dark"), (20317, "horse2_king_dark"))
+
+def RegisterLexiwHorses():
+	try:
+		for name, folder in LEXIW_HORSE_SRC:
+			chrmgr.RegisterRaceSrcName(name, folder)
+		for vnum, name in LEXIW_HORSE_RACES:
+			chrmgr.RegisterRaceName(vnum, name)
+	except Exception, msg:
+		import dbg
+		dbg.TraceError("LEXIW_HORSES: %s" % msg)
+	# The rider's name stands over the horse at the race's height; the exe
+	# knows 100 only for its own horses (20101-20109), so the new ones get it here.
+	try:
+		for vnum, name in LEXIW_HORSE_RACES:
+			chrmgr.SetRaceHeight(vnum, 100.0)
+	except Exception, msg:
+		import dbg
+		dbg.TraceError("LEXIW_HORSES height: %s" % msg)
+
+# LEXIW_DANCE_EFFECTS_V1: emotki nad glowa tancerzy z pokazu ("kaia_emote <vid> <nazwa>"),
+# w wolnych slotach emotek klienta 100-115 (klient przyjmuje ponizej 128; 120 to czaszka bossa).
+KAIA_EMOTICONS = (("heart", "love_l"), ("hearts", "love_s"), ("happy", "happy"), ("celebration", "celebration"),
+	("angry", "angry"), ("aha", "aha"), ("question", "question"), ("exclaim", "!_mix_back"), ("sweat", "sweat"),
+	("money", "money"), ("siren", "siren"), ("whirl", "whirl"), ("doze", "doze"), ("alcohol", "alcohol"),
+	("letter", "letter"), ("gloom", "gloom"))
+_kaiaEmoticonRegistered = [False]
+
+def PlayKaiaEmoticon(vid, name):
+	try:
+		if not _kaiaEmoticonRegistered[0]:
+			_kaiaEmoticonRegistered[0] = True
+			for i, (key, fileName) in enumerate(KAIA_EMOTICONS):
+				chrmgr.RegisterEffect(chrmgr.EFFECT_EMOTICON + 100 + i, "", "d:/ymir work/effect/etc/emoticon/%s.mse" % fileName)
+		for i, (key, fileName) in enumerate(KAIA_EMOTICONS):
+			if key == name:
+				chrmgr.SetEmoticon(int(vid), 100 + i)
+				return
+	except Exception, msg:
+		import dbg
+		dbg.TraceError("KAIA_EMOTE %s %s: %s" % (vid, name, msg))
 
 def PlayKaiaDance(vid, n):
 	try:
@@ -229,12 +285,17 @@ def patch_introloading(text):
 def patch_game(text):
     text = replace_once(text, '\t\tserverCommandList["SidekickVid"] = self.__SidekickVid\n',
                         '\t\tserverCommandList["SidekickVid"] = self.__SidekickVid\n'
-                        '\t\tserverCommandList["kaia_dance"] = self.__KaiaDance # LEXIW_KAIA_DANCES_V1\n', "game")
+                        '\t\tserverCommandList["kaia_dance"] = self.__KaiaDance # LEXIW_KAIA_DANCES_V1\n'
+                        '\t\tserverCommandList["kaia_emote"] = self.__KaiaEmote # LEXIW_DANCE_EFFECTS_V1\n', "game")
     return replace_once(text, "\tdef __SidekickVid(self, ",
                         "\tdef __KaiaDance(self, vid=\"0\", n=\"0\", *rest):\n"
                         "\t\t# LEXIW_KAIA_DANCES_V1: a dancer of the show plays custom dance n.\n"
                         "\t\timport emotion\n"
                         "\t\temotion.PlayKaiaDance(vid, n)\n\n"
+                        "\tdef __KaiaEmote(self, vid=\"0\", name=\"\", *rest):\n"
+                        "\t\t# LEXIW_DANCE_EFFECTS_V1: an emoticon over a dancer's head.\n"
+                        "\t\timport emotion\n"
+                        "\t\temotion.PlayKaiaEmoticon(vid, name)\n\n"
                         "\tdef __SidekickVid(self, ", "game")
 
 
@@ -409,6 +470,12 @@ def main():
                 add(base + ".msa", 2, "\r\n".join(lines).encode("latin-1"))
                 added += 2
             add(f"icon/action/x_{move}.tga", 0, extra(f"icon/action/{move}.tga"))
+            added += 1
+        # LEXIW_HORSE31_V1: the dark (Ironman) horse models; the Storm Horse's own
+        # model (horse2_king_*) is in this client already.
+        packs["npc"] = {e["name"]: e for e in eterpack.read_index(extra_dir, "npc")[3]}
+        for name in HORSE_FILES:
+            add(name, 0, extra(name))
             added += 1
     report.append(f"added {added} files")
 

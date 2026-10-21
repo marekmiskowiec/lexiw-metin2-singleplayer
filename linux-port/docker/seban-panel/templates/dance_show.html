@@ -84,6 +84,9 @@
             <li><code>12 gest klask</code> — gest: {% for key, label, word in gestures %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}.</li>
             <li><code>16 szyk koło</code> — zespół przechodzi do szyku: {% for key, label, word in formations %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}.</li>
             <li><code>20 pauza parzyści</code> — ich powtarzany taniec się kończy.</li>
+            <li><code>4 efekt fajerwerk co 2</code> — efekt nad tancerzami (z „co N” powtarzany): {% for key, label, word in effects %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}.</li>
+            <li><code>8 aura miecz parzyści na 20</code> — świecąca aura przez N sekund (bez „na”: 30 s): {% for key, label, word in auras %}<code>{{ word }}</code>{{ ', ' if not loop.last }}{% endfor %}. <code>bez aury</code> (albo <code>bez aury miecz</code>) ją zdejmuje.</li>
+            <li><code>12 przemiana 691 nieparzyści</code> — tancerz zmienia się w potwora o tym numerze (numer znajdziesz w Wiki przy potworze), <code>16 powrót</code> — wraca. Po Stop i nowym Start aury i przemiany znikają same.</li>
             <li>Kto: <code>wszyscy</code> (domyślnie), <code>parzyści</code>, <code>nieparzyści</code>, <code>rząd 2</code>, numer <code>4</code> albo zakres <code>1-5</code> (miejsca w zespole od 1).</li>
           </ul>
         </details>

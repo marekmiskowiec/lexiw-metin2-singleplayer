@@ -43,6 +43,34 @@ GESTURES = (("clap", "Klaskanie", "klask"), ("cheer1", "Wiwat", "wiwat"), ("chee
             ("joy", "Radość", "radość"),
             # Custom, in the client patched by tools/kaia-dances (LEXIW_KAIA_DANCES_V1).
             ("backflip", "Salto (custom)", "salto"), ("pushup", "Pompka (custom)", "pompka"))
+# LEXIW_DANCE_EFFECTS_V1: (engine key, label, the word the script uses)
+EFFECTS = (("firework", "Fajerwerk", "fajerwerk"), ("firecracker", "Petarda", "petarda"),
+           # Over the head (the client's emoticons; needs the client from tools/kaia-dances):
+           ("heart", "Serce", "serce"), ("hearts", "Serduszka", "serduszka"), ("happy", "Uśmiech", "uśmiech"),
+           ("celebration", "Świętowanie", "święto"), ("angry", "Złość", "złość"), ("aha", "Aha!", "aha"),
+           ("question", "Pytajnik", "pytajnik"), ("exclaim", "Wykrzyknik", "wykrzyknik"), ("sweat", "Pot", "pot"),
+           ("money", "Pieniądze", "kasa"), ("siren", "Syrena", "syrena"), ("whirl", "Zawrót głowy", "zawrót"),
+           ("doze", "Drzemka", "drzemka"), ("alcohol", "Pijany", "pijany"), ("letter", "List", "list"),
+           ("gloom", "Smutek", "smutek"),
+           # At the feet / around:
+           ("levelup", "Level up", "levelup"),
+           ("levelup2", "Level up 2", "levelup2"), ("start", "Start", "start"), ("snowflake", "Śnieżynka", "śnieżynka"),
+           ("flash", "Błysk", "błysk"), ("lightning", "Piorun", "piorun"), ("fire_red", "Czerwony ogień", "ogień-czerwony"),
+           ("fire_blue", "Niebieski ogień", "ogień-niebieski"), ("fire_green", "Zielony ogień", "ogień-zielony"),
+           ("fire_violet", "Fioletowy ogień", "ogień-fioletowy"), ("fire_yellow", "Żółty ogień", "ogień-żółty"),
+           ("bats", "Nietoperze", "nietoperze"), ("smoke", "Dym", "dym"), ("spintop", "Bączek", "bączek"),
+           ("success", "Sukces", "sukces"), ("critical", "Krytyk", "krytyk"), ("penetrate", "Przebicie", "przebicie"),
+           ("hpup", "Czerwony błysk", "hp"), ("spup", "Niebieski błysk", "pm"),
+           ("speedup", "Zielony błysk", "zielony"), ("dxup", "Fioletowy błysk", "fioletowy"),
+           ("cape", "Peleryna Odwagi", "peleryna"), ("flameblow", "Wybuch płomienia", "płomień"))
+AURAS = (("sword", "Aura miecza", "miecz"), ("berserk", "Berserk", "berserk"), ("strongbody", "Silne ciało", "ciało"),
+         ("blade", "Zaklęte ostrze", "ostrze"), ("terror", "Strach", "strach"), ("armor", "Zaklęta zbroja", "zbroja"),
+         ("blessing", "Błogosławieństwo", "błogosławieństwo"), ("reflect", "Odbicie", "odbicie"),
+         ("swiftness", "Szybkość", "szybkość"), ("manashield", "Tarcza many", "tarcza"),
+         ("flamespirit", "Ogniste kule", "kule"), ("dragon", "Pomoc smoka", "smok"), ("attackup", "Siła ataku", "atak"),
+         ("feather", "Lekkie stopy", "piórko"), ("fire", "Płonięcie", "ogień"), ("poison", "Trucizna", "trucizna"))
+EFFECT_WORDS = {w: k for k, _l, w in EFFECTS}
+AURA_WORDS = {w: k for k, _l, w in AURAS}
 WHO_WORDS = {"wszyscy": "all", "parzyści": "even", "parzysci": "even", "nieparzyści": "odd", "nieparzysci": "odd"}
 NAME_RE = re.compile(r"^[A-Za-z0-9\[\]]{2,24}$")
 MAX_DANCERS = 40
@@ -122,6 +150,20 @@ def parse_script(text, formation_words, gesture_words):
                 errors.append(f"Linia {no}: „co” od 0,5 do 600 sekund.")
                 continue
             rest = rest[:i] + rest[i + 2:]
+        lasting = 0
+        if "na" in rest:
+            i = rest.index("na")
+            try:
+                lasting = float(rest[i + 1].replace(",", "."))
+            except (IndexError, ValueError):
+                errors.append(f"Linia {no}: po „na” podaj sekundy, np. „na 20”.")
+                continue
+            if not 1 <= lasting <= 3600:
+                errors.append(f"Linia {no}: „na” od 1 do 3600 sekund.")
+                continue
+            rest = rest[:i] + rest[i + 2:]
+        if action == "bez" and rest[:1] == ["aury"]:
+            action, rest = "bez-aury", rest[1:]
         arg, who_words = None, rest
         if action == "taniec":
             if not rest or not rest[0].isdigit() or not 1 <= int(rest[0]) <= MAX_DANCE:
@@ -142,8 +184,34 @@ def parse_script(text, formation_words, gesture_words):
             who_words, kind, every = [], "formation", 0
         elif action == "pauza":
             arg, kind, every = "-", "pause", 0
+        elif action == "efekt":
+            arg = EFFECT_WORDS.get(rest[0]) if rest else None
+            if not arg:
+                errors.append(f"Linia {no}: nieznany efekt. Dostępne: {', '.join(EFFECT_WORDS)}.")
+                continue
+            who_words, kind = rest[1:], "effect"
+        elif action == "aura":
+            arg = AURA_WORDS.get(rest[0]) if rest else None
+            if not arg:
+                errors.append(f"Linia {no}: nieznana aura. Dostępne: {', '.join(AURA_WORDS)}.")
+                continue
+            # The aura's time goes where "every" goes for the others.
+            who_words, kind, every = rest[1:], "aura", lasting or 30
+        elif action == "bez-aury":
+            arg = "-"
+            if rest and rest[0] in AURA_WORDS:
+                arg, rest = AURA_WORDS[rest[0]], rest[1:]
+            who_words, kind, every = rest, "noaura", 0
+        elif action == "przemiana":
+            if not rest or not rest[0].isdigit():
+                errors.append(f"Linia {no}: „przemiana” i numer potwora (VNUM), np. „przemiana 691”.")
+                continue
+            arg, who_words, kind, every = str(int(rest[0])), rest[1:], "poly", 0
+        elif action in ("powrót", "powrot"):
+            arg, kind, every = "-", "unpoly", 0
         else:
-            errors.append(f"Linia {no}: „{action}” — znam: taniec, gest, szyk, pauza.")
+            errors.append(f"Linia {no}: „{action}” — znam: taniec, gest, efekt, aura, bez aury, przemiana, powrót, "
+                          "szyk, pauza.")
             continue
         who = "all"
         if who_words:
@@ -382,7 +450,7 @@ def install_dance_show(m):
             except ValueError:
                 scene["dancers"] = 0
         maps = sorted(((i, n) for i, n in m.MAP_NAMES.items()), key=lambda x: x[1])
-        return render_template("dance_show.html", roster=roster, jobs=JOBS, formations=FORMATIONS, gestures=GESTURES,
+        return render_template("dance_show.html", roster=roster, jobs=JOBS, formations=FORMATIONS, gestures=GESTURES, effects=EFFECTS, auras=AURAS,
                                owners=owners(), look_slots=LOOK_SLOTS, settings=read_settings(), maps=maps,
                                show=show, status=status, status_age=age, last_beat=last_beat, scenes=scenes,
                                phases=PHASES, formation_names={k: lbl for k, lbl, _w in FORMATIONS},
@@ -526,6 +594,10 @@ def install_dance_show(m):
             flash(problem, "error")
             return redirect(url_for("dance_show"))
         steps, errors = parse_script(s["script"], formation_words, gesture_words)
+        # A monster to turn into must be one the world knows.
+        for vnum in sorted({int(arg) for _at, kind, arg, _who, _every in steps if kind == "poly"}):
+            if not m.one("SELECT vnum FROM player.mob_proto WHERE vnum=%s", (vnum,)):
+                errors.append(f"Przemiana: nie ma potwora o numerze {vnum}.")
         if errors:
             flash("Skrypt: " + " ".join(errors[:5]) + (" …" if len(errors) > 5 else ""), "error")
             return redirect(url_for("dance_show"))
